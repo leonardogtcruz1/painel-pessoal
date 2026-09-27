@@ -1,0 +1,2101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel Pessoal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Aplica o tema antes da pintura para evitar "flash" -->
+  <script>
+    (function () {
+      var dark = true;
+      try {
+        var s = JSON.parse(localStorage.getItem('evolution-dashboard-v1') || '{}');
+        var t = s.settings && s.settings.theme;
+        dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      } catch (e) {}
+      if (dark) document.documentElement.classList.add('dark');
+    })();
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] } } },
+    };
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer components {
+      .card { @apply rounded-2xl border border-zinc-200/80 bg-white p-5 sm:p-6 dark:border-zinc-800 dark:bg-zinc-900/50; }
+      .eyebrow { @apply text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500; }
+      .field { @apply w-full rounded-lg border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none transition placeholder:text-zinc-400 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/15 dark:border-zinc-800 dark:placeholder:text-zinc-600; }
+      .btn-ghost { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100; }
+      .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white; }
+      .chip { @apply rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 transition hover:border-emerald-500/50 hover:text-emerald-600 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-emerald-400; }
+      .track { @apply h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800; }
+      .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-500; }
+    }
+    html { -webkit-font-smoothing: antialiased; }
+    body { background: #fafafa; }
+    html.dark body { background: #09090b; }
+
+    /* Cores dos gráficos (par validado para daltonismo nos dois temas) */
+    :root {
+      --c-habit: #059669;  /* hábitos diários */
+      --c-goal: #2a78d6;   /* metas semanais */
+      --c-avg: #18181b;    /* linha de média */
+      --c-grid: #f0f0f1;
+      --c-axis: #71717a;
+      --c-surface: #ffffff;
+      --c-hover: rgba(24, 24, 27, 0.04);
+    }
+    html.dark {
+      --c-habit: #059669;
+      --c-goal: #3987e5;
+      --c-avg: #e4e4e7;
+      --c-grid: #232326;
+      --c-axis: #71717a;
+      --c-surface: #111113;
+      --c-hover: rgba(255, 255, 255, 0.04);
+    }
+    details > summary::-webkit-details-marker { display: none; }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</head>
+
+<body class="min-h-screen font-sans text-zinc-900 dark:text-zinc-100">
+  <main class="mx-auto max-w-5xl space-y-4 px-4 py-8 sm:space-y-5 sm:px-6 sm:py-12">
+
+    <!-- ============ HEADER ============ -->
+    <header class="flex items-start justify-between gap-4 pb-2">
+      <div>
+        <p id="date-label" class="eyebrow"></p>
+        <h1 id="greeting" class="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl"></h1>
+      </div>
+      <div class="flex items-center gap-1">
+      <button id="sync-btn" class="btn-ghost relative" aria-label="Sincronização entre aparelhos" title="Sincronização">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+        <span id="sync-dot" class="absolute right-1.5 top-1.5 hidden h-1.5 w-1.5 rounded-full"></span>
+      </button>
+      <button id="theme-toggle" class="btn-ghost" aria-label="Alternar tema claro/escuro">
+        <svg class="h-4 w-4 dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="hidden h-4 w-4 dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      </div>
+    </header>
+
+    <!-- ============ THE ONE THING ============ -->
+    <section id="one-card" class="card relative overflow-hidden transition">
+      <span id="one-accent" class="absolute inset-y-0 left-0 w-1 bg-zinc-200 transition dark:bg-zinc-800"></span>
+      <div class="flex items-center justify-between">
+        <p class="eyebrow">The One Thing · foco único</p>
+        <span id="won-badge" class="hidden rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Dia ganho ✓</span>
+      </div>
+      <div class="mt-3 flex items-center gap-3">
+        <button id="one-check" data-check class="shrink-0" aria-label="Marcar foco do dia como feito"></button>
+        <input id="one-input" type="text" maxlength="140" autocomplete="off"
+          class="w-full bg-transparent text-lg font-medium tracking-tight outline-none placeholder:text-zinc-400 sm:text-xl dark:placeholder:text-zinc-600"
+          placeholder="Se eu fizer só uma coisa hoje, será…" />
+      </div>
+    </section>
+
+    <!-- ============ REVISÃO DA SEMANA (domingo) ============ -->
+    <section id="review-card" class="card hidden">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="eyebrow">Revisão da semana</p>
+          <h2 id="review-range" class="mt-1 text-lg font-semibold tracking-tight"></h2>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="review-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Semana anterior">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button id="review-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próxima semana">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <button id="review-close" class="btn-ghost h-7 w-7 p-0" aria-label="Fechar revisão">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
+        <div><p class="eyebrow">Hábitos</p><p id="rv-habits" class="mt-1 text-xl font-semibold"></p><p id="rv-habits-sub" class="text-xs text-zinc-500"></p></div>
+        <div><p class="eyebrow">Metas</p><p id="rv-goals" class="mt-1 text-xl font-semibold"></p><p id="rv-goals-sub" class="text-xs text-zinc-500"></p></div>
+        <div><p class="eyebrow">Estudo</p><p id="rv-study" class="mt-1 text-xl font-semibold"></p><p id="rv-study-sub" class="text-xs text-zinc-500"></p></div>
+        <div><p class="eyebrow">Sono médio</p><p id="rv-sleep" class="mt-1 text-xl font-semibold"></p><p id="rv-sleep-sub" class="text-xs text-zinc-500"></p></div>
+        <div><p class="eyebrow">Dias 100%</p><p id="rv-perfect" class="mt-1 text-xl font-semibold"></p><p id="rv-perfect-sub" class="text-xs text-zinc-500"></p></div>
+      </div>
+      <p id="rv-bestworst" class="mt-4 text-sm text-zinc-600 dark:text-zinc-400"></p>
+
+      <div class="mt-5 grid gap-5 border-t border-zinc-100 pt-5 sm:grid-cols-2 dark:border-zinc-800">
+        <div>
+          <p class="eyebrow">Vitórias da semana</p>
+          <ul id="rv-wins" class="mt-2 space-y-2 text-sm"></ul>
+        </div>
+        <div>
+          <p class="eyebrow">O que melhorar</p>
+          <ul id="rv-improves" class="mt-2 space-y-2 text-sm"></ul>
+        </div>
+      </div>
+
+      <div class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800">
+        <label for="review-note" class="eyebrow">Foco da próxima semana</label>
+        <textarea id="review-note" rows="2" class="field mt-1.5 resize-none" placeholder="Uma frase: no que vou me concentrar?"></textarea>
+        <div class="mt-3 flex justify-end">
+          <button id="review-done" class="btn-primary">Concluir revisão</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ KPIs ============ -->
+    <section class="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
+      <div class="card col-span-2 flex items-center gap-4 lg:col-span-1">
+        <svg class="h-14 w-14 shrink-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
+          <circle cx="28" cy="28" r="23" fill="none" stroke-width="5" class="stroke-zinc-100 dark:stroke-zinc-800" />
+          <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round"
+            class="stroke-emerald-500 transition-[stroke-dashoffset] duration-500" />
+        </svg>
+        <div class="min-w-0">
+          <p class="eyebrow">Hoje</p>
+          <p id="kpi-today" class="text-2xl font-semibold tabular-nums tracking-tight">0%</p>
+          <p id="kpi-today-sub" class="truncate text-xs text-zinc-500"></p>
+        </div>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Semana</p>
+        <p id="kpi-week" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
+        <div class="track mt-2"><div id="kpi-week-bar" class="fill" style="width:0"></div></div>
+        <p id="kpi-week-sub" class="mt-1.5 text-xs text-zinc-500">média · 7 dias</p>
+      </div>
+      <div class="card">
+        <p id="kpi-month-label" class="eyebrow">Mês</p>
+        <p id="kpi-month" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
+        <div class="track mt-2"><div id="kpi-month-bar" class="fill" style="width:0"></div></div>
+        <p id="kpi-month-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+      </div>
+      <div class="card col-span-2 lg:col-span-1">
+        <p class="eyebrow">Ofensiva de estudo</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight"><span id="kpi-streak">0</span> <span id="kpi-streak-unit" class="text-base font-medium text-zinc-500">dias</span></p>
+        <p id="kpi-streak-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+      </div>
+    </section>
+
+    <!-- ============ GRID PRINCIPAL ============ -->
+    <div class="grid gap-4 sm:gap-5 lg:grid-cols-5">
+
+      <!-- Coluna esquerda -->
+      <div class="space-y-4 sm:space-y-5 lg:col-span-3">
+
+        <!-- Tarefas -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <div class="flex items-baseline gap-2">
+              <h2 class="text-sm font-semibold">Hábitos de hoje</h2>
+              <span id="task-count" class="text-xs tabular-nums text-zinc-500"></span>
+            </div>
+            <button id="reset-day" class="btn-ghost text-xs" title="Desmarca todos os hábitos de hoje">Zerar dia</button>
+          </div>
+          <ul id="task-list" class="mt-3 space-y-0.5"></ul>
+          <form id="task-form" class="mt-3 flex gap-2">
+            <input id="task-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Novo hábito ou tarefa…" />
+            <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </form>
+        </section>
+
+        <!-- Estudos -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold">Estudos & evolução</h2>
+            <span class="text-xs text-zinc-500"><span id="study-today" class="font-medium text-zinc-900 tabular-nums dark:text-zinc-100">0m</span> hoje</span>
+          </div>
+
+          <div class="mt-5 grid gap-6 sm:grid-cols-2 sm:gap-8">
+            <!-- Pomodoro -->
+            <div>
+              <div id="mode-toggle" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800/70">
+                <button data-mode="25" class="rounded-md px-3 py-1 transition">25 min</button>
+                <button data-mode="50" class="rounded-md px-3 py-1 transition">50 min</button>
+              </div>
+              <p id="timer-digits" class="mt-4 text-5xl font-semibold tabular-nums tracking-tight">25:00</p>
+              <div class="track mt-3"><div id="timer-bar" class="fill" style="width:0"></div></div>
+              <div class="mt-4 flex items-center gap-2">
+                <button id="timer-main" class="btn-primary min-w-[96px]"></button>
+                <button id="timer-stop" class="btn-ghost" title="Encerra e registra o tempo já estudado">Encerrar</button>
+              </div>
+              <p id="timer-note" class="mt-3 min-h-[1rem] text-xs text-zinc-500"></p>
+            </div>
+
+            <!-- Tópico + XP -->
+            <div class="space-y-5 sm:border-l sm:border-zinc-100 sm:pl-6 dark:sm:border-zinc-800">
+              <div class="flex items-center gap-3">
+                <svg class="h-11 w-11 shrink-0 -rotate-90" viewBox="0 0 44 44" aria-hidden="true">
+                  <circle cx="22" cy="22" r="18" fill="none" stroke-width="4" class="stroke-zinc-100 dark:stroke-zinc-800" />
+                  <circle id="sg-ring" cx="22" cy="22" r="18" fill="none" stroke-width="4" stroke-linecap="round"
+                    class="stroke-emerald-500 transition-[stroke-dashoffset] duration-500" />
+                </svg>
+                <div class="min-w-0">
+                  <p class="eyebrow">Meta semanal</p>
+                  <p class="mt-0.5 text-sm">
+                    <span id="sg-value" class="font-semibold">0m</span>
+                    <span class="text-zinc-500">de</span>
+                    <input id="sg-input" type="number" min="1" max="80" step="1" aria-label="Meta de horas por semana"
+                      class="w-7 border-b border-dashed border-zinc-300 bg-transparent text-center font-semibold outline-none focus:border-emerald-500 dark:border-zinc-600" /><span class="font-semibold">h</span>
+                  </p>
+                  <p id="sg-sub" class="text-xs text-zinc-500"></p>
+                </div>
+              </div>
+              <div>
+                <label for="topic" class="eyebrow">Tópico em foco</label>
+                <input id="topic" class="field mt-1.5" type="text" maxlength="120" autocomplete="off" placeholder="O que você estudou hoje?" />
+              </div>
+              <div>
+                <p class="eyebrow">Registro manual</p>
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
+                  <button class="chip" data-add="15">+15m</button>
+                  <button class="chip" data-add="30">+30m</button>
+                  <button class="chip" data-add="60">+1h</button>
+                  <button class="chip" data-add="-15" title="Corrigir">−15m</button>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-baseline justify-between">
+                  <p class="text-sm font-semibold">Nível <span id="xp-level" class="tabular-nums">1</span></p>
+                  <p id="xp-text" class="text-xs tabular-nums text-zinc-500"></p>
+                </div>
+                <div class="track mt-2 h-2"><div id="xp-bar" class="fill" style="width:0"></div></div>
+                <p id="xp-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reflexão -->
+        <details id="reflection" class="card group">
+          <summary class="flex cursor-pointer list-none items-center justify-between">
+            <h2 class="text-sm font-semibold">Reflexão noturna <span class="font-normal text-zinc-500">· 1 min</span></h2>
+            <span class="flex items-center gap-2">
+              <span id="reflect-saved" class="text-xs text-emerald-600 opacity-0 transition dark:text-emerald-400">salvo</span>
+              <svg class="h-4 w-4 text-zinc-400 transition group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+            </span>
+          </summary>
+          <div class="mt-4 space-y-4">
+            <div>
+              <label for="win" class="eyebrow">Qual foi a vitória de hoje?</label>
+              <textarea id="win" rows="2" class="field mt-1.5 resize-none"></textarea>
+            </div>
+            <div>
+              <label for="improve" class="eyebrow">O que posso melhorar amanhã?</label>
+              <textarea id="improve" rows="2" class="field mt-1.5 resize-none"></textarea>
+            </div>
+            <div class="flex justify-end">
+              <button id="journal-open" class="btn-ghost -mr-2.5 text-xs">Ver diário das reflexões →</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Coluna direita -->
+      <div class="space-y-4 sm:space-y-5 lg:col-span-2">
+
+        <!-- Metas da semana -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <div class="flex items-baseline gap-2">
+              <h2 class="text-sm font-semibold">Metas da semana</h2>
+              <span id="goal-count" class="text-xs tabular-nums text-zinc-500"></span>
+            </div>
+            <span id="week-range" class="text-xs text-zinc-500"></span>
+          </div>
+          <p id="week-focus" class="mt-2 hidden text-xs leading-relaxed text-zinc-500"></p>
+          <div class="track mt-3"><div id="goal-bar" class="h-full rounded-full transition-[width] duration-500" style="width:0;background:var(--c-goal)"></div></div>
+          <ul id="goal-list" class="mt-3 space-y-0.5"></ul>
+          <button id="copy-goals" class="btn-ghost -mx-2.5 hidden text-xs">↺ Copiar metas da semana passada</button>
+          <form id="goal-form" class="mt-3 flex gap-2">
+            <input id="goal-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Meta para esta semana…" />
+            <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar meta">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </form>
+          <div class="mt-2 flex justify-end">
+            <button id="review-open" class="btn-ghost -mr-2.5 text-xs">Revisão da semana →</button>
+          </div>
+        </section>
+
+        <!-- Heatmap -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold">Últimos 7 dias</h2>
+            <span id="heat-sub" class="text-xs text-zinc-500"></span>
+          </div>
+          <div id="heatmap" class="mt-4 grid grid-cols-7 gap-2"></div>
+          <div class="mt-4 flex items-center justify-end gap-1 text-[10px] text-zinc-500">
+            <span class="mr-1">menos</span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-300 dark:bg-emerald-800"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
+            <span class="ml-1">mais</span>
+          </div>
+        </section>
+
+        <!-- Sono & energia -->
+        <section class="card">
+          <h2 class="text-sm font-semibold">Sono & energia</h2>
+          <div class="mt-4 flex items-end justify-between gap-4">
+            <div>
+              <p class="eyebrow">Horas dormidas</p>
+              <div class="mt-1.5 flex items-center gap-1">
+                <button class="btn-ghost h-8 w-8 p-0" data-sleep="-0.5" aria-label="Menos meia hora">−</button>
+                <input id="sleep-input" type="number" step="0.25" min="0" max="16" placeholder="0"
+                  class="w-16 bg-transparent text-center text-2xl font-semibold tabular-nums tracking-tight outline-none placeholder:text-zinc-400" />
+                <button class="btn-ghost h-8 w-8 p-0" data-sleep="0.5" aria-label="Mais meia hora">+</button>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="eyebrow">Energia</p>
+              <div id="energy" class="mt-2 flex items-center justify-end">
+                <div class="flex h-6 items-stretch gap-[3px] rounded-md border border-zinc-300 p-[3px] dark:border-zinc-700" id="energy-cells"></div>
+                <span class="ml-[2px] h-2.5 w-[3px] rounded-r-sm bg-zinc-300 dark:bg-zinc-700"></span>
+              </div>
+              <p id="energy-label" class="mt-1.5 h-4 text-xs text-zinc-500"></p>
+            </div>
+          </div>
+          <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <p class="text-xs text-zinc-500">Média da semana: <span id="sleep-avg" class="font-medium text-zinc-900 tabular-nums dark:text-zinc-100">—</span></p>
+            <p id="sleep-insight" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- ============ VISÃO MENSAL ============ -->
+    <section id="month-card" class="card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold">Visão mensal</h2>
+        <div class="flex items-center gap-1">
+          <button id="month-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Mês anterior">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <span id="month-title" class="min-w-[124px] text-center text-sm font-medium"></span>
+          <button id="month-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo mês">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-6 grid gap-8 lg:grid-cols-2">
+        <!-- Mês preenchido -->
+        <div>
+          <p class="eyebrow">Mês preenchido</p>
+          <p class="mt-1 flex items-baseline gap-2">
+            <span id="mf-value" class="text-5xl font-semibold tracking-tight">0%</span>
+            <span id="mf-pace" class="text-xs text-zinc-500"></span>
+          </p>
+          <div class="relative mt-4">
+            <div class="track h-2.5">
+              <div id="mf-bar" class="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style="width:0"></div>
+            </div>
+            <span id="mf-marker" class="absolute -top-1 h-[18px] w-0.5 rounded-full bg-zinc-900 dark:bg-zinc-100" style="left:0" title="Ritmo ideal até hoje"></span>
+          </div>
+          <div class="mt-4 space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-2 text-zinc-600 dark:text-zinc-400"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Hábitos diários</span>
+              <span id="mf-habits" class="font-medium tabular-nums"></span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-2 text-zinc-600 dark:text-zinc-400"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Metas semanais</span>
+              <span id="mf-goals" class="font-medium tabular-nums"></span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-2 text-zinc-600 dark:text-zinc-400"><span class="h-2.5 w-2.5 rounded-sm bg-zinc-900 dark:bg-zinc-100"></span>Metas do mês</span>
+              <span id="mf-mgoals" class="font-medium tabular-nums"></span>
+            </div>
+          </div>
+          <p id="mf-note" class="mt-3 text-xs leading-relaxed text-zinc-500"></p>
+
+          <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-zinc-100 pt-5 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 dark:border-zinc-800">
+            <div><p class="eyebrow">Dias 100%</p><p id="ms-perfect" class="mt-1 text-lg font-semibold">0</p></div>
+            <div><p class="eyebrow">One Thing</p><p id="ms-one" class="mt-1 text-lg font-semibold">0</p></div>
+            <div><p class="eyebrow">Estudo</p><p id="ms-study" class="mt-1 text-lg font-semibold">0m</p></div>
+            <div><p class="eyebrow">Sono médio</p><p id="ms-sleep" class="mt-1 text-lg font-semibold">—</p></div>
+          </div>
+
+          <div class="mt-6 border-t border-zinc-100 pt-5 dark:border-zinc-800">
+            <div class="flex items-baseline justify-between">
+              <p class="text-sm font-semibold">Metas do mês</p>
+              <span id="mgoal-count" class="text-xs tabular-nums text-zinc-500"></span>
+            </div>
+            <ul id="mgoal-list" class="mt-2 space-y-0.5"></ul>
+            <form id="mgoal-form" class="mt-2 flex gap-2">
+              <input id="mgoal-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Uma meta grande para o mês…" />
+              <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar meta do mês">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Contribuições estilo GitHub -->
+        <div>
+          <div class="flex items-center justify-between">
+            <p class="eyebrow">Completude diária</p>
+            <div class="flex items-center gap-1 text-[10px] text-zinc-500">
+              <span class="mr-1">0%</span>
+              <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
+              <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
+              <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-300 dark:bg-emerald-800"></span>
+              <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
+              <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
+              <span class="ml-1">100%</span>
+            </div>
+          </div>
+          <div id="contrib" class="mt-4 overflow-x-auto pb-1"></div>
+          <p class="mt-3 text-xs text-zinc-500">Cada coluna é uma semana (seg → dom). Embaixo: metas semanais concluídas.</p>
+        </div>
+      </div>
+
+      <div class="mt-8 grid gap-8 border-t border-zinc-100 pt-6 lg:grid-cols-2 dark:border-zinc-800">
+        <div>
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <p class="text-sm font-semibold">Evolução do mês</p>
+            <div class="flex items-center gap-3 text-xs text-zinc-500">
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Conclusão do dia</span>
+              <span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>
+            </div>
+          </div>
+          <div id="chart-month" class="relative mt-3 h-48"></div>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <p class="text-sm font-semibold">Evolução semanal <span class="font-normal text-zinc-500">· 8 semanas</span></p>
+            <div class="flex items-center gap-3 text-xs text-zinc-500">
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Hábitos</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Metas</span>
+            </div>
+          </div>
+          <div id="chart-week" class="relative mt-3 h-48"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="flex flex-col items-center justify-between gap-2 pt-4 text-xs text-zinc-500 sm:flex-row">
+      <p>Salvo localmente neste navegador · reinicia sozinho à meia-noite</p>
+      <div class="flex gap-1">
+        <button id="export-btn" class="btn-ghost text-xs">Exportar backup</button>
+        <button id="import-btn" class="btn-ghost text-xs">Importar</button>
+        <input id="import-file" type="file" accept="application/json,.json" class="hidden" />
+      </div>
+    </footer>
+  </main>
+
+  <!-- Tooltip compartilhado dos gráficos -->
+  <div id="tip" role="tooltip" class="pointer-events-none fixed z-50 hidden min-w-[140px] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-lg shadow-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900"></div>
+
+  <!-- Diário das reflexões -->
+  <dialog id="journal" class="m-auto max-h-[85vh] w-[min(640px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+    <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+      <div class="flex items-baseline gap-2">
+        <h2 class="text-base font-semibold">Diário</h2>
+        <span id="journal-count" class="text-xs text-zinc-500"></span>
+      </div>
+      <button class="btn-ghost h-7 w-7 p-0" data-close aria-label="Fechar">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="px-5 pt-4">
+      <input id="journal-search" class="field" type="search" placeholder="Buscar nas reflexões…" autocomplete="off" />
+    </div>
+    <div id="journal-list" class="max-h-[60vh] space-y-6 overflow-y-auto px-5 py-5"></div>
+  </dialog>
+
+  <!-- Sincronização (GitHub Gist) -->
+  <dialog id="sync-dialog" class="m-auto w-[min(480px,calc(100%-32px))] rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+    <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+      <h2 class="text-base font-semibold">Sincronizar aparelhos</h2>
+      <button class="btn-ghost h-7 w-7 p-0" data-close aria-label="Fechar">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="space-y-4 px-5 py-5 text-sm">
+      <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">
+        Os dados ficam num <strong class="font-medium text-zinc-900 dark:text-zinc-100">gist secreto</strong> da sua conta do GitHub.
+        Conecte com o mesmo token em cada aparelho — o painel encontra o gist sozinho e mescla dia a dia (vale a edição mais recente).
+      </p>
+      <div id="sync-off" class="space-y-3">
+        <div>
+          <label for="sync-token" class="eyebrow">Token do GitHub (permissão “gist”)</label>
+          <input id="sync-token" autofocus class="field mt-1.5 font-mono" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…" />
+          <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Painel%20Pessoal" target="_blank" rel="noopener"
+            class="mt-1.5 inline-block text-xs text-zinc-500 underline decoration-dotted hover:text-zinc-900 dark:hover:text-zinc-100">Criar um token com só a permissão de gist →</a>
+        </div>
+        <button id="sync-connect" class="btn-primary w-full">Conectar</button>
+      </div>
+      <div id="sync-on" class="hidden space-y-3">
+        <div class="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-800/60">
+          <span class="flex items-center gap-2"><span id="sync-dot2" class="h-2 w-2 rounded-full bg-emerald-500"></span><span id="sync-status" class="text-zinc-700 dark:text-zinc-300"></span></span>
+          <a id="sync-gist-link" href="#" target="_blank" rel="noopener" class="text-xs text-zinc-500 underline decoration-dotted">ver gist</a>
+        </div>
+        <div class="flex gap-2">
+          <button id="sync-now" class="btn-primary flex-1">Sincronizar agora</button>
+          <button id="sync-disconnect" class="btn-ghost border border-zinc-200 dark:border-zinc-700">Desconectar</button>
+        </div>
+      </div>
+      <p id="sync-error" class="hidden text-xs text-rose-500"></p>
+      <p class="text-xs leading-relaxed text-zinc-500">
+        O token fica salvo só neste navegador e nunca entra no backup exportado. “Desconectar” apaga o token deste aparelho; o gist continua na sua conta.
+      </p>
+    </div>
+  </dialog>
+
+<script>
+/* =========================================================
+   STORE — estado + persistência (localStorage)
+   ========================================================= */
+const STORAGE_KEY = 'evolution-dashboard-v1';
+const DEFAULT_TASKS = ['Beber 2L de água', 'Treino', 'Ler 20 páginas', 'Meditar 10 min'];
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const uid = () => Math.random().toString(36).slice(2, 10);
+const pad = (n) => String(n).padStart(2, '0');
+const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const todayKey = () => keyOf(new Date());
+const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+/** Segunda-feira da semana de `d` (semanas começam na segunda). */
+const weekStart = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+const weekKey = (d) => keyOf(weekStart(d));
+
+function freshState() {
+  return {
+    version: 1,
+    startDate: todayKey(),
+    tasks: DEFAULT_TASKS.map((title) => ({ id: uid(), title })),
+    days: {},
+    weeks: {},   // metas semanais + revisão, chave = segunda-feira da semana
+    months: {},  // metas do mês, chave = AAAA-MM
+    settings: { theme: null, studyGoalH: 10 },
+    timer: { mode: 25, status: 'idle', endAt: null, remaining: 25 * 60 },
+  };
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (s && s.version === 1) {
+      const base = freshState();
+      return { ...base, ...s, settings: { ...base.settings, ...s.settings }, timer: { ...base.timer, ...s.timer } };
+    }
+  } catch (e) {}
+  return freshState();
+}
+
+let S = loadState();
+
+/*
+ * Carimbo de edição para a sincronização: cada dia/semana/mês guarda `u`
+ * (momento da última mudança). save() compara uma assinatura de cada registro
+ * com a anterior e carimba só o que mudou — as ações não precisam lembrar disso.
+ */
+const SYNCED = ['days', 'weeks', 'months'];
+const sigs = new Map();
+const sigOf = (rec) => { const { u, ...rest } = rec; return JSON.stringify(rest); };
+const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH });
+function rememberSigs() {
+  sigs.clear();
+  for (const col of SYNCED) for (const [k, rec] of Object.entries(S[col])) sigs.set(`${col}:${k}`, sigOf(rec));
+  sigs.set('tasks', JSON.stringify(S.tasks));
+  sigs.set('settings', settingsSig());
+}
+function stampChanges() {
+  const now = Date.now();
+  let changed = false;
+  for (const col of SYNCED) {
+    for (const [k, rec] of Object.entries(S[col])) {
+      const key = `${col}:${k}`, sig = sigOf(rec);
+      if (sigs.get(key) !== sig) { rec.u = now; sigs.set(key, sig); changed = true; }
+    }
+  }
+  const ts = JSON.stringify(S.tasks);
+  if (sigs.get('tasks') !== ts) { S.tasksU = now; sigs.set('tasks', ts); changed = true; }
+  const ss = settingsSig();
+  if (sigs.get('settings') !== ss) { S.settingsU = now; sigs.set('settings', ss); changed = true; }
+  return changed;
+}
+rememberSigs();
+
+function save() {
+  const changed = stampChanges();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+  if (changed) scheduleSync();
+}
+
+/** Registro de um dia (cria se não existir). */
+function day(k = todayKey()) {
+  if (!S.days[k]) {
+    S.days[k] = { done: [], total: 0, oneThing: '', oneDone: false, sleep: null, energy: 0,
+                  studyMin: 0, sessions: 0, topic: '', win: '', improve: '' };
+  }
+  return S.days[k];
+}
+const peek = (k) => S.days[k];
+
+/* Frequência dos hábitos: `t.days` = dias da semana (0 = dom … 6 = sáb); ausente = todo dia. */
+const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const isDaily = (t) => !t.days || t.days.length === 7;
+const scheduledOn = (t, date) => isDaily(t) || t.days.includes(date.getDay());
+const tasksFor = (date) => S.tasks.filter((t) => scheduledOn(t, date));
+function schedLabel(t) {
+  if (isDaily(t)) return '';
+  const d = [...t.days].sort().join();
+  if (d === '1,2,3,4,5') return 'seg–sex';
+  if (d === '0,6') return 'fim de semana';
+  return WEEK_ORDER.filter((x) => t.days.includes(x)).map((x) => WD[x]).join(' · ');
+}
+
+/** Mantém o registro de hoje coerente com os hábitos previstos para hoje. */
+function syncToday() {
+  const d = day();
+  const ids = new Set(tasksFor(new Date()).map((t) => t.id));
+  d.done = d.done.filter((id) => ids.has(id));
+  d.total = ids.size;
+}
+
+/* =========================================================
+   MÉTRICAS
+   ========================================================= */
+/**
+ * Conclusão de um dia (0–1), ou null quando é "dia livre" (nenhum hábito previsto).
+ * Dia sem registro com hábitos previstos conta 0 — você não abriu o painel.
+ */
+function completion(k) {
+  const d = peek(k);
+  if (d) return d.total ? Math.min(d.done.length, d.total) / d.total : null;
+  return tasksFor(parseKey(k)).length ? 0 : null;
+}
+
+/** Média de conclusão entre duas datas (ignora dias antes do primeiro uso e dias livres). */
+function averageBetween(from, to) {
+  const start = parseKey(S.startDate);
+  let d = from < start ? start : new Date(from);
+  const vals = [];
+  while (keyOf(d) <= keyOf(to)) { const p = completion(keyOf(d)); if (p != null) vals.push(p); d = addDays(d, 1); }
+  return vals.length ? { value: avg(vals), days: vals.length } : null;
+}
+
+/** Minutos estudados na semana que começa em `ws`. */
+function weekStudyMin(ws) {
+  let m = 0;
+  for (let i = 0; i < 7; i++) m += peek(keyOf(addDays(ws, i)))?.studyMin || 0;
+  return m;
+}
+
+/** Resumo de uma semana (usado na revisão). */
+function weekSummary(ws) {
+  const tk = todayKey(), wk = keyOf(ws), days = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(ws, i), k = keyOf(date);
+    if (k > tk || k < S.startDate) continue;
+    days.push({ date, k, p: completion(k), rec: peek(k) });
+  }
+  const scored = days.filter((d) => d.p != null);
+  const g = S.weeks[wk]?.goals || [];
+  const sleeps = days.map((d) => d.rec?.sleep).filter((v) => v != null);
+  const sorted = [...scored].sort((a, b) => b.p - a.p);
+  return {
+    wk, days, habit: scored.length ? avg(scored.map((d) => d.p)) : null,
+    goalsDone: g.filter((x) => x.done).length, goalsTotal: g.length,
+    study: weekStudyMin(ws), sleep: sleeps.length ? avg(sleeps) : null,
+    perfect: scored.filter((d) => d.p === 1).length, scoredDays: scored.length,
+    best: sorted.length >= 2 ? sorted[0] : null, worst: sorted.length >= 2 ? sorted[sorted.length - 1] : null,
+    wins: days.filter((d) => d.rec?.win?.trim()), improves: days.filter((d) => d.rec?.improve?.trim()),
+  };
+}
+
+function studyStreak() {
+  let d = new Date();
+  if (!(peek(keyOf(d))?.studyMin > 0)) d = addDays(d, -1); // hoje ainda conta se estudou ontem
+  let n = 0;
+  while (peek(keyOf(d))?.studyMin > 0) { n++; d = addDays(d, -1); }
+  return n;
+}
+
+function bestStreak() {
+  const keys = Object.keys(S.days).filter((k) => S.days[k].studyMin > 0).sort();
+  let best = 0, run = 0, prev = null;
+  for (const k of keys) {
+    run = prev && keyOf(addDays(parseKey(prev), 1)) === k ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = k;
+  }
+  return best;
+}
+
+/** XP: 1 por minuto de estudo, 10 por hábito, 25 por One Thing, 30 por meta semanal, 100 por meta do mês. */
+function totalXP() {
+  let xp = 0;
+  for (const d of Object.values(S.days)) {
+    xp += (d.studyMin || 0) + 10 * (d.done?.length || 0) + (d.oneDone ? 25 : 0);
+  }
+  for (const w of Object.values(S.weeks)) xp += 30 * (w.goals || []).filter((g) => g.done).length;
+  for (const m of Object.values(S.months)) xp += 100 * (m.goals || []).filter((g) => g.done).length;
+  return xp;
+}
+
+/** Conclusão das metas de uma semana (null se a semana não tem metas). */
+function goalCompletion(wk) {
+  const w = S.weeks[wk];
+  if (!w || !w.goals?.length) return null;
+  return w.goals.filter((g) => g.done).length / w.goals.length;
+}
+
+const monthKey = (y, m) => `${y}-${pad(m + 1)}`;
+const MONTH_WEIGHTS = { habits: 0.6, weekly: 0.25, monthly: 0.15 };
+
+/**
+ * Mês preenchido — cada parte "enche" ao longo do mês:
+ *  - Hábitos diários: soma da conclusão de cada dia ÷ dias com hábitos previstos
+ *  - Metas semanais:  soma da conclusão de cada semana ÷ semanas do mês
+ *  - Metas do mês:    metas concluídas ÷ metas do mês
+ * Pesos 60/25/15, redistribuídos entre as partes que existem no mês.
+ * Dias e semanas futuros contam zero; dias livres e anteriores ao 1º uso ficam de fora.
+ */
+function monthStats(y, m) {
+  const first = new Date(y, m, 1), daysIn = new Date(y, m + 1, 0).getDate();
+  const tk = todayKey(), start = S.startDate;
+  const days = [];
+  let habitSum = 0, possible = 0, possibleElapsed = 0, perfect = 0, one = 0, study = 0; const sleeps = [];
+  for (let i = 1; i <= daysIn; i++) {
+    const date = new Date(y, m, i), k = keyOf(date), rec = peek(k);
+    const future = k > tk, tracked = !future && k >= start;
+    const p = tracked ? completion(k) : null;
+    const free = future ? !tasksFor(date).length : tracked && p == null;
+    if (k >= start && !free) { possible++; if (!future) possibleElapsed++; }
+    if (p != null) habitSum += p;
+    if (p === 1) perfect++;
+    if (rec?.oneDone) one++;
+    study += rec?.studyMin || 0;
+    if (rec && rec.sleep != null) sleeps.push(rec.sleep);
+    days.push({ date, k, p, rec, future, free });
+  }
+  // Semanas (seg→dom) que tocam o mês
+  const weeks = [];
+  for (let w = weekStart(first); w.getMonth() === m || w < first; w = addDays(w, 7)) {
+    const wk = keyOf(w), g = S.weeks[wk]?.goals || [];
+    weeks.push({ start: w, wk, pct: goalCompletion(wk), done: g.filter((x) => x.done).length, total: g.length,
+                 counted: keyOf(addDays(w, 6)) >= start });
+  }
+  const counted = weeks.filter((w) => w.counted);
+  const hasGoals = weeks.some((w) => w.total);
+  const mg = S.months[monthKey(y, m)]?.goals || [];
+  const habitsPart = possible ? habitSum / possible : 0;
+  const goalsPart = counted.length ? counted.reduce((a, w) => a + (w.pct || 0), 0) / counted.length : 0;
+  const monthPart = mg.length ? mg.filter((g) => g.done).length / mg.length : 0;
+
+  const parts = [{ key: 'habits', v: habitsPart }];
+  if (hasGoals) parts.push({ key: 'weekly', v: goalsPart });
+  if (mg.length) parts.push({ key: 'monthly', v: monthPart });
+  const wsum = parts.reduce((a, x) => a + MONTH_WEIGHTS[x.key], 0);
+  const weights = Object.fromEntries(parts.map((x) => [x.key, MONTH_WEIGHTS[x.key] / wsum]));
+  const fill = parts.reduce((a, x) => a + x.v * weights[x.key], 0);
+
+  return { daysIn, days, weeks, hasGoals, habitsPart, goalsPart, monthPart, fill, weights,
+           pace: possible ? possibleElapsed / possible : 0,
+           perfect, one, study, sleepAvg: sleeps.length ? avg(sleeps) : null,
+           goalsDone: weeks.reduce((a, w) => a + w.done, 0), goalsTotal: weeks.reduce((a, w) => a + w.total, 0),
+           mDone: mg.filter((g) => g.done).length, mTotal: mg.length };
+}
+function levelFrom(xp) {
+  let level = 1, need = 100;
+  while (xp >= need) { xp -= need; level++; need = 100 + 50 * (level - 1); }
+  return { level, cur: xp, need };
+}
+
+const fmtPct = (v) => `${Math.round(v * 100)}%`;
+const fmtMin = (m) => {
+  const h = Math.floor(m / 60), r = m % 60;
+  return h ? (r ? `${h}h ${pad(r)}m` : `${h}h`) : `${r}m`;
+};
+const fmtSleep = (h) => {
+  const whole = Math.floor(h), m = Math.round((h - whole) * 60);
+  return m ? `${whole}h ${pad(m)}m` : `${whole}h`;
+};
+
+/* =========================================================
+   COMPONENTES
+   ========================================================= */
+const CHECK_SVG = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+function paintCheck(el, on, tone) {
+  el.setAttribute('role', 'checkbox');
+  el.setAttribute('aria-checked', String(on));
+  const onCls = tone === 'goal' ? 'border-[color:var(--c-goal)] bg-[color:var(--c-goal)] text-white'
+    : tone === 'month' ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+    : 'border-emerald-500 bg-emerald-500 text-white';
+  const hover = tone === 'goal' ? 'hover:border-[color:var(--c-goal)]' : tone === 'month' ? 'hover:border-zinc-900 dark:hover:border-zinc-100' : 'hover:border-emerald-500';
+  el.className = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ' +
+    (on ? onCls : `border-zinc-300 text-transparent ${hover} dark:border-zinc-700`);
+  el.innerHTML = CHECK_SVG;
+}
+
+// ---------- Header ----------
+function renderHeader() {
+  const now = new Date(), h = now.getHours();
+  $('#greeting').textContent = h < 5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  $('#date-label').textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
+}
+
+// ---------- One Thing ----------
+function renderOne() {
+  const d = day();
+  const input = $('#one-input');
+  if (document.activeElement !== input) input.value = d.oneThing;
+  paintCheck($('#one-check'), d.oneDone);
+  $('#one-check').classList.replace('h-5', 'h-6');
+  $('#one-check').classList.replace('w-5', 'w-6');
+  input.classList.toggle('text-zinc-400', d.oneDone);
+  input.classList.toggle('dark:text-zinc-500', d.oneDone);
+  $('#one-accent').className = 'absolute inset-y-0 left-0 w-1 transition ' +
+    (d.oneDone ? 'bg-emerald-500' : d.oneThing ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-200 dark:bg-zinc-800');
+  $('#won-badge').classList.toggle('hidden', !d.oneDone);
+}
+
+// ---------- Tarefas ----------
+const ICON_X = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const ICON_CAL = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>';
+const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-zinc-800 dark:hover:text-zinc-200';
+
+/**
+ * Linha de lista com checkbox + remover (hábitos e metas).
+ * opts: { badge, onEdit, editing, off } — `off` = hábito fora de hoje (sem checkbox).
+ */
+function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
+  const li = document.createElement('li');
+  li.className = 'group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+
+  let check;
+  if (opts.off) {
+    check = document.createElement('span');
+    check.className = 'flex h-5 w-5 shrink-0 items-center justify-center text-zinc-300 dark:text-zinc-700';
+    check.textContent = '–';
+  } else {
+    check = document.createElement('button');
+    paintCheck(check, on, tone);
+    check.setAttribute('aria-label', title);
+    check.onclick = onToggle;
+  }
+
+  const label = document.createElement('span');
+  label.textContent = title;
+  label.className = 'min-w-0 flex-1 select-none truncate text-sm transition ' +
+    (opts.off ? 'text-zinc-400 dark:text-zinc-500'
+      : 'cursor-pointer ' + (on ? 'text-zinc-400 line-through decoration-zinc-400/50 dark:text-zinc-500' : ''));
+  if (!opts.off) label.onclick = onToggle;
+  li.append(check, label);
+
+  if (opts.badge) {
+    const b = document.createElement('span');
+    b.className = 'shrink-0 text-[11px] text-zinc-500';
+    b.textContent = opts.badge;
+    li.append(b);
+  }
+  if (opts.onEdit) {
+    const ed = document.createElement('button');
+    ed.className = ROW_BTN + (opts.editing ? ' !opacity-100 text-zinc-700 dark:text-zinc-200' : '');
+    ed.setAttribute('aria-label', `Dias da semana de “${title}”`);
+    ed.title = 'Escolher dias da semana';
+    ed.innerHTML = ICON_CAL;
+    ed.onclick = opts.onEdit;
+    li.append(ed);
+  }
+  const rm = document.createElement('button');
+  rm.className = ROW_BTN;
+  rm.setAttribute('aria-label', `Remover “${title}”`);
+  rm.innerHTML = ICON_X;
+  rm.onclick = onRemove;
+  li.append(rm);
+  return li;
+}
+function emptyRow(text) {
+  const li = document.createElement('li');
+  li.className = 'py-4 text-center text-sm text-zinc-500';
+  li.textContent = text;
+  return li;
+}
+
+/** Seletor de dias da semana de um hábito. */
+function scheduleEditor(t) {
+  const li = document.createElement('li');
+  li.className = 'mb-2 ml-8 flex flex-wrap items-center gap-1.5';
+  const days = t.days || [0, 1, 2, 3, 4, 5, 6];
+  const chip = (text, on, onclick) => {
+    const b = document.createElement('button');
+    b.className = 'rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
+      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-600 dark:bg-zinc-700 dark:text-white'
+      : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600');
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = text;
+    b.onclick = onclick;
+    return b;
+  };
+  for (const dw of WEEK_ORDER) {
+    const on = days.includes(dw);
+    li.append(chip(WD[dw], on, () => {
+      const next = on ? days.filter((x) => x !== dw) : [...days, dw];
+      if (next.length) setTaskDays(t.id, next);
+    }));
+  }
+  const sep = document.createElement('span');
+  sep.className = 'mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700';
+  li.append(sep,
+    chip('todo dia', isDaily(t), () => setTaskDays(t.id, [0, 1, 2, 3, 4, 5, 6])),
+    chip('seg–sex', schedLabel(t) === 'seg–sex', () => setTaskDays(t.id, [1, 2, 3, 4, 5])));
+  return li;
+}
+
+let editingTask = null, showOffTasks = false;
+function renderTasks() {
+  const d = day(), now = new Date();
+  const ul = $('#task-list');
+  ul.replaceChildren();
+  const today = tasksFor(now), off = S.tasks.filter((t) => !scheduledOn(t, now));
+  if (!S.tasks.length) ul.append(emptyRow('Nenhum hábito ainda. Adicione o primeiro abaixo.'));
+  else if (!today.length) ul.append(emptyRow('Nenhum hábito previsto para hoje — dia livre.'));
+
+  const row = (t, isOff) => {
+    ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
+      badge: schedLabel(t), off: isOff, editing: editingTask === t.id,
+      onEdit: () => { editingTask = editingTask === t.id ? null : t.id; renderTasks(); },
+    }));
+    if (editingTask === t.id) ul.append(scheduleEditor(t));
+  };
+  today.forEach((t) => row(t, false));
+
+  if (off.length) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.className = 'btn-ghost -mx-2.5 mt-1 text-xs';
+    b.textContent = `${showOffTasks ? '▾' : '▸'} ${off.length} ${off.length === 1 ? 'hábito' : 'hábitos'} fora de hoje`;
+    b.onclick = () => { showOffTasks = !showOffTasks; renderTasks(); };
+    li.append(b);
+    ul.append(li);
+    if (showOffTasks) off.forEach((t) => row(t, true));
+  }
+  $('#task-count').textContent = today.length ? `${d.done.length}/${today.length}` : '';
+}
+
+// ---------- Metas da semana ----------
+const week = (wk = weekKey(new Date())) => { const w = (S.weeks[wk] ||= { goals: [] }); w.goals ||= []; return w; };
+function renderGoals() {
+  const now = new Date(), wk = weekKey(now), w = { goals: [], ...S.weeks[wk] };
+  const ul = $('#goal-list');
+  ul.replaceChildren();
+  if (!w.goals.length) ul.append(emptyRow('Defina 2–4 metas maiores para esta semana.'));
+  for (const g of w.goals) {
+    ul.append(checkRow(g.title, g.done, () => toggleGoal(g.id), () => removeGoal(g.id), 'goal'));
+  }
+  const done = w.goals.filter((g) => g.done).length;
+  $('#goal-count').textContent = w.goals.length ? `${done}/${w.goals.length}` : '';
+  $('#goal-bar').style.width = w.goals.length ? `${(done / w.goals.length) * 100}%` : '0';
+  const fmt = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
+  $('#week-range').textContent = `${fmt.format(weekStart(now))} – ${fmt.format(addDays(weekStart(now), 6))}`.replace(/\./g, '');
+  const prev = S.weeks[keyOf(addDays(weekStart(now), -7))];
+  $('#copy-goals').classList.toggle('hidden', !!w.goals.length || !prev?.goals?.length);
+  // Foco escrito na revisão da semana passada
+  const focus = (prev?.review || '').trim();
+  $('#week-focus').classList.toggle('hidden', !focus);
+  $('#week-focus').textContent = focus ? `Foco definido na revisão: ${focus}` : '';
+}
+
+// ---------- KPIs ----------
+function renderKPIs() {
+  const d = day(), now = new Date(), k = todayKey();
+  const today = completion(k), n = tasksFor(now).length;
+  const C = 2 * Math.PI * 23;
+  const ring = $('#ring');
+  ring.style.strokeDasharray = C;
+  ring.style.strokeDashoffset = C * (1 - (today || 0));
+  $('#kpi-today').textContent = today == null ? '—' : fmtPct(today);
+  $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? 'dia livre'
+    : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
+
+  const week = averageBetween(addDays(now, -6), now);
+  $('#kpi-week').textContent = week ? fmtPct(week.value) : '—';
+  $('#kpi-week-bar').style.width = week ? fmtPct(week.value) : '0';
+  $('#kpi-week-sub').textContent = week ? `média · ${week.days} ${week.days === 1 ? 'dia' : 'dias'}` : 'média · 7 dias';
+
+  const month = averageBetween(new Date(now.getFullYear(), now.getMonth(), 1), now);
+  const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(now);
+  $('#kpi-month-label').textContent = monthName;
+  $('#kpi-month').textContent = month ? fmtPct(month.value) : '—';
+  $('#kpi-month-bar').style.width = month ? fmtPct(month.value) : '0';
+  $('#kpi-month-sub').textContent = month ? `média · ${month.days} ${month.days === 1 ? 'dia' : 'dias'}` : '';
+
+  const streak = studyStreak(), best = bestStreak();
+  $('#kpi-streak').textContent = streak;
+  $('#kpi-streak-unit').textContent = streak === 1 ? 'dia' : 'dias';
+  const studiedToday = d.studyMin > 0;
+  $('#kpi-streak-sub').textContent = streak && !studiedToday ? 'estude hoje para manter' : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
+}
+
+// ---------- Heatmap semanal ----------
+const heatLevel = (p) => (p === 0 ? 0 : p < 0.34 ? 1 : p < 0.67 ? 2 : p < 1 ? 3 : 4);
+const HEAT = [
+  'bg-zinc-100 dark:bg-zinc-800',
+  'bg-emerald-100 dark:bg-emerald-950',
+  'bg-emerald-300 dark:bg-emerald-800',
+  'bg-emerald-500 dark:bg-emerald-600',
+  'bg-emerald-600 dark:bg-emerald-400',
+];
+function renderHeatmap() {
+  const wrap = $('#heatmap');
+  wrap.replaceChildren();
+  const now = new Date(), tk = todayKey();
+  const fmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' });
+  let consistent = 0;
+  for (let i = 6; i >= 0; i--) {
+    const date = addDays(now, -i), k = keyOf(date);
+    const p = completion(k), rec = peek(k);
+    if (p != null && p >= 0.5) consistent++;
+    const lvl = p == null ? 0 : heatLevel(p);
+    const col = document.createElement('div');
+    col.className = 'flex flex-col items-center gap-1.5';
+    const sq = document.createElement('div');
+    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${HEAT[lvl]} ` +
+      (k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
+    sq.title = `${fmt.format(date)} · ${p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    const lbl = document.createElement('span');
+    lbl.className = 'text-[10px] font-medium uppercase ' + (k === tk ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
+    lbl.textContent = 'DSTQQSS'[date.getDay()];
+    const dot = document.createElement('span');
+    dot.className = 'h-1 w-1 rounded-full ' + (rec?.oneDone ? 'bg-emerald-500' : 'bg-transparent');
+    col.append(sq, lbl, dot);
+    wrap.append(col);
+  }
+  $('#heat-sub').textContent = `${consistent}/7 dias ≥ 50%`;
+}
+
+// ---------- Sono & energia ----------
+const ENERGY_LABELS = ['', 'Exausto', 'Baixa', 'Ok', 'Boa', 'Ótima'];
+function renderSleep() {
+  const d = day();
+  const input = $('#sleep-input');
+  if (document.activeElement !== input) input.value = d.sleep ?? '';
+
+  const cells = $('#energy-cells');
+  cells.replaceChildren();
+  for (let i = 1; i <= 5; i++) {
+    const b = document.createElement('button');
+    const on = i <= d.energy;
+    const tone = d.energy <= 1 ? 'bg-rose-400' : d.energy === 2 ? 'bg-amber-400' : 'bg-emerald-500';
+    b.className = `w-3 rounded-[2px] transition ${on ? tone : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'}`;
+    b.setAttribute('aria-label', `Energia ${i} de 5 — ${ENERGY_LABELS[i]}`);
+    b.onclick = () => setEnergy(i);
+    cells.append(b);
+  }
+  $('#energy-label').textContent = ENERGY_LABELS[d.energy] || 'toque para marcar';
+
+  // Média semanal
+  const now = new Date(), vals = [];
+  for (let i = 0; i < 7; i++) { const r = peek(keyOf(addDays(now, -i))); if (r && r.sleep != null) vals.push(r.sleep); }
+  $('#sleep-avg').textContent = vals.length ? fmtSleep(avg(vals)) : '—';
+  $('#sleep-insight').textContent = sleepInsight();
+}
+
+/** Compara a taxa de conclusão de dias com 7.5h+ de sono vs. os demais (últimos 30 dias, sem hoje). */
+function sleepInsight() {
+  const hi = [], lo = [], now = new Date();
+  for (let i = 1; i <= 30; i++) {
+    const k = keyOf(addDays(now, -i)), r = peek(k);
+    if (!r || r.sleep == null || !r.total) continue;
+    (r.sleep >= 7.5 ? hi : lo).push(completion(k));
+  }
+  if (hi.length >= 2 && lo.length >= 2) {
+    const a = avg(hi), b = avg(lo), diff = Math.round((a - b) * 100);
+    if (Math.abs(diff) < 5) return 'Até agora, dormir 7.5h+ não mudou muito sua taxa de conclusão.';
+    return diff > 0
+      ? `Com 7.5h+ de sono você conclui ${fmtPct(a)} dos hábitos — ${diff} pontos a mais que nos outros dias.`
+      : `Curioso: dias com menos de 7.5h de sono tiveram ${-diff} pontos a mais de conclusão.`;
+  }
+  return 'Registre o sono por alguns dias (com e sem 7.5h) para ver como ele afeta sua rotina.';
+}
+
+// ---------- Estudos ----------
+function renderStudy() {
+  const d = day();
+  $('#study-today').textContent = fmtMin(d.studyMin);
+  const topic = $('#topic');
+  if (document.activeElement !== topic) topic.value = d.topic;
+
+  const xp = totalXP(), { level, cur, need } = levelFrom(xp);
+  $('#xp-level').textContent = level;
+  $('#xp-text').textContent = `${cur} / ${need} XP`;
+  $('#xp-bar').style.width = `${(cur / need) * 100}%`;
+  const allMin = Object.values(S.days).reduce((a, r) => a + (r.studyMin || 0), 0);
+  $('#xp-sub').textContent = `${fmtMin(allMin)} estudadas no total`;
+
+  // Meta de horas da semana
+  const goalMin = (S.settings.studyGoalH || 10) * 60, ws = weekStart(new Date());
+  const doneMin = weekStudyMin(ws), pct = Math.min(1, doneMin / goalMin);
+  const C = 2 * Math.PI * 18, ring = $('#sg-ring');
+  ring.style.strokeDasharray = C;
+  ring.style.strokeDashoffset = C * (1 - pct);
+  $('#sg-value').textContent = fmtMin(doneMin);
+  const sg = $('#sg-input');
+  if (document.activeElement !== sg) sg.value = S.settings.studyGoalH || 10;
+  const left = goalMin - doneMin, daysLeft = 7 - ((new Date().getDay() + 6) % 7);
+  $('#sg-sub').textContent = left <= 0 ? 'meta da semana batida ✓'
+    : daysLeft === 1 ? `faltam ${fmtMin(left)} — último dia da semana`
+    : `faltam ${fmtMin(left)} · ≈ ${fmtMin(Math.ceil(left / daysLeft))}/dia até domingo`;
+}
+
+// ---------- Pomodoro ----------
+function timerRemaining() {
+  const t = S.timer;
+  return t.status === 'running' ? Math.max(0, Math.ceil((t.endAt - Date.now()) / 1000)) : t.remaining;
+}
+function renderTimer() {
+  const t = S.timer, rem = timerRemaining(), total = t.mode * 60;
+  const txt = `${pad(Math.floor(rem / 60))}:${pad(rem % 60)}`;
+  $('#timer-digits').textContent = txt;
+  $('#timer-digits').classList.toggle('text-zinc-400', t.status === 'paused');
+  $('#timer-bar').style.width = `${((total - rem) / total) * 100}%`;
+  $('#timer-main').textContent = t.status === 'running' ? 'Pausar' : t.status === 'paused' ? 'Continuar' : 'Iniciar';
+  $('#timer-stop').disabled = t.status === 'idle';
+  $$('#mode-toggle button').forEach((b) => {
+    const on = Number(b.dataset.mode) === t.mode;
+    b.className = 'rounded-md px-3 py-1 transition ' +
+      (on ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200') +
+      (t.status !== 'idle' ? ' cursor-not-allowed' : '');
+  });
+  const d = day();
+  if (!$('#timer-note').dataset.flash) {
+    $('#timer-note').textContent = d.sessions ? `${d.sessions} ${d.sessions === 1 ? 'sessão concluída' : 'sessões concluídas'} hoje` : '';
+  }
+  document.title = t.status === 'running' ? `${txt} · Foco` : 'Painel Pessoal';
+}
+function flashNote(msg) {
+  const el = $('#timer-note');
+  el.dataset.flash = '1';
+  el.textContent = msg;
+  clearTimeout(flashNote.t);
+  flashNote.t = setTimeout(() => { delete el.dataset.flash; renderTimer(); }, 4000);
+}
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25].forEach((delay, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = i ? 880 : 660;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.4);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + 0.45);
+    });
+  } catch (e) {}
+}
+
+// ---------- Visão mensal ----------
+const now0 = new Date();
+let view = { y: now0.getFullYear(), m: now0.getMonth() };
+let lastMonth = null;
+const fmtDay = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtShort = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
+
+function renderMonth() {
+  const ms = monthStats(view.y, view.m);
+  lastMonth = ms;
+  const first = new Date(view.y, view.m, 1);
+  const title = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(first);
+  $('#month-title').textContent = title[0].toUpperCase() + title.slice(1);
+  const cur = new Date();
+  $('#month-next').disabled = view.y === cur.getFullYear() && view.m === cur.getMonth();
+  $('#month-prev').disabled = keyOf(new Date(view.y, view.m, 0)) < S.startDate;
+
+  $('#mf-value').textContent = fmtPct(ms.fill);
+  $('#mf-bar').style.width = `${ms.fill * 100}%`;
+  $('#mf-marker').style.left = `calc(${ms.pace * 100}% - 1px)`;
+  $('#mf-pace').textContent = ms.pace >= 1 ? 'mês encerrado' : `${fmtPct(ms.pace)} do mês já passou`;
+  $('#mf-habits').textContent = fmtPct(ms.habitsPart);
+  $('#mf-goals').textContent = ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal} · ${fmtPct(ms.goalsPart)}` : 'sem metas';
+  $('#mf-mgoals').textContent = ms.mTotal ? `${ms.mDone}/${ms.mTotal} · ${fmtPct(ms.monthPart)}` : 'sem metas';
+  const W = ms.weights, pctW = (x) => `${Math.round(x * 100)}%`;
+  const partsTxt = [`${pctW(W.habits)} hábitos diários`];
+  if (W.weekly) partsTxt.push(`${pctW(W.weekly)} metas semanais`);
+  if (W.monthly) partsTxt.push(`${pctW(W.monthly)} metas do mês`);
+  $('#mf-note').textContent = `O mês enche com ${partsTxt.join(' + ')}. O traço marca quanto do mês já passou — fique perto ou à frente dele.` +
+    (W.weekly && W.monthly ? '' : ' Metas semanais e do mês entram na conta assim que você cria a primeira.');
+  renderMonthGoals();
+  $('#ms-perfect').textContent = ms.perfect;
+  $('#ms-one').textContent = `${ms.one} ${ms.one === 1 ? 'dia' : 'dias'}`;
+  $('#ms-study').textContent = fmtMin(ms.study);
+  $('#ms-sleep').textContent = ms.sleepAvg != null ? fmtSleep(ms.sleepAvg) : '—';
+
+  renderContrib(ms);
+  renderCharts();
+}
+
+function renderMonthGoals() {
+  const mk = monthKey(view.y, view.m), goals = S.months[mk]?.goals || [];
+  const ul = $('#mgoal-list');
+  ul.replaceChildren();
+  if (!goals.length) ul.append(emptyRow('1 a 3 metas grandes — o que faria este mês valer a pena?'));
+  for (const g of goals) {
+    ul.append(checkRow(g.title, g.done, () => toggleMonthGoal(g.id), () => removeMonthGoal(g.id), 'month'));
+  }
+  $('#mgoal-count').textContent = goals.length ? `${goals.filter((g) => g.done).length}/${goals.length}` : '';
+}
+
+/** Grade estilo GitHub: colunas = semanas, linhas = seg→dom, última linha = metas. */
+function renderContrib(ms) {
+  const wrap = $('#contrib');
+  wrap.replaceChildren();
+  const grid = document.createElement('div');
+  grid.className = 'inline-grid items-center gap-1.5';
+  grid.style.gridTemplateColumns = `28px repeat(${ms.weeks.length}, 32px)`;
+  const tk = todayKey();
+  const rowLabels = ['Seg', '', 'Qua', '', 'Sex', '', 'Dom'];
+  const label = (txt) => { const s = document.createElement('span'); s.className = 'text-[10px] text-zinc-500'; s.textContent = txt; return s; };
+
+  for (let r = 0; r < 7; r++) {
+    grid.append(label(rowLabels[r]));
+    for (const w of ms.weeks) {
+      const date = addDays(w.start, r);
+      const cell = document.createElement('div');
+      if (date.getMonth() !== view.m) { cell.className = 'h-8 w-8'; grid.append(cell); continue; }
+      const info = ms.days[date.getDate() - 1];
+      const k = info.k;
+      let cls = 'h-8 w-8 rounded-md outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-emerald-500 ';
+      if (info.future) cls += 'border border-dashed border-zinc-200 dark:border-zinc-800';
+      else if (info.free) cls += 'border border-zinc-200 dark:border-zinc-800';
+      else cls += HEAT[info.p == null ? 0 : heatLevel(info.p)];
+      if (k === tk) cls += ' ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900';
+      cell.className = cls;
+      cell.tabIndex = 0;
+      cell.setAttribute('aria-label', `${fmtDay.format(date)}: ${info.free ? 'dia livre' : info.p == null ? 'sem registro' : fmtPct(info.p)}`);
+      const show = (e) => {
+        const rec = info.rec, rows = [];
+        if (info.future) rows.push({ value: 'ainda não chegou', label: '' });
+        else if (info.free) rows.push({ value: 'dia livre', label: 'sem hábitos previstos' });
+        else if (info.p == null) rows.push({ value: 'sem registro', label: '' });
+        else {
+          rows.push({ value: fmtPct(info.p), label: `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0})`, color: 'var(--c-habit)', box: true });
+          if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
+          if (rec?.studyMin) rows.push({ value: fmtMin(rec.studyMin), label: 'de estudo' });
+          if (rec?.sleep != null) rows.push({ value: fmtSleep(rec.sleep), label: 'de sono' });
+        }
+        showTip(e, fmtDay.format(date), rows);
+      };
+      cell.addEventListener('pointerenter', show);
+      cell.addEventListener('pointermove', moveTip);
+      cell.addEventListener('pointerleave', hideTip);
+      cell.addEventListener('focus', show);
+      cell.addEventListener('blur', hideTip);
+      grid.append(cell);
+    }
+  }
+  // Linha das metas semanais
+  grid.append(label('Metas'));
+  for (const w of ms.weeks) {
+    const s = document.createElement('span');
+    s.className = 'text-center text-[11px] font-medium tabular-nums ' +
+      (w.total && w.done === w.total ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
+    s.textContent = w.total ? `${w.done}/${w.total}` : '–';
+    s.title = `Semana de ${fmtShort.format(w.start)}: ${w.total ? `${w.done} de ${w.total} metas` : 'sem metas'}`;
+    grid.append(s);
+  }
+  wrap.append(grid);
+}
+
+// ---------- Revisão da semana ----------
+let reviewWeek = null;        // segunda-feira (Date) da semana aberta na revisão
+let reviewManual = false;     // aberta pelo botão (não pelo domingo)
+const fmtRange = (ws) => {
+  const we = addDays(ws, 6);
+  const f = (d, withMonth) => new Intl.DateTimeFormat('pt-BR', withMonth ? { day: 'numeric', month: 'long' } : { day: 'numeric' }).format(d);
+  return ws.getMonth() === we.getMonth() ? `${f(ws)} – ${f(we, true)}` : `${f(ws, true)} – ${f(we, true)}`;
+};
+
+/** Qual semana revisar automaticamente: a atual no domingo, a anterior na segunda. */
+function autoReviewWeek() {
+  const now = new Date(), dow = now.getDay();
+  if (dow === 0) { const ws = weekStart(now); return S.weeks[keyOf(ws)]?.reviewDone ? null : ws; }
+  if (dow === 1) {
+    const ws = addDays(weekStart(now), -7), wk = keyOf(ws);
+    const hadData = [...Array(7)].some((_, i) => peek(keyOf(addDays(ws, i))));
+    return hadData && !S.weeks[wk]?.reviewDone ? ws : null;
+  }
+  return null;
+}
+
+function renderReview() {
+  const card = $('#review-card');
+  if (!reviewManual) reviewWeek = autoReviewWeek();
+  card.classList.toggle('hidden', !reviewWeek);
+  if (!reviewWeek) return;
+  const ws = reviewWeek, r = weekSummary(ws), prev = weekSummary(addDays(ws, -7));
+  $('#review-range').textContent = fmtRange(ws);
+  $('#review-next').disabled = keyOf(addDays(ws, 7)) > todayKey();
+  $('#review-prev').disabled = keyOf(addDays(ws, 6)) < S.startDate;
+
+  $('#rv-habits').textContent = r.habit == null ? '—' : fmtPct(r.habit);
+  const delta = r.habit != null && prev.habit != null ? Math.round((r.habit - prev.habit) * 100) : null;
+  $('#rv-habits-sub').textContent = delta == null ? `${r.scoredDays} ${r.scoredDays === 1 ? 'dia' : 'dias'}`
+    : `${delta > 0 ? '+' : ''}${delta} pts vs semana anterior`;
+  $('#rv-goals').textContent = r.goalsTotal ? `${r.goalsDone}/${r.goalsTotal}` : '—';
+  $('#rv-goals-sub').textContent = r.goalsTotal ? `${fmtPct(r.goalsDone / r.goalsTotal)} concluídas` : 'sem metas';
+  $('#rv-study').textContent = fmtMin(r.study);
+  $('#rv-study-sub').textContent = `meta: ${S.settings.studyGoalH || 10}h`;
+  $('#rv-sleep').textContent = r.sleep == null ? '—' : fmtSleep(r.sleep);
+  $('#rv-sleep-sub').textContent = prev.sleep == null || r.sleep == null ? '' : `antes: ${fmtSleep(prev.sleep)}`;
+  $('#rv-perfect').textContent = r.perfect;
+  $('#rv-perfect-sub').textContent = `de ${r.scoredDays} ${r.scoredDays === 1 ? 'dia' : 'dias'}`;
+  const wd = (d) => new Intl.DateTimeFormat('pt-BR', { weekday: 'long' }).format(d.date);
+  $('#rv-bestworst').textContent = r.best && r.best.p !== r.worst.p
+    ? `Melhor dia: ${wd(r.best)} (${fmtPct(r.best.p)}) · Mais difícil: ${wd(r.worst)} (${fmtPct(r.worst.p)})`
+    : r.best ? 'Semana constante — todos os dias com a mesma conclusão.' : '';
+
+  const list = (ul, items, field, empty) => {
+    ul.replaceChildren();
+    if (!items.length) { const li = document.createElement('li'); li.className = 'text-zinc-500'; li.textContent = empty; ul.append(li); return; }
+    for (const d of items) {
+      const li = document.createElement('li');
+      li.className = 'flex gap-3';
+      const when = document.createElement('span');
+      when.className = 'w-8 shrink-0 pt-px text-xs text-zinc-500';
+      when.textContent = WD[d.date.getDay()];
+      const txt = document.createElement('span');
+      txt.className = 'leading-relaxed';
+      txt.textContent = d.rec[field].trim();
+      li.append(when, txt);
+      ul.append(li);
+    }
+  };
+  list($('#rv-wins'), r.wins, 'win', 'Nenhuma vitória registrada na Reflexão noturna.');
+  list($('#rv-improves'), r.improves, 'improve', 'Nada anotado para melhorar.');
+
+  const note = $('#review-note');
+  if (document.activeElement !== note) note.value = S.weeks[r.wk]?.review || '';
+  const done = !!S.weeks[r.wk]?.reviewDone;
+  $('#review-done').textContent = done ? 'Revisão concluída ✓' : 'Concluir revisão';
+}
+
+// ---------- Diário das reflexões ----------
+function renderJournal() {
+  const q = $('#journal-search').value.trim().toLowerCase();
+  const keys = Object.keys(S.days).filter((k) => {
+    const d = S.days[k];
+    return (d.win || '').trim() || (d.improve || '').trim();
+  }).sort().reverse();
+  const match = keys.filter((k) => {
+    if (!q) return true;
+    const d = S.days[k];
+    return [d.win, d.improve, d.oneThing].some((t) => (t || '').toLowerCase().includes(q));
+  });
+  $('#journal-count').textContent = `${keys.length} ${keys.length === 1 ? 'reflexão' : 'reflexões'}`;
+  const wrap = $('#journal-list');
+  wrap.replaceChildren();
+  if (!match.length) {
+    const p = document.createElement('p');
+    p.className = 'py-8 text-center text-sm text-zinc-500';
+    p.textContent = keys.length ? 'Nada encontrado.' : 'Suas reflexões noturnas aparecem aqui.';
+    wrap.append(p);
+    return;
+  }
+  const fmtMonth = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
+  const fmtD = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' });
+  let lastMonth = '';
+  for (const k of match) {
+    const d = S.days[k], date = parseKey(k), mLabel = fmtMonth.format(date);
+    if (mLabel !== lastMonth) {
+      lastMonth = mLabel;
+      const h = document.createElement('p');
+      h.className = 'eyebrow';
+      h.textContent = mLabel;
+      wrap.append(h);
+    }
+    const art = document.createElement('article');
+    art.className = 'grid grid-cols-[56px_1fr] gap-3';
+    const when = document.createElement('p');
+    when.className = 'pt-0.5 text-xs text-zinc-500';
+    when.textContent = fmtD.format(date).replace('.', '');
+    const body = document.createElement('div');
+    body.className = 'space-y-1.5 text-sm leading-relaxed';
+    const line = (label, text, cls = '') => {
+      if (!(text || '').trim()) return;
+      const p = document.createElement('p');
+      p.className = cls;
+      const l = document.createElement('span');
+      l.className = 'text-zinc-500';
+      l.textContent = `${label} `;
+      p.append(l, document.createTextNode(text.trim()));
+      body.append(p);
+    };
+    line(d.oneDone ? 'One Thing ✓' : 'One Thing', d.oneThing, 'text-xs');
+    line('Vitória:', d.win);
+    line('Melhorar:', d.improve);
+    art.append(when, body);
+    wrap.append(art);
+  }
+}
+
+// ---------- Gráficos (SVG puro) ----------
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs = {}) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+/** Coluna com topo arredondado (4px) e base reta. */
+function barPath(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+/**
+ * Gráfico de colunas 0–100% com 1–2 séries agrupadas e linha opcional.
+ * cfg: { n, series:[{values,color}], line?:{values,color}, xLabel(i), showX(i), tip(i) → {title, rows} }
+ */
+function columnChart(host, cfg) {
+  host.replaceChildren();
+  const W = host.clientWidth, H = host.clientHeight;
+  if (!W) return;
+  const m = { l: 34, r: cfg.line ? 36 : 4, t: 8, b: 22 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const y = (v) => m.t + ph - (v / 100) * ph;
+  const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'block overflow-visible' });
+
+  for (const v of [0, 50, 100]) {
+    svg.append(svgEl('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: 'var(--c-grid)', 'stroke-width': 1, 'shape-rendering': 'crispEdges' }));
+    const t = svgEl('text', { x: m.l - 8, y: y(v) + 3.5, 'text-anchor': 'end', 'font-size': 10, fill: 'var(--c-axis)', class: 'tabular-nums' });
+    t.textContent = `${v}%`;
+    svg.append(t);
+  }
+
+  const band = pw / cfg.n, k = cfg.series.length, gap = 2;
+  const bw = Math.max(2, Math.min(24, (band * 0.7 - gap * (k - 1)) / k));
+  const groupW = bw * k + gap * (k - 1);
+  const wash = svgEl('rect', { x: 0, y: m.t, width: band, height: ph, fill: 'var(--c-hover)', rx: 4, visibility: 'hidden' });
+  svg.append(wash);
+  const cx = (i) => m.l + band * i + band / 2;
+
+  for (let i = 0; i < cfg.n; i++) {
+    cfg.series.forEach((s, j) => {
+      const v = s.values[i];
+      if (v == null) return;
+      const x = cx(i) - groupW / 2 + j * (bw + gap);
+      const h = v > 0 ? Math.max(2, (v / 100) * ph) : 2;
+      svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: s.color, opacity: v > 0 ? 1 : 0.35 }));
+    });
+    if (cfg.showX(i)) {
+      const t = svgEl('text', { x: cx(i), y: H - 5, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--c-axis)', class: 'tabular-nums' });
+      t.textContent = cfg.xLabel(i);
+      svg.append(t);
+    }
+  }
+
+  if (cfg.line) {
+    const pts = cfg.line.values.map((v, i) => (v == null ? null : [cx(i), y(v)])).filter(Boolean);
+    if (pts.length) {
+      if (pts.length > 1) {
+        svg.append(svgEl('path', { d: 'M' + pts.map((p) => p.join(',')).join('L'), fill: 'none', stroke: cfg.line.color,
+          'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+      }
+      const [ex, ey] = pts[pts.length - 1];
+      svg.append(svgEl('circle', { cx: ex, cy: ey, r: 4, fill: cfg.line.color, stroke: 'var(--c-surface)', 'stroke-width': 2 }));
+      const lastV = cfg.line.values.filter((v) => v != null).pop();
+      const t = svgEl('text', { x: ex + 8, y: ey + 3.5, 'font-size': 11, 'font-weight': 600, class: 'fill-zinc-700 dark:fill-zinc-300' });
+      t.textContent = `${Math.round(lastV)}%`;
+      svg.append(t);
+    }
+  }
+
+  // Alvos de hover/foco: a faixa inteira de cada coluna
+  for (let i = 0; i < cfg.n; i++) {
+    const hit = svgEl('rect', { x: m.l + band * i, y: m.t, width: band, height: ph, fill: 'transparent', tabindex: 0, class: 'outline-none' });
+    const show = (e) => {
+      wash.setAttribute('x', m.l + band * i);
+      wash.setAttribute('visibility', 'visible');
+      const { title, rows } = cfg.tip(i);
+      showTip(e, title, rows);
+    };
+    const hide = () => { wash.setAttribute('visibility', 'hidden'); hideTip(); };
+    hit.addEventListener('pointerenter', show);
+    hit.addEventListener('pointermove', moveTip);
+    hit.addEventListener('pointerleave', hide);
+    hit.addEventListener('focus', show);
+    hit.addEventListener('blur', hide);
+    svg.append(hit);
+  }
+  host.append(svg);
+}
+
+function renderCharts() {
+  const ms = lastMonth;
+  if (!ms) return;
+  // Evolução do mês: conclusão diária + média acumulada
+  const daily = ms.days.map((d) => (d.p == null ? null : d.p * 100));
+  let sum = 0, cnt = 0;
+  const running = daily.map((v) => (v == null ? null : ((sum += v), ++cnt, sum / cnt)));
+  columnChart($('#chart-month'), {
+    n: ms.daysIn,
+    series: [{ values: daily, color: 'var(--c-habit)' }],
+    line: { values: running, color: 'var(--c-avg)' },
+    xLabel: (i) => String(i + 1),
+    showX: (i) => i === 0 || i === ms.daysIn - 1 || ((i + 1) % 5 === 0 && ms.daysIn - (i + 1) >= 3),
+    tip: (i) => {
+      const d = ms.days[i];
+      if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+      return { title: fmtDay.format(d.date), rows: [
+        { value: fmtPct(d.p), label: 'conclusão do dia', color: 'var(--c-habit)', box: true },
+        { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
+      ] };
+    },
+  });
+
+  // Evolução semanal: últimas 8 semanas até a semana atual (ou a última do mês visto)
+  const tk = todayKey(), cur = new Date();
+  const isCurrent = view.y === cur.getFullYear() && view.m === cur.getMonth();
+  const anchor = weekStart(isCurrent ? cur : new Date(view.y, view.m + 1, 0));
+  const weeks = [];
+  for (let i = 7; i >= 0; i--) {
+    const start = addDays(anchor, -7 * i), vals = [];
+    for (let d = 0; d < 7; d++) {
+      const k = keyOf(addDays(start, d));
+      if (k >= S.startDate && k <= tk) { const p = completion(k); if (p != null) vals.push(p); }
+    }
+    const wk = keyOf(start), g = S.weeks[wk]?.goals || [];
+    weeks.push({ start, habit: vals.length ? avg(vals) * 100 : null, goal: g.length ? (g.filter((x) => x.done).length / g.length) * 100 : null,
+                 gDone: g.filter((x) => x.done).length, gTotal: g.length, days: vals.length });
+  }
+  columnChart($('#chart-week'), {
+    n: weeks.length,
+    series: [{ values: weeks.map((w) => w.habit), color: 'var(--c-habit)' },
+             { values: weeks.map((w) => w.goal), color: 'var(--c-goal)' }],
+    xLabel: (i) => `${weeks[i].start.getDate()}/${weeks[i].start.getMonth() + 1}`,
+    showX: () => true,
+    tip: (i) => {
+      const w = weeks[i];
+      return { title: `Semana de ${fmtShort.format(w.start)}`, rows: [
+        { value: w.habit == null ? '—' : `${Math.round(w.habit)}%`, label: w.habit == null ? 'hábitos: sem registro' : `hábitos · média de ${w.days} ${w.days === 1 ? 'dia' : 'dias'}`, color: 'var(--c-habit)', box: true },
+        { value: w.gTotal ? `${w.gDone}/${w.gTotal}` : '—', label: w.gTotal ? 'metas concluídas' : 'sem metas', color: 'var(--c-goal)', box: true },
+      ] };
+    },
+  });
+}
+
+let resizeRaf;
+new ResizeObserver(() => { cancelAnimationFrame(resizeRaf); resizeRaf = requestAnimationFrame(renderCharts); })
+  .observe($('#chart-month'));
+
+// ---------- Tooltip ----------
+const tipEl = $('#tip');
+function showTip(e, title, rows) {
+  tipEl.replaceChildren();
+  const t = document.createElement('p');
+  t.className = 'mb-1.5 text-zinc-500';
+  t.textContent = title[0].toUpperCase() + title.slice(1);
+  tipEl.append(t);
+  for (const r of rows) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 py-0.5';
+    if (r.color) {
+      const key = document.createElement('span');
+      key.className = r.box ? 'h-2.5 w-2.5 shrink-0 rounded-sm' : 'h-0.5 w-2.5 shrink-0 rounded-full';
+      key.style.background = r.color;
+      row.append(key);
+    }
+    const v = document.createElement('span');
+    v.className = 'font-semibold tabular-nums text-zinc-900 dark:text-zinc-100';
+    v.textContent = r.value;
+    const l = document.createElement('span');
+    l.className = 'text-zinc-500';
+    l.textContent = r.label;
+    row.append(v, l);
+    tipEl.append(row);
+  }
+  tipEl.classList.remove('hidden');
+  moveTip(e);
+}
+function moveTip(e) {
+  let x, y;
+  if (e.type === 'focus' || e.clientX == null) {
+    const r = e.target.getBoundingClientRect();
+    x = r.left + r.width / 2; y = r.top;
+  } else { x = e.clientX; y = e.clientY; }
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let left = x + 14, top = y - h - 10;
+  if (left + w > innerWidth - 8) left = x - w - 14;
+  if (left < 8) left = 8;
+  if (top < 8) top = y + 18;
+  tipEl.style.left = `${left}px`;
+  tipEl.style.top = `${top}px`;
+}
+function hideTip() { tipEl.classList.add('hidden'); }
+
+/* =========================================================
+   AÇÕES
+   ========================================================= */
+function commit(...renders) { save(); renders.forEach((r) => r()); }
+const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); };
+
+function toggleTask(id) {
+  syncToday();
+  const d = day();
+  d.done = d.done.includes(id) ? d.done.filter((x) => x !== id) : [...d.done, id];
+  commit(renderTasks, renderProgress);
+}
+function addTask(title) {
+  title = title.trim();
+  if (!title) return;
+  S.tasks.push({ id: uid(), title });
+  syncToday();
+  commit(renderTasks, renderProgress);
+}
+function removeTask(id) {
+  S.tasks = S.tasks.filter((t) => t.id !== id);
+  if (editingTask === id) editingTask = null;
+  syncToday();
+  commit(renderTasks, renderProgress);
+}
+function setTaskDays(id, days) {
+  const t = S.tasks.find((x) => x.id === id);
+  if (!t || !days.length) return;
+  if (days.length === 7) delete t.days;
+  else t.days = [...new Set(days)].sort();
+  syncToday();
+  commit(renderTasks, renderProgress);
+}
+const monthGoals = () => { const mk = monthKey(view.y, view.m); const m = (S.months[mk] ||= { goals: [] }); m.goals ||= []; return m; };
+function toggleMonthGoal(id) {
+  const g = monthGoals().goals.find((x) => x.id === id);
+  if (g) g.done = !g.done;
+  commit(renderMonth, renderStudy);
+}
+function addMonthGoal(title) {
+  title = title.trim();
+  if (!title) return;
+  monthGoals().goals.push({ id: uid(), title, done: false });
+  commit(renderMonth);
+}
+function removeMonthGoal(id) {
+  const m = monthGoals();
+  m.goals = m.goals.filter((x) => x.id !== id);
+  commit(renderMonth, renderStudy);
+}
+function toggleGoal(id) {
+  const g = week().goals.find((x) => x.id === id);
+  if (g) g.done = !g.done;
+  commit(renderGoals, renderMonth, renderStudy, renderReview);
+}
+function addGoal(title) {
+  title = title.trim();
+  if (!title) return;
+  week().goals.push({ id: uid(), title, done: false });
+  commit(renderGoals, renderMonth);
+}
+function removeGoal(id) {
+  const w = week();
+  w.goals = w.goals.filter((x) => x.id !== id);
+  commit(renderGoals, renderMonth, renderStudy);
+}
+function copyLastWeekGoals() {
+  const prev = S.weeks[keyOf(addDays(weekStart(new Date()), -7))];
+  if (!prev) return;
+  week().goals = prev.goals.map((g) => ({ id: uid(), title: g.title, done: false }));
+  commit(renderGoals, renderMonth);
+}
+function setEnergy(i) {
+  const d = day();
+  d.energy = d.energy === i ? 0 : i;
+  commit(renderSleep);
+}
+function setSleep(v) {
+  const d = day();
+  d.sleep = v == null || isNaN(v) ? null : Math.min(16, Math.max(0, Math.round(v * 4) / 4));
+  commit(renderSleep);
+}
+function addStudy(min, session = false) {
+  const d = day();
+  d.studyMin = Math.max(0, d.studyMin + min);
+  if (session) d.sessions++;
+  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview);
+}
+
+const T = () => S.timer;
+function timerMain() {
+  const t = T();
+  if (t.status === 'running') { t.remaining = timerRemaining(); t.status = 'paused'; t.endAt = null; }
+  else { t.endAt = Date.now() + t.remaining * 1000; t.status = 'running'; }
+  commit(renderTimer);
+}
+function timerReset() { const t = T(); t.status = 'idle'; t.endAt = null; t.remaining = t.mode * 60; }
+function timerStop() {
+  const t = T(), mins = Math.floor((t.mode * 60 - timerRemaining()) / 60);
+  timerReset();
+  if (mins > 0) { addStudy(mins); flashNote(`+${fmtMin(mins)} registrados`); }
+  else { commit(renderTimer); flashNote('Menos de 1 min — nada registrado'); }
+}
+function timerComplete() {
+  const mode = T().mode;
+  timerReset();
+  addStudy(mode, true);
+  flashNote(`Sessão de ${mode} min concluída · +${mode} XP`);
+  beep();
+}
+
+/* =========================================================
+   EVENTOS
+   ========================================================= */
+$('#theme-toggle').onclick = () => {
+  const dark = document.documentElement.classList.toggle('dark');
+  S.settings.theme = dark ? 'dark' : 'light';
+  save();
+  renderHeatmap();
+};
+
+$('#one-input').addEventListener('input', (e) => { day().oneThing = e.target.value; save(); renderOne(); });
+$('#one-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+$('#one-check').onclick = () => {
+  const d = day();
+  d.oneDone = !d.oneDone;
+  commit(renderOne, renderHeatmap, renderStudy);
+};
+
+$('#task-form').onsubmit = (e) => {
+  e.preventDefault();
+  addTask($('#task-input').value);
+  $('#task-input').value = '';
+};
+
+$('#goal-form').onsubmit = (e) => {
+  e.preventDefault();
+  addGoal($('#goal-input').value);
+  $('#goal-input').value = '';
+};
+$('#copy-goals').onclick = copyLastWeekGoals;
+
+$('#month-prev').onclick = () => { view.m--; if (view.m < 0) { view.m = 11; view.y--; } renderMonth(); };
+$('#month-next').onclick = () => { view.m++; if (view.m > 11) { view.m = 0; view.y++; } renderMonth(); };
+
+$('#mgoal-form').onsubmit = (e) => {
+  e.preventDefault();
+  addMonthGoal($('#mgoal-input').value);
+  $('#mgoal-input').value = '';
+};
+
+$('#sg-input').addEventListener('change', (e) => {
+  const v = Math.round(Number(e.target.value));
+  if (v >= 1 && v <= 80) S.settings.studyGoalH = v;
+  commit(renderStudy, renderReview);
+});
+$('#sg-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+
+// Revisão da semana
+$('#review-open').onclick = () => {
+  reviewManual = true;
+  reviewWeek = weekStart(new Date());
+  renderReview();
+  $('#review-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+$('#review-prev').onclick = () => { reviewManual = true; reviewWeek = addDays(reviewWeek, -7); renderReview(); };
+$('#review-next').onclick = () => { reviewManual = true; reviewWeek = addDays(reviewWeek, 7); renderReview(); };
+$('#review-close').onclick = () => {
+  if (!reviewManual && reviewWeek) week(keyOf(reviewWeek)).reviewDone = true;  // não reaparece sozinha
+  reviewManual = false; reviewWeek = null;
+  save();
+  $('#review-card').classList.add('hidden');
+};
+$('#review-note').addEventListener('input', (e) => { week(keyOf(reviewWeek)).review = e.target.value; save(); renderGoals(); });
+$('#review-done').onclick = () => {
+  week(keyOf(reviewWeek)).reviewDone = true;
+  reviewManual = false; reviewWeek = null;
+  commit(renderReview);
+};
+
+// Diálogos: fechar no X ou clicando fora
+$$('dialog').forEach((dlg) => {
+  dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+});
+$('#journal-open').onclick = () => { $('#journal-search').value = ''; renderJournal(); $('#journal').showModal(); };
+$('#journal-search').addEventListener('input', renderJournal);
+
+$('#reset-day').onclick = (e) => {
+  const btn = e.currentTarget;
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = '1';
+    btn.textContent = 'Confirmar?';
+    btn.classList.add('text-rose-500');
+    setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Zerar dia'; btn.classList.remove('text-rose-500'); }, 3000);
+    return;
+  }
+  delete btn.dataset.armed;
+  btn.textContent = 'Zerar dia';
+  btn.classList.remove('text-rose-500');
+  day().done = [];
+  commit(renderTasks, renderProgress);
+};
+
+$$('[data-sleep]').forEach((b) => b.onclick = () => {
+  const cur = day().sleep;
+  setSleep(cur == null ? 7 : cur + Number(b.dataset.sleep));
+});
+$('#sleep-input').addEventListener('change', (e) => setSleep(e.target.value === '' ? null : parseFloat(e.target.value)));
+
+$('#topic').addEventListener('input', (e) => { day().topic = e.target.value; save(); });
+$$('[data-add]').forEach((b) => b.onclick = () => addStudy(Number(b.dataset.add)));
+
+$('#timer-main').onclick = timerMain;
+$('#timer-stop').onclick = timerStop;
+$$('#mode-toggle button').forEach((b) => b.onclick = () => {
+  const t = T();
+  if (t.status !== 'idle') return;
+  t.mode = Number(b.dataset.mode);
+  t.remaining = t.mode * 60;
+  commit(renderTimer);
+});
+
+let reflectTimer;
+['win', 'improve'].forEach((id) => $('#' + id).addEventListener('input', (e) => {
+  day()[id] = e.target.value;
+  save();
+  const s = $('#reflect-saved');
+  s.classList.remove('opacity-0');
+  clearTimeout(reflectTimer);
+  reflectTimer = setTimeout(() => s.classList.add('opacity-0'), 1200);
+}));
+function renderReflection() {
+  const d = day();
+  ['win', 'improve'].forEach((id) => { const el = $('#' + id); if (document.activeElement !== el) el.value = d[id]; });
+}
+
+// Backup
+$('#export-btn').onclick = () => {
+  const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `painel-backup-${todayKey()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('#import-btn').onclick = () => $('#import-file').click();
+$('#import-file').onchange = async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.version !== 1 || !Array.isArray(data.tasks) || typeof data.days !== 'object') throw new Error();
+    if (!confirm('Substituir todos os dados atuais por este backup?')) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    S = loadState();
+    sigs.clear();   // tudo conta como editado agora → o backup vence na sincronização
+    renderAll();
+  } catch (err) {
+    alert('Arquivo de backup inválido.');
+  }
+};
+
+/* =========================================================
+   SINCRONIZAÇÃO — GitHub Gist secreto
+   Ciclo: baixa o gist → mescla (registro mais recente vence) → sobe o resultado.
+   ========================================================= */
+const SYNC_KEY = 'evolution-dashboard-sync';
+const GIST_FILE = 'painel-pessoal.json';
+let syncCfg = (() => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch (e) { return {}; } })();
+const saveSyncCfg = () => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg)); } catch (e) {} };
+let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syncTimer;
+
+/** O que vai para o gist: tudo menos o timer e o tema (esses são por aparelho). */
+function syncPayload() {
+  return { version: 1, startDate: S.startDate, tasks: S.tasks, tasksU: S.tasksU || 0,
+           days: S.days, weeks: S.weeks, months: S.months,
+           settings: { studyGoalH: S.settings.studyGoalH }, settingsU: S.settingsU || 0 };
+}
+
+function mergeRemote(r) {
+  if (!r || r.version !== 1) return false;
+  let changed = false;
+  for (const col of SYNCED) {
+    const L = S[col], R = r[col] || {};
+    for (const [k, rec] of Object.entries(R)) {
+      if (!L[k] || (rec.u || 0) > (L[k].u || 0)) { L[k] = rec; changed = true; }
+    }
+  }
+  if ((r.tasksU || 0) > (S.tasksU || 0)) { S.tasks = r.tasks; S.tasksU = r.tasksU; changed = true; }
+  if ((r.settingsU || 0) > (S.settingsU || 0)) {
+    S.settings.studyGoalH = r.settings?.studyGoalH ?? S.settings.studyGoalH;
+    S.settingsU = r.settingsU; changed = true;
+  }
+  if (r.startDate && r.startDate < S.startDate) { S.startDate = r.startDate; changed = true; }
+  if (changed) {
+    rememberSigs();   // o que veio do gist não conta como edição local
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+  }
+  return changed;
+}
+
+async function gh(path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, {
+    ...opts,
+    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${syncCfg.token}`,
+               'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+  });
+  if (!res.ok) { const e = new Error(`GitHub ${res.status}`); e.status = res.status; throw e; }
+  return res.json();
+}
+
+/** Procura o gist do painel na conta (para o 2º aparelho achar sozinho) ou cria um. */
+async function findOrCreateGist() {
+  for (let page = 1; page <= 10; page++) {
+    const list = await gh(`/gists?per_page=100&page=${page}`);
+    const found = list.find((g) => g.files && g.files[GIST_FILE]);
+    if (found) return found.id;
+    if (list.length < 100) break;
+  }
+  const g = await gh('/gists', { method: 'POST', body: JSON.stringify({
+    description: 'Painel Pessoal — dados sincronizados', public: false,
+    files: { [GIST_FILE]: { content: JSON.stringify(syncPayload()) } } }) });
+  return g.id;
+}
+
+async function syncNow() {
+  if (!syncCfg.token) return;
+  if (syncBusy) { syncAgain = true; return; }
+  syncBusy = true; clearTimeout(syncTimer);
+  setSyncStatus('syncing');
+  try {
+    if (!syncCfg.gistId) { syncCfg.gistId = await findOrCreateGist(); saveSyncCfg(); }
+    let remoteText = '';
+    try {
+      const g = await gh(`/gists/${syncCfg.gistId}`);
+      const f = g.files?.[GIST_FILE];
+      if (f) remoteText = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+    } catch (e) {
+      if (e.status !== 404) throw e;
+      syncCfg.gistId = null; saveSyncCfg();       // gist apagado: recria na próxima volta
+      syncAgain = true;
+      throw Object.assign(new Error('gist não encontrado'), { status: 404 });
+    }
+    if (remoteText && mergeRemote(JSON.parse(remoteText))) renderAll(false);
+    const out = JSON.stringify(syncPayload());
+    clearTimeout(syncTimer);   // o que foi carimbado até aqui já vai neste envio
+    if (out !== remoteText) {
+      await gh(`/gists/${syncCfg.gistId}`, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: out } } }) });
+    }
+    syncCfg.last = Date.now(); saveSyncCfg();
+    setSyncStatus('ok');
+  } catch (e) {
+    setSyncStatus('error',
+      e.status === 401 ? 'Token inválido ou expirado.'
+      : e.status === 403 ? 'O token não tem permissão de gist (ou o limite da API foi atingido).'
+      : e.status === 404 ? 'Gist não encontrado — vou criar outro.'
+      : navigator.onLine === false ? 'Sem internet — tento de novo quando voltar.'
+      : `Falha ao sincronizar (${e.message}).`);
+  } finally {
+    syncBusy = false;
+    if (syncAgain) { syncAgain = false; syncTimer = setTimeout(syncNow, 1500); }
+  }
+}
+function scheduleSync() {
+  if (!syncCfg.token) return;
+  clearTimeout(syncTimer);
+  setSyncStatus('pending');
+  syncTimer = setTimeout(syncNow, 4000);
+}
+
+function setSyncStatus(st, err = '') {
+  syncStatus = syncCfg.token ? st : 'off';
+  syncError = err;
+  renderSync();
+}
+function renderSync() {
+  const on = !!syncCfg.token;
+  const color = { ok: 'bg-emerald-500', syncing: 'bg-sky-500', pending: 'bg-amber-400', error: 'bg-rose-500' }[syncStatus] || '';
+  $('#sync-dot').className = `absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${on ? color : 'hidden'}`;
+  $('#sync-dot2').className = `h-2 w-2 rounded-full ${color || 'bg-zinc-400'}`;
+  const time = syncCfg.last ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(syncCfg.last) : '';
+  const label = { ok: `Sincronizado às ${time}`, syncing: 'Sincronizando…', pending: 'Alterações a enviar…',
+                  error: 'Erro na sincronização' }[syncStatus] || 'Conectado';
+  $('#sync-btn').title = on ? label : 'Sincronização desligada';
+  $('#sync-off').classList.toggle('hidden', on);
+  $('#sync-on').classList.toggle('hidden', !on);
+  $('#sync-status').textContent = label;
+  $('#sync-gist-link').href = syncCfg.gistId ? `https://gist.github.com/${syncCfg.gistId}` : '#';
+  $('#sync-gist-link').classList.toggle('hidden', !syncCfg.gistId);
+  $('#sync-error').classList.toggle('hidden', !syncError);
+  $('#sync-error').textContent = syncError;
+  $('#sync-now').disabled = syncStatus === 'syncing';
+}
+
+$('#sync-btn').onclick = () => { renderSync(); $('#sync-dialog').showModal(); };
+$('#sync-connect').onclick = () => {
+  const token = $('#sync-token').value.trim();
+  if (!token) return;
+  syncCfg = { token };
+  saveSyncCfg();
+  $('#sync-token').value = '';
+  syncNow();
+};
+$('#sync-now').onclick = syncNow;
+$('#sync-disconnect').onclick = () => {
+  syncCfg = {};
+  try { localStorage.removeItem(SYNC_KEY); } catch (e) {}
+  clearTimeout(syncTimer);
+  setSyncStatus('off');
+};
+window.addEventListener('online', () => { if (syncStatus === 'error' || syncStatus === 'pending') syncNow(); });
+setInterval(() => { if (!document.hidden && syncCfg.token) syncNow(); }, 5 * 60 * 1000);
+
+/* =========================================================
+   CICLO DE VIDA — tick do timer + virada do dia à meia-noite
+   ========================================================= */
+let currentDay = todayKey();
+function renderAll(openReflection = true) {
+  syncToday();
+  save();
+  renderHeader(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
+  renderSleep(); renderStudy(); renderTimer(); renderReflection(); renderMonth(); renderReview(); renderSync();
+  // Reflexão abre sozinha à noite
+  if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
+}
+
+setInterval(() => {
+  if (todayKey() !== currentDay) {   // meia-noite: o dia anterior fica no histórico, hoje começa zerado
+    currentDay = todayKey();
+    renderAll();
+  }
+  if (S.timer.status === 'running') {
+    if (timerRemaining() <= 0) timerComplete();
+    else renderTimer();
+  }
+}, 1000);
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { currentDay = todayKey(); renderAll(false); if (syncCfg.token) syncNow(); }
+});
+setInterval(renderHeader, 60000);
+
+// Se um pomodoro terminou com a aba fechada, registra ao abrir
+if (S.timer.status === 'running' && timerRemaining() <= 0) timerComplete();
+renderAll();
+if (syncCfg.token) syncNow();
+</script>
+</body>
+</html>
