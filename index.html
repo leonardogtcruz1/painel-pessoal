@@ -4729,7 +4729,7 @@ $('#import-file').onchange = async (e) => {
    ========================================================= */
 // Project URL e chave publishable (sb_publishable_…) do Supabase. A chave pode ficar no código:
 // quem não fizer login não lê nem grava nada (RLS). Vazio = painel só local, sem nuvem.
-const CLOUD = { url: '', key: '' };
+const CLOUD = { url: 'https://utqnuvepeajjmsvazxej.supabase.co', key: 'sb_publishable_DOW0bPnFScrGcOMgM3dN9w_qKN0N9Lw' };
 const TABLE = 'dashboard_state';
 const DEVICE = (() => {
   try { let d = localStorage.getItem('evolution-device'); if (!d) { d = uid(); localStorage.setItem('evolution-device', d); } return d; }
