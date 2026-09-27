@@ -770,6 +770,7 @@
       <div class="flex gap-1">
         <button id="export-btn" class="btn-ghost text-xs">Exportar backup</button>
         <button id="import-btn" class="btn-ghost text-xs">Importar</button>
+        <button id="reset-all" class="btn-ghost text-xs hover:!text-rose-500">Zerar tudo</button>
         <input id="import-file" type="file" accept="application/json,.json" class="hidden" />
       </div>
     </footer>
@@ -889,6 +890,7 @@ const weekKey = (d) => keyOf(weekStart(d));
 function freshState() {
   return {
     version: 1,
+    resetAt: 0,  // "época" dos dados: zerar/importar cria uma nova, que prevalece sobre a sincronização antiga
     startDate: todayKey(),
     tasks: DEFAULT_TASKS.map((title) => ({ id: uid(), title })),
     days: {},
@@ -4692,6 +4694,47 @@ $('#export-btn').onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 $('#import-btn').onclick = () => $('#import-file').click();
+
+/**
+ * Zerar tudo: baixa um backup, apaga os dados e começa do zero hoje (sem hábitos de exemplo).
+ * Mantém o tema e a conexão de sincronização; a nova época apaga os dados antigos do gist
+ * e dos outros aparelhos na próxima sincronização.
+ */
+function resetAll() {
+  $('#export-btn').click();
+  const theme = S.settings.theme;
+  S = freshState();
+  S.tasks = [];
+  S.settings.theme = theme;
+  S.resetAt = Date.now();
+  selKey = todayKey();
+  editingTask = taskDraft = editingMetric = metricDraft = projectEditing = projectDraft = projectLogOpen = null;
+  reviewManual = false; reviewWeek = null; mreviewManual = false; mreview = null; lastReview = null;
+  managingSubjects = managingQuestions = addingSubject = false; subjectDrafts = questionDrafts = null;
+  view = { y: new Date().getFullYear(), m: new Date().getMonth() };
+  viewYear = view.y;
+  sigs.clear();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+  renderAll(false);
+  if (syncCfg.token) syncNow();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+$('#reset-all').onclick = (e) => {
+  const btn = e.currentTarget;
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = '1';
+    btn.textContent = 'Apagar tudo? Clique de novo (baixa um backup antes)';
+    btn.classList.add('!text-rose-500');
+    clearTimeout(btn.t);
+    btn.t = setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Zerar tudo'; btn.classList.remove('!text-rose-500'); }, 5000);
+    return;
+  }
+  clearTimeout(btn.t);
+  delete btn.dataset.armed;
+  btn.textContent = 'Zerar tudo';
+  btn.classList.remove('!text-rose-500');
+  resetAll();
+};
 $('#import-file').onchange = async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
@@ -4700,7 +4743,7 @@ $('#import-file').onchange = async (e) => {
     const data = JSON.parse(await file.text());
     if (data.version !== 1 || !Array.isArray(data.tasks) || typeof data.days !== 'object') throw new Error();
     if (!confirm('Substituir todos os dados atuais por este backup?')) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, resetAt: Date.now() }));   // nova época: o backup substitui o gist
     S = loadState();
     sigs.clear();   // tudo conta como editado agora → o backup vence na sincronização
     renderAll();
@@ -4722,13 +4765,23 @@ let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syn
 /** O que vai para o gist: tudo menos o tema e a matéria selecionada (esses são por aparelho). */
 function syncPayload() {
   const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
-  return { version: 1, startDate: S.startDate, ...lists,
+  return { version: 1, resetAt: S.resetAt || 0, startDate: S.startDate, ...lists,
            days: S.days, weeks: S.weeks, months: S.months,
            settings: { studyGoalH: S.settings.studyGoalH }, settingsU: S.settingsU || 0 };
 }
 
 function mergeRemote(r) {
   if (!r || r.version !== 1) return false;
+  // Épocas diferentes: não mescla. A mais nova substitui a outra por inteiro.
+  if ((S.resetAt || 0) > (r.resetAt || 0)) return false;   // este aparelho foi zerado/importado → o envio sobrescreve o gist
+  if ((r.resetAt || 0) > (S.resetAt || 0)) {                 // outro aparelho zerou/importou → adota o gist
+    const keep = { theme: S.settings.theme, studySubject: S.settings.studySubject };
+    const base = freshState();
+    S = { ...base, ...r, tasks: r.tasks || [], settings: { ...base.settings, ...r.settings, ...keep } };
+    rememberSigs();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+    return true;
+  }
   let changed = false;
   for (const col of SYNCED) {
     const L = S[col], R = r[col] || {};
