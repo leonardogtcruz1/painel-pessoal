@@ -42,6 +42,13 @@
       .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-500; }
     }
     html { -webkit-font-smoothing: antialiased; }
+    /* Dia antes do 1º uso do painel: X, fora de qualquer cálculo */
+    .day-x {
+      background:
+        linear-gradient(to top right, transparent calc(50% - 0.75px), var(--c-axis) calc(50% - 0.75px), var(--c-axis) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
+        linear-gradient(to top left, transparent calc(50% - 0.75px), var(--c-axis) calc(50% - 0.75px), var(--c-axis) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+      opacity: 0.45;
+    }
     body { background: #fafafa; }
     html.dark body { background: #09090b; }
 
@@ -451,6 +458,7 @@
                     class="w-14 rounded-md border border-zinc-200 bg-transparent px-1.5 py-0.5 text-right text-sm font-medium text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:text-zinc-100" />
                   <span>min</span>
                   <button type="submit" class="chip">Salvar</button>
+                  <span id="study-hab" class="text-emerald-600 dark:text-emerald-400"></span>
                 </form>
               </div>
               <div>
@@ -574,6 +582,7 @@
           </div>
           <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
             <p class="text-xs text-zinc-500">Média da semana: <span id="sleep-avg" class="font-medium text-zinc-900 tabular-nums dark:text-zinc-100">—</span></p>
+            <p id="sleep-goal" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
             <p id="sleep-insight" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
           </div>
         </section>
@@ -588,6 +597,7 @@
             </div>
           </div>
           <div id="checkin" class="mt-4 space-y-4"></div>
+          <div id="checkin-summary" class="mt-4 space-y-1.5 text-xs text-zinc-500"></div>
           <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
             <p class="eyebrow">Tags do dia</p>
             <div id="day-tags" class="mt-2 flex flex-wrap gap-1.5"></div>
@@ -774,6 +784,8 @@
         </div>
         <div id="chart-year" class="relative mt-3 h-52"></div>
       </section>
+
+      <section id="month-detail" class="card hidden"></section>
 
       <div id="month-cards" class="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4"></div>
     </div>
@@ -1065,6 +1077,20 @@ function syncDay(k = todayKey()) {
   d.done = d.done.filter((id) => ids.has(id));
   for (const id of Object.keys(d.qty)) if (!ids.has(id)) { delete d.qty[id]; delete d.tgt[id]; }
   for (const t of list) {
+    // Hábito de check-in: feito quando as perguntas de nota/número do dia estão respondidas
+    if (t.checkin) {
+      const qs = checkinQs(), n = qs.filter((q) => d.answers?.[q.id] != null && d.answers[q.id] !== '').length;
+      if (qs.length) { d.qty[t.id] = n; d.tgt[t.id] = qs.length; } else { delete d.qty[t.id]; delete d.tgt[t.id]; }
+      const has = d.done.includes(t.id), full = qs.length && n >= qs.length;
+      if (full && !has) d.done.push(t.id);
+      if (!full && has) d.done = d.done.filter((x) => x !== t.id);
+      continue;
+    }
+    // Hábito de sono: a quantidade é o sono registrado no card "Sono & energia"
+    if (t.sleep) {
+      if (d.sleep != null) d.qty[t.id] = d.sleep;
+      else { delete d.qty[t.id]; d.done = d.done.filter((x) => x !== t.id); }
+    }
     if (!t.target) { delete d.qty[t.id]; delete d.tgt[t.id]; continue; }
     if (d.qty[t.id] == null) { if (!d.done.includes(t.id)) continue; d.qty[t.id] = t.target; } // era sim/não e estava feito
     d.tgt[t.id] = t.target;
@@ -1101,9 +1127,40 @@ function dayScore(d) {
   for (const [id, v] of Object.entries(d.qty || {})) if (!done.has(id) && d.tgt?.[id]) s += Math.min(1, v / d.tgt[id]);
   return Math.min(s, d.total) / d.total;
 }
+/** Minutos que um hábito vale num dia: pela unidade (min/hora) ou "cada vez vale X min" (`t.projectMin`). */
+function habitMinutes(t, rec) {
+  if (!rec) return 0;
+  const f = t.target ? minPerUnit(t.unit) : 0;
+  if (f) return Math.round((rec.qty?.[t.id] || 0) * f);
+  const done = rec.done?.includes(t.id) || rec.wk?.includes(t.id);
+  return done ? t.projectMin || 0 : 0;
+}
+/** Estudo vindo de hábitos com "Conta como estudo": total e por matéria ('' = sem matéria). */
+function habitStudy(rec) {
+  const res = { total: 0, by: {} };
+  if (!rec) return res;
+  for (const t of S.tasks) {
+    if (!t.study) continue;
+    const m = habitMinutes(t, rec);
+    if (!m) continue;
+    res.total += m;
+    const k = t.studySubject || '';
+    res.by[k] = (res.by[k] || 0) + m;
+  }
+  return res;
+}
+/** Estudo do dia = registro manual + hábitos que contam como estudo. */
+const studyOf = (rec) => (rec?.studyMin || 0) + habitStudy(rec).total;
 /** Quanto de um hábito foi feito num registro de dia (0–1). */
 function habitDone(rec, id) {
   if (!rec) return 0;
+  // Hábitos automáticos: calculados do próprio dado do dia (vale também para dias antes de criar o hábito)
+  const auto = S.tasks.find((t) => t.id === id && (t.sleep || t.checkin));
+  if (auto?.sleep) return rec.sleep == null ? 0 : Math.min(1, rec.sleep / auto.target);
+  if (auto?.checkin) {
+    const qs = checkinQs();
+    return qs.length ? qs.filter((q) => rec.answers?.[q.id] != null && rec.answers[q.id] !== '').length / qs.length : 0;
+  }
   if (rec.done.includes(id) || rec.wk?.includes(id)) return 1;
   const v = rec.qty?.[id], t = rec.tgt?.[id];
   return v && t ? Math.min(1, v / t) : 0;
@@ -1121,7 +1178,7 @@ function averageBetween(from, to) {
 /** Minutos estudados na semana que começa em `ws`. */
 function weekStudyMin(ws) {
   let m = 0;
-  for (let i = 0; i < 7; i++) m += peek(keyOf(addDays(ws, i)))?.studyMin || 0;
+  for (let i = 0; i < 7; i++) m += studyOf(peek(keyOf(addDays(ws, i))));
   return m;
 }
 
@@ -1149,14 +1206,14 @@ function weekSummary(ws) {
 
 function studyStreak() {
   let d = new Date();
-  if (!(peek(keyOf(d))?.studyMin > 0)) d = addDays(d, -1); // hoje ainda conta se estudou ontem
+  if (!(studyOf(peek(keyOf(d))) > 0)) d = addDays(d, -1); // hoje ainda conta se estudou ontem
   let n = 0;
-  while (peek(keyOf(d))?.studyMin > 0) { n++; d = addDays(d, -1); }
+  while (studyOf(peek(keyOf(d))) > 0) { n++; d = addDays(d, -1); }
   return n;
 }
 
 function bestStreak() {
-  const keys = Object.keys(S.days).filter((k) => S.days[k].studyMin > 0).sort();
+  const keys = Object.keys(S.days).filter((k) => studyOf(S.days[k]) > 0).sort();
   let best = 0, run = 0, prev = null;
   for (const k of keys) {
     run = prev && keyOf(addDays(parseKey(prev), 1)) === k ? run + 1 : 1;
@@ -1198,7 +1255,7 @@ function monthStats(y, m) {
     if (p != null) habitSum += p;
     if (p === 1) perfect++;
     if (rec?.oneDone) one++;
-    study += rec?.studyMin || 0;
+    study += studyOf(rec);
     if (rec && rec.sleep != null) sleeps.push(rec.sleep);
     days.push({ date, k, p, rec, future, free });
   }
@@ -1237,7 +1294,7 @@ const fmtMin = (m) => {
 };
 const fmtSleep = (h) => {
   const whole = Math.floor(h), m = Math.round((h - whole) * 60);
-  return m ? `${whole}h ${pad(m)}m` : `${whole}h`;
+  return m ? `${whole}h ${pad(m)}min` : `${whole}h`;
 };
 
 /* =========================================================
@@ -1488,7 +1545,7 @@ function emptyRow(text) {
  */
 let taskDraft = null;
 function scheduleEditor(t) {
-  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '', metricAdd: !!t.metricAdd, projectMin: t.projectMin || '',
+  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '', metricAdd: !!t.metricAdd, projectMin: t.projectMin || '', study: t.study ? t.studySubject || '*' : '',
                                               weeklyMode: isWeekly(t), onceMode: !!t.once, weekly: t.weekly || 3 };
   const dr = taskDraft;
   const wrapLi = document.createElement('li');
@@ -1561,7 +1618,8 @@ function scheduleEditor(t) {
     : 'Só marca feito ou não feito. Escolha "Quantidade" para anotar quanto fez (páginas, ml, km…).'));
   const kRow = document.createElement('div');
   kRow.className = 'mt-1.5 flex flex-wrap items-center gap-1.5';
-  kRow.append(chip('Feito / não feito', !dr.qty, () => { dr.qty = false; renderTasks(); }),
+  if (t.sleep) dr.qty = true;
+  else kRow.append(chip('Feito / não feito', !dr.qty, () => { dr.qty = false; renderTasks(); }),
               chip('Quantidade', dr.qty, () => { dr.qty = true; renderTasks(); }));
   qBox.append(kRow);
   if (dr.qty) {
@@ -1625,8 +1683,23 @@ function scheduleEditor(t) {
   psel.disabled = !projs.length;
   psel.onchange = () => { dr.projectId = psel.value; renderTasks(); };
   pBox.append(psel);
+
+  // 5. Estudos
+  const sBox = document.createElement('div');
+  sBox.append(sectionLabel('Conta como estudo',
+    'O tempo deste hábito soma em "Estudos & evolução": total do dia, meta da semana, ofensiva e matérias.'));
+  const ssel = document.createElement('select');
+  ssel.className = small + ' mt-1.5 w-full max-w-xs';
+  ssel.setAttribute('aria-label', 'Conta como estudo');
+  ssel.append(new Option('Não', ''), new Option('Sim, sem matéria', '*'));
+  for (const sub of S.subjects) ssel.append(new Option(`Sim, em ${sub.name}`, sub.id, false, dr.study === sub.id));
+  ssel.value = dr.study;
+  ssel.onchange = () => { dr.study = ssel.value; renderTasks(); };
+  sBox.append(ssel);
+
+  // Tempo por vez (hábito de marcar ligado a projeto ou estudo)
   const minUnit = !dr.weeklyMode && dr.qty && minPerUnit(dr.unit) > 0;
-  if (dr.projectId && !minUnit) {
+  if ((dr.projectId || dr.study) && !minUnit) {
     const r = document.createElement('label');
     r.className = 'mt-2 flex items-center gap-1.5 text-xs text-zinc-500';
     const pm = document.createElement('input');
@@ -1634,8 +1707,12 @@ function scheduleEditor(t) {
     pm.value = dr.projectMin; pm.placeholder = '30';
     pm.className = small + ' w-20';
     pm.oninput = () => { dr.projectMin = pm.value; };
-    r.append('Cada vez vale', pm, 'min no projeto (opcional)');
-    pBox.append(r);
+    r.append('Cada vez vale', pm, `min ${[dr.projectId && 'no projeto', dr.study && 'de estudo'].filter(Boolean).join(' e ')}`);
+    sBox.append(r);
+  } else if (dr.study && minUnit) {
+    const h = document.createElement('p'); h.className = 'mt-1 text-[11px] text-zinc-500';
+    h.textContent = `Medido em ${dr.unit.trim()}: o tempo feito entra direto (1 hora = 60 min).`;
+    sBox.append(h);
   }
 
   // Ações
@@ -1655,12 +1732,13 @@ function scheduleEditor(t) {
     const qty = !dr.weeklyMode && dr.qty;
     const once = dr.onceMode ? t.once || selKey : null;
     setTaskConfig(t.id, { once, ...(once ? {} : { lateK: null, dropK: null }), target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
-                          metricAdd: dr.metricId && dr.metricAdd ? true : null, projectMin: dr.projectId && Number(dr.projectMin) > 0 ? Math.round(Number(dr.projectMin)) : null,
+                          metricAdd: dr.metricId && dr.metricAdd ? true : null, projectMin: (dr.projectId || dr.study) && Number(dr.projectMin) > 0 ? Math.round(Number(dr.projectMin)) : null,
+                          study: dr.study ? true : null, studySubject: dr.study && dr.study !== '*' ? dr.study : null,
                           weekly: dr.weeklyMode && !once ? dr.weekly : null, ...(dr.weeklyMode || once ? { days: null } : {}) });
   };
   act.append(err, cancel, saveBtn);
 
-  wrapLi.append(...(dr.weeklyMode ? [dBox, mBox, pBox, act] : [dBox, qBox, mBox, pBox, act]));
+  wrapLi.append(...(dr.weeklyMode ? [dBox, mBox, pBox, sBox, act] : [dBox, qBox, mBox, pBox, sBox, act]));
   return wrapLi;
 }
 
@@ -1678,10 +1756,10 @@ function renderTasks() {
   const projectName = (t) => S.projects.find((p) => p.id === t.projectId)?.name;
   const links = (t) => [metricName(t), projectName(t)].filter(Boolean).map((n) => `→ ${n}`);
   const row = (t, isOff) => {
-    const badge = [schedLabel(t), ...links(t)].filter(Boolean).join(' · ');
+    const badge = [schedLabel(t), t.sleep ? 'vem do card Sono' : '', t.checkin ? `vem do Check-in · ${d.qty?.[t.id] || 0}/${checkinQs().length}` : '', ...links(t)].filter(Boolean).join(' · ');
     ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
       badge, off: isOff, editing: editingTask === t.id,
-      qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => setQty(t.id, v) } : null,
+      qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => (t.sleep ? setSleep(v) : setQty(t.id, v)) } : null,
       onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
     }));
     if (editingTask === t.id) ul.append(scheduleEditor(t));
@@ -1718,11 +1796,11 @@ function renderTasks() {
   }
   $('#task-count').textContent = today.length ? `${d.done.length}/${today.length}` : '';
   // Hábito que não move nenhum número é candidato a sair (ou a ganhar uma métrica)
-  const loose = S.metrics.length ? habits().filter((t) => !t.metricId && !t.projectId).length : 0;
+  const loose = S.metrics.length ? habits().filter((t) => !t.metricId && !t.projectId && !t.study && !t.sleep && !t.checkin).length : 0;
   if (loose) {
     const li = document.createElement('li');
     li.className = 'pt-2 text-xs text-zinc-500';
-    li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica nem projeto — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
+    li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica, projeto ou estudo — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
     ul.append(li);
   }
 }
@@ -1840,7 +1918,7 @@ function renderKPIs() {
   const streak = studyStreak(), best = bestStreak();
   $('#kpi-streak').textContent = streak;
   $('#kpi-streak-unit').textContent = streak === 1 ? 'dia' : 'dias';
-  const studiedToday = d.studyMin > 0;
+  const studiedToday = studyOf(d) > 0;
   $('#kpi-streak-sub').textContent = streak && !studiedToday ? 'estude hoje para manter' : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
 }
 
@@ -1867,9 +1945,9 @@ function renderHeatmap() {
     const col = document.createElement('div');
     col.className = 'flex flex-col items-center gap-1.5';
     const sq = document.createElement('div');
-    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${HEAT[lvl]} ` +
+    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${k < S.startDate ? 'day-x' : HEAT[lvl]} ` +
       (k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
-    sq.title = `${fmt.format(date)} · ${p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
     const lbl = document.createElement('span');
     lbl.className = 'text-[10px] font-medium uppercase ' + (k === tk ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
     lbl.textContent = 'DSTQQSS'[date.getDay()];
@@ -1905,6 +1983,26 @@ function renderSleep() {
   const now = new Date(), vals = [];
   for (let i = 0; i < 7; i++) { const r = peek(keyOf(addDays(now, -i))); if (r && r.sleep != null) vals.push(r.sleep); }
   $('#sleep-avg').textContent = vals.length ? fmtSleep(avg(vals)) : '—';
+  const sh = sleepHabit(), goalEl = $('#sleep-goal');
+  goalEl.replaceChildren();
+  if (sh) {
+    const ws = weekStart(now);
+    let hit = 0, logged = 0;
+    for (let i = 0; i < 7; i++) {
+      const k = keyOf(addDays(ws, i)), r = peek(k);
+      if (k > todayKey() || r?.sleep == null) continue;
+      logged++;
+      if (r.sleep >= sh.target) hit++;
+    }
+    goalEl.textContent = `Meta de ${fmtSleep(sh.target)}: ${hit} de ${logged} ${logged === 1 ? 'noite registrada' : 'noites registradas'} nesta semana · conta no % do dia como “${sh.title}”.`;
+  } else {
+    const b = document.createElement('button');
+    b.className = 'btn-ghost -ml-2.5 text-xs';
+    b.textContent = '+ Contar sono como hábito (meta 7,5h)';
+    b.title = 'Cria o hábito "Dormir bem": registrar o sono marca o hábito, proporcional à meta';
+    b.onclick = addSleepHabit;
+    goalEl.append(b);
+  }
   $('#sleep-insight').textContent = sleepInsight();
 }
 
@@ -1929,7 +2027,9 @@ function sleepInsight() {
 // ---------- Estudos ----------
 function renderStudy() {
   const d = rday();
-  $('#study-today').textContent = fmtMin(d.studyMin);
+  $('#study-today').textContent = fmtMin(studyOf(d));
+  const hab = habitStudy(d).total;
+  $('#study-hab').textContent = hab ? `+ ${fmtMin(hab)} de hábitos` : '';
   $('#study-today-label').textContent = isToday() ? 'hoje' : 'neste dia';
   $('#study-fix-day').textContent = isToday() ? 'de hoje' : 'deste dia';
   const tot = $('#study-total');
@@ -1967,7 +2067,7 @@ function renderStudyTrend() {
     bars.append(b);
   });
   // Janela móvel: evita comparar a semana pela metade com semanas cheias
-  const now = new Date(), sumRange = (from, to) => { let m = 0; for (let i = from; i <= to; i++) m += peek(keyOf(addDays(now, -i)))?.studyMin || 0; return m; };
+  const now = new Date(), sumRange = (from, to) => { let m = 0; for (let i = from; i <= to; i++) m += studyOf(peek(keyOf(addDays(now, -i)))); return m; };
   const last7 = sumRange(0, 6), prev = [];
   for (let w = 1; w <= 4; w++) if (keyOf(addDays(now, -7 * w - 6)) >= S.startDate) prev.push(sumRange(7 * w, 7 * w + 6));
   const el = $('#st-trend');
@@ -1978,7 +2078,7 @@ function renderStudyTrend() {
     $('#st-sub').textContent = `${fmtMin(last7)} nos últimos 7 dias · média de ${fmtMin(Math.round(avg(prev)))} nas ${prev.length} semanas anteriores`;
   } else {
     el.textContent = '';
-    const allMin = Object.values(S.days).reduce((a, r) => a + (r.studyMin || 0), 0);
+    const allMin = Object.values(S.days).reduce((a, r) => a + studyOf(r), 0);
     $('#st-sub').textContent = `${fmtMin(last7)} nos últimos 7 dias · ${fmtMin(allMin)} no total. A tendência aparece após 2 semanas.`;
   }
 }
@@ -2036,10 +2136,12 @@ function habitAmount(t, d, m) {
 /** Incremento automático por dia dos hábitos com "Somar na métrica". */
 function metricIncrements(m) {
   const linked = S.tasks.filter((t) => t.metricId === m.id && t.metricAdd);
+  const qs = S.questions.filter((q) => q.type === 'number' && q.metricId === m.id);
   const inc = {};
-  if (!linked.length) return inc;
+  if (!linked.length && !qs.length) return inc;
   for (const [k, d] of Object.entries(S.days)) {
-    const v = linked.reduce((a, t) => a + habitAmount(t, d, m), 0);
+    const v = linked.reduce((a, t) => a + habitAmount(t, d, m), 0)
+      + qs.reduce((a, q) => a + (typeof d.answers?.[q.id] === 'number' ? d.answers[q.id] : 0), 0);
     if (v) inc[k] = v;
   }
   return inc;
@@ -2409,7 +2511,7 @@ function computeInsights() {
           text: `Nos dias com “${t.title}” → ${q.text} ${r.a > r.b ? 'sobe' : 'cai'}: ${fmtNum(+r.a.toFixed(1))}/5 contra ${fmtNum(+r.b.toFixed(1))}/5 nos outros.` });
       }
     }
-    const s = split(sched, did, (x) => x.r.studyMin || 0);
+    const s = split(sched, did, (x) => studyOf(x.r));
     if (s && Math.abs(s.a - s.b) >= 15) {
       out.push({ score: Math.min(1, Math.abs(s.a - s.b) / Math.max(s.a, s.b)) * 0.8, n: s.n, text: s.a > s.b
         ? `Nos dias com “${t.title}”, você estuda ${fmtMin(Math.round(s.a))} em média, contra ${fmtMin(Math.round(s.b))} nos outros.`
@@ -2527,9 +2629,9 @@ function periodStats(fromK, toK) {
   const ps = [], sleeps = [], energies = [];
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
     const k = keyOf(d), p = completion(k), r = peek(k);
-    if (k === tk && (p == null || p < 1)) { res.study += r?.studyMin || 0; continue; }   // hoje ainda está em andamento
+    if (k === tk && (p == null || p < 1)) { res.study += studyOf(r); continue; }   // hoje ainda está em andamento
     if (p != null) { ps.push(p); if (p === 1) res.perfect++; if (p === 0) res.zero++; }
-    res.study += r?.studyMin || 0;
+    res.study += studyOf(r);
     if (r?.sleep != null) sleeps.push(r.sleep);
     if (r?.energy > 0) energies.push(r.energy);
   }
@@ -2900,6 +3002,59 @@ function recentTags(n = 60) {
   return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([t]) => t);
 }
 const scaleQs = () => S.questions.filter((q) => q.type === 'scale');
+/** Perguntas que contam para o hábito de check-in (texto é opcional). */
+const checkinQs = () => S.questions.filter((q) => q.type !== 'text');
+const checkinHabit = () => S.tasks.find((t) => t.checkin);
+function addCheckinHabit() {
+  if (checkinHabit()) return;
+  S.tasks.push({ id: uid(), title: 'Fazer check-in', checkin: true });
+  resync();
+  commit(renderTasks, renderProgress, renderCheckin);
+}
+/** Médias da semana (nota) ou soma (número) de cada pergunta, contra a semana anterior. */
+function renderCheckinSummary() {
+  const box = $('#checkin-summary');
+  box.replaceChildren();
+  if (managingQuestions) return;
+  const ws = weekStart(new Date()), tk = todayKey();
+  const vals = (q, from) => {
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const k = keyOf(addDays(from, i));
+      if (k > tk) break;
+      const v = peek(k)?.answers?.[q.id];
+      if (typeof v === 'number') out.push(v);
+    }
+    return out;
+  };
+  const lines = [];
+  for (const q of checkinQs()) {
+    const a = vals(q, ws), b = vals(q, addDays(ws, -7));
+    if (!a.length) continue;
+    const isScale = q.type === 'scale';
+    const cur = isScale ? avg(a) : a.reduce((x, y) => x + y, 0), prev = b.length ? (isScale ? avg(b) : b.reduce((x, y) => x + y, 0)) : null;
+    const fmt = (v) => (isScale ? `${fmtNum(+v.toFixed(1))}/5` : `${fmtNum(+v.toFixed(2))}${q.unit ? ' ' + q.unit : ''}`);
+    const diff = prev == null ? '' : cur > prev ? ` · ↑ vs ${fmt(prev)}` : cur < prev ? ` · ↓ vs ${fmt(prev)}` : ' · igual à semana passada';
+    const metric = q.metricId && S.metrics.find((m) => m.id === q.metricId);
+    lines.push(`${q.text}: ${isScale ? 'média' : 'total'} ${fmt(cur)} esta semana${diff}${metric ? ` · → ${metric.name}` : ''}`);
+  }
+  for (const l of lines) { const p = document.createElement('p'); p.textContent = l; box.append(p); }
+  const h = checkinHabit();
+  if (h) {
+    const p = document.createElement('p');
+    let n = 0, days = 0;
+    for (let i = 0; i < 7; i++) { const k = keyOf(addDays(ws, i)); if (k > tk) break; days++; if (habitDone(peek(k), h.id) >= 1) n++; }
+    p.textContent = `Check-in completo em ${n} de ${days} ${days === 1 ? 'dia' : 'dias'} nesta semana · conta no % do dia como “${h.title}”.`;
+    box.append(p);
+  } else if (checkinQs().length) {
+    const b = document.createElement('button');
+    b.className = 'btn-ghost -ml-2.5 text-xs';
+    b.textContent = '+ Contar check-in como hábito';
+    b.title = 'Cria o hábito "Fazer check-in": responder as perguntas marca o hábito';
+    b.onclick = addCheckinHabit;
+    box.append(b);
+  }
+}
 
 let managingQuestions = false, questionDrafts = null;
 function renderCheckin() {
@@ -2954,6 +3109,7 @@ function renderCheckin() {
       wrap.append(row);
     }
   }
+  renderCheckinSummary();
   renderDayTags();
 }
 
@@ -3010,7 +3166,14 @@ function questionManager() {
       const u = document.createElement('input');
       u.className = small + ' w-20'; u.value = q.unit || ''; u.placeholder = 'unidade'; u.maxLength = 10;
       u.oninput = () => { q.unit = u.value; };
-      row.append(u);
+      const ms = document.createElement('select');
+      ms.className = small + ' max-w-[10rem]';
+      ms.setAttribute('aria-label', 'Somar na métrica');
+      ms.append(new Option('não soma em métrica', ''));
+      for (const m of S.metrics) ms.append(new Option(`soma em ${m.name}`, m.id, false, q.metricId === m.id));
+      ms.value = q.metricId || '';
+      ms.onchange = () => { q.metricId = ms.value || undefined; };
+      row.append(u, ms);
     }
     const rm = document.createElement('button');
     rm.type = 'button'; rm.className = 'rounded-md p-1 text-zinc-400 hover:text-rose-500';
@@ -3031,9 +3194,10 @@ function questionManager() {
   const save_ = document.createElement('button');
   save_.type = 'button'; save_.className = 'btn-primary !py-1 text-xs'; save_.textContent = 'Salvar';
   save_.onclick = () => {
-    S.questions = questionDrafts.filter((q) => q.text.trim()).map((q) => ({ id: q.id, text: q.text.trim(), type: q.type, ...(q.type === 'number' && q.unit?.trim() ? { unit: q.unit.trim() } : {}) }));
+    S.questions = questionDrafts.filter((q) => q.text.trim()).map((q) => ({ id: q.id, text: q.text.trim(), type: q.type, ...(q.type === 'number' && q.unit?.trim() ? { unit: q.unit.trim() } : {}), ...(q.type === 'number' && q.metricId ? { metricId: q.metricId } : {}) }));
     questionDrafts = null; managingQuestions = false;
-    commit(renderCheckin, renderInsights);
+    resync();
+    commit(renderCheckin, renderInsights, renderTasks, renderProgress);
   };
   right.append(cancel, save_);
   act.append(add, right);
@@ -3049,7 +3213,8 @@ function setAnswer(qid, v, quiet = false) {
   d.answers ||= {};
   if (v == null || v === '') delete d.answers[qid]; else d.answers[qid] = v;
   if (quiet) { save(); return; }
-  commit(renderCheckin, renderInsights);
+  syncDay(selKey);
+  commit(renderCheckin, renderInsights, renderTasks, renderProgress);
 }
 function toggleTag(t) {
   const d = wday();
@@ -3073,7 +3238,7 @@ function tagAnalysis(days = 90) {
     { name: 'Hábitos', get: (x) => x.p, fmt: (v) => fmtPct(v), min: 0.1, scale: 1 },
     { name: 'Energia', get: (x) => (x.r.energy > 0 ? x.r.energy : null), fmt: (v) => `${fmtNum(+v.toFixed(1))}/5`, min: 0.5, scale: 4 },
     ...scaleQs().map((q) => ({ name: q.text, get: (x) => x.r.answers?.[q.id] ?? null, fmt: (v) => `${fmtNum(+v.toFixed(1))}/5`, min: 0.5, scale: 4 })),
-    { name: 'Estudo', get: (x) => x.r.studyMin || 0, fmt: (v) => fmtMin(Math.round(v)), min: 15, scale: 60 },
+    { name: 'Estudo', get: (x) => studyOf(x.r), fmt: (v) => fmtMin(Math.round(v)), min: 15, scale: 60 },
     { name: 'Sono', get: (x) => x.r.sleep ?? null, fmt: (v) => fmtSleep(v), min: 0.5, scale: 3 },
   ];
   const nextOutcomes = [
@@ -3167,9 +3332,9 @@ function projHabits(p, fromK = '0000', toK = '9999') {
     for (const t of linked) {
       const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
       const q = t.target ? d.qty?.[t.id] || 0 : 0;
-      const f = t.target ? minPerUnit(t.unit) : 0;
-      if (done) { res.n++; hit = true; if (!f && t.projectMin) res.min += t.projectMin; }
-      if (f && q > 0) { res.min += Math.round(q * f); hit = true; }
+      const mins = habitMinutes(t, d);
+      if (done) { res.n++; hit = true; }
+      if (mins) { res.min += mins; hit = true; }
     }
     if (hit) res.keys.push(k);
   }
@@ -3204,9 +3369,8 @@ function projectDaily(p) {
     for (const t of linked) {
       const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
       const q = t.target ? d.qty?.[t.id] || 0 : 0;
-      const f = t.target ? minPerUnit(t.unit) : 0;
-      if (done) { at(k).hab++; if (!f && t.projectMin) at(k).min += t.projectMin; }
-      if (f && q > 0) at(k).min += Math.round(q * f);
+      if (done) at(k).hab++;
+      at(k).min += habitMinutes(t, d);
     }
   }
   return out;
@@ -3616,14 +3780,18 @@ function subjectMinutes(fromK, toK) {
   const out = {}, known = new Set(S.subjects.map((x) => x.id));
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
     const r = peek(keyOf(d));
-    if (!r?.studyMin) continue;
+    if (!studyOf(r)) continue;
     let assigned = 0;
     for (const [id, m] of Object.entries(r.studyBy || {})) {
       if (!known.has(id)) continue;
       out[id] = (out[id] || 0) + m;
       assigned += m;
     }
-    if (r.studyMin > assigned) out[''] = (out[''] || 0) + r.studyMin - assigned;
+    if ((r.studyMin || 0) > assigned) out[''] = (out[''] || 0) + r.studyMin - assigned;
+    for (const [id, m] of Object.entries(habitStudy(r).by)) {
+      const key = known.has(id) ? id : '';
+      out[key] = (out[key] || 0) + m;
+    }
   }
   return out;
 }
@@ -4029,6 +4197,7 @@ function renderContrib(ms) {
       const k = info.k;
       let cls = 'h-8 w-8 rounded-md outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-emerald-500 ';
       if (info.future) cls += 'border border-dashed border-zinc-200 dark:border-zinc-800';
+      else if (k < S.startDate) cls += 'day-x';
       else if (info.free) cls += 'border border-zinc-200 dark:border-zinc-800';
       else cls += HEAT[info.p == null ? 0 : heatLevel(info.p)];
       if (k === tk) cls += ' ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900';
@@ -4038,12 +4207,13 @@ function renderContrib(ms) {
       const show = (e) => {
         const rec = info.rec, rows = [];
         if (info.future) rows.push({ value: 'ainda não chegou', label: '' });
+        else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: 'não conta' });
         else if (info.free) rows.push({ value: 'dia livre', label: 'sem hábitos previstos' });
         else if (info.p == null) rows.push({ value: 'sem registro', label: '' });
         else {
           rows.push({ value: fmtPct(info.p), label: `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0})`, color: 'var(--c-habit)', box: true });
           if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
-          if (rec?.studyMin) rows.push({ value: fmtMin(rec.studyMin), label: 'de estudo' });
+          if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
           if (rec?.sleep != null) rows.push({ value: fmtSleep(rec.sleep), label: 'de sono' });
         }
         showTip(e, fmtDay.format(date), rows);
@@ -4465,7 +4635,7 @@ function yearStats(y) {
     wDone += (w.goals || []).filter((g) => g.done).length;
     wTotal += (w.goals || []).length;
   }
-  for (const [k, d] of Object.entries(S.days)) if (k.startsWith(`${y}-`)) study += d.studyMin || 0;
+  for (const [k, d] of Object.entries(S.days)) if (k.startsWith(`${y}-`)) study += studyOf(d);
   const mDone = months.reduce((a, x) => a + x.ms.mDone, 0), mTotal = months.reduce((a, x) => a + x.ms.mTotal, 0);
   const perfect = months.reduce((a, x) => a + x.ms.perfect, 0);
   const yearAvg = averageBetween(new Date(y, 0, 1), new Date(Math.min(new Date(y, 11, 31), new Date())));
@@ -4498,6 +4668,8 @@ function renderYear() {
   renderYearGrid(viewYear);
   renderYearChart();
   renderMonthCards(ys);
+  if (monthOpen && monthOpen.y !== viewYear) monthOpen = null;
+  renderMonthDetail();
 }
 
 /** Grade do ano inteiro estilo GitHub: colunas = semanas, linhas = seg→dom. */
@@ -4536,7 +4708,7 @@ function renderYearGrid(y) {
       if (date.getFullYear() !== y) { grid.append(cell); continue; }
       let cls = 'rounded-[3px] ';
       if (k > tk) cls += 'bg-zinc-50 dark:bg-zinc-900';
-      else if (k < S.startDate) cls += 'bg-zinc-100/60 dark:bg-zinc-800/50';
+      else if (k < S.startDate) { cls += 'day-x'; cell.title = 'antes do 1º uso'; }
       else {
         const p = completion(k);
         cls += p == null ? 'border border-zinc-200 dark:border-zinc-700' : HEAT[heatLevel(p)];
@@ -4559,7 +4731,7 @@ function renderYearGrid(y) {
       if (p == null) rows.push({ value: 'dia livre', label: 'sem hábitos previstos' });
       else rows.push({ value: fmtPct(p), label: 'hábitos', color: 'var(--c-habit)', box: true });
       if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
-      if (rec?.studyMin) rows.push({ value: fmtMin(rec.studyMin), label: 'de estudo' });
+      if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
     }
     showTip(e, fmtDay.format(date), rows);
   });
@@ -4605,8 +4777,9 @@ function renderMonthCards(ys) {
     card.className = 'card flex flex-col gap-3 !p-4 text-left transition ' +
       (active ? 'hover:border-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:border-zinc-700' : 'opacity-50');
     if (active) {
-      card.setAttribute('aria-label', `Abrir ${fmtMonthLong.format(new Date(ys.y, x.m, 1))} na visão mensal`);
-      card.onclick = () => { view = { y: ys.y, m: x.m }; setTab('hoje'); renderMonth(); $('#month-card').scrollIntoView({ behavior: 'smooth' }); };
+      card.setAttribute('aria-label', `Ver tudo de ${fmtMonthLong.format(new Date(ys.y, x.m, 1))}`);
+      if (monthOpen && monthOpen.y === ys.y && monthOpen.m === x.m) card.className += ' ring-2 ring-emerald-500';
+      card.onclick = () => openMonthDetail(ys.y, x.m);
     }
     const head = document.createElement('div');
     head.className = 'flex items-baseline justify-between';
@@ -4634,12 +4807,12 @@ function renderMonthCards(ys) {
       const c = document.createElement('span');
       let cls = 'aspect-square rounded-[3px] ';
       if (d.future) cls += 'bg-zinc-50 dark:bg-zinc-900';
-      else if (d.k < S.startDate) cls += 'bg-zinc-100/60 dark:bg-zinc-800/50';
+      else if (d.k < S.startDate) cls += 'day-x';
       else if (d.free) cls += 'border border-zinc-200 dark:border-zinc-700';
       else cls += HEAT[heatLevel(d.p ?? 0)];
       if (d.k === tk) cls += ' ring-1 ring-zinc-900 dark:ring-zinc-100';
       c.className = cls;
-      c.title = `${d.date.getDate()} · ${d.future ? 'ainda não chegou' : d.free ? 'dia livre' : d.p == null ? 'sem dados' : fmtPct(d.p)}`;
+      c.title = `${d.date.getDate()} · ${d.k < S.startDate ? 'antes do 1º uso' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : d.p == null ? 'sem dados' : fmtPct(d.p)}`;
       cal.append(c);
     }
 
@@ -4658,6 +4831,213 @@ function renderMonthCards(ys) {
     }
     card.append(head, track, cal, foot);
     wrap.append(card);
+  }
+}
+
+// ---------- Detalhe do mês: tudo o que foi registrado ----------
+let monthOpen = null;
+function openMonthDetail(y, m) {
+  monthOpen = monthOpen && monthOpen.y === y && monthOpen.m === m ? null : { y, m };
+  renderMonthDetail();
+  if (yearCache) renderMonthCards(yearCache);
+  if (monthOpen) $('#month-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderMonthDetail() {
+  const box = $('#month-detail');
+  box.replaceChildren();
+  box.classList.toggle('hidden', !monthOpen);
+  if (!monthOpen) return;
+  const { y, m } = monthOpen, mk = monthKey(y, m);
+  const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0)), tk = todayKey();
+  const from = first < S.startDate ? S.startDate : first, to = last > tk ? tk : last;
+  const st = periodStats(first, last);
+  const dayKeys = [];
+  for (let d = parseKey(from); keyOf(d) <= to; d = addDays(d, 1)) dayKeys.push(keyOf(d));
+  const recs = dayKeys.map((k) => [k, peek(k)]).filter(([, r]) => r);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const dayLbl = (k) => fmtDay.format(parseKey(k)).replace(/\./g, '');
+  const section = (title, sub) => {
+    const sec = el('div', 'border-t border-zinc-100 pt-4 dark:border-zinc-800');
+    const h = el('p', 'text-sm font-semibold', title);
+    sec.append(h);
+    if (sub) sec.append(el('p', 'text-xs text-zinc-500', sub));
+    box.append(sec);
+    return sec;
+  };
+  const list = (items, empty) => {
+    const ul = el('ul', 'mt-2 space-y-1 text-sm');
+    if (!items.length) ul.append(el('li', 'text-xs text-zinc-500', empty));
+    for (const it of items) {
+      const li = el('li', 'flex gap-2');
+      if (Array.isArray(it)) { li.append(el('span', 'w-28 shrink-0 text-xs tabular-nums text-zinc-500 pt-0.5', it[0]), el('span', 'min-w-0 whitespace-pre-wrap break-words', it[1])); }
+      else li.append(el('span', 'min-w-0 whitespace-pre-wrap break-words', it));
+      ul.append(li);
+    }
+    return ul;
+  };
+  const stat = (label, value, hint) => {
+    const d = el('div', 'rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40');
+    d.append(el('p', 'text-[11px] text-zinc-500', label), el('p', 'text-base font-semibold tabular-nums', value), el('p', 'text-[11px] text-zinc-500', hint || ''));
+    return d;
+  };
+  const bar = (label, v, max, text, color = 'var(--c-habit)') => {
+    const row = el('div', 'flex items-center gap-2 text-xs');
+    const t = el('div', 'track flex-1');
+    const f = el('div', 'h-full rounded-full'); f.style.width = `${max ? (v / max) * 100 : 0}%`; f.style.background = color;
+    t.append(f);
+    row.append(el('span', 'w-32 shrink-0 truncate text-zinc-600 dark:text-zinc-400', label), t, el('span', 'w-20 shrink-0 text-right tabular-nums text-zinc-500', text));
+    return row;
+  };
+
+  // Cabeçalho
+  const head = el('div', 'flex flex-wrap items-start justify-between gap-2');
+  const ttl = el('div');
+  ttl.append(el('p', 'eyebrow', 'Tudo do mês'), el('h2', 'mt-1 text-lg font-semibold tracking-tight',
+    cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)))));
+  if (first < S.startDate) ttl.append(el('p', 'text-xs text-zinc-500', `Painel em uso desde ${fmtShort.format(parseKey(S.startDate)).replace('.', '')} — dias anteriores não contam.`));
+  const act = el('div', 'flex items-center gap-1');
+  const go = el('button', 'btn-ghost text-xs', 'Abrir no calendário');
+  go.onclick = () => { view = { y, m }; setTab('hoje'); renderMonth(); $('#month-card').scrollIntoView({ behavior: 'smooth' }); };
+  const close = el('button', 'btn-ghost h-7 w-7 p-0'); close.innerHTML = ICON_X; close.setAttribute('aria-label', 'Fechar');
+  close.onclick = () => openMonthDetail(y, m);
+  act.append(go, close);
+  head.append(ttl, act);
+  box.append(head);
+  box.classList.add('space-y-5');
+
+  // Números
+  const one = recs.filter(([, r]) => r.oneThing).length, oneDone = recs.filter(([, r]) => r.oneDone).length;
+  const grid = el('div', 'grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6');
+  grid.append(
+    stat('Hábitos', st.habitAvg == null ? '—' : fmtPct(st.habitAvg), `média em ${st.days} ${st.days === 1 ? 'dia' : 'dias'}`),
+    stat('Dias 100%', String(st.perfect), `${st.zero} com 0%`),
+    stat('Estudo', fmtMin(st.study), `${st.learned} ${st.learned === 1 ? 'tópico aprendido' : 'tópicos aprendidos'}`),
+    stat('Sono médio', st.sleepAvg == null ? '—' : fmtSleep(st.sleepAvg), `${recs.filter(([, r]) => r.sleep != null).length} noites registradas`),
+    stat('Energia', st.energyAvg == null ? '—' : `${fmtNum(+st.energyAvg.toFixed(1))}/5`, 'média'),
+    stat('One Thing', one ? `${oneDone}/${one}` : '—', 'cumprido / definido'),
+  );
+  box.append(grid);
+
+  // Sono
+  const sleeps = recs.filter(([, r]) => r.sleep != null).map(([, r]) => r.sleep);
+  const sec1 = section('Sono', sleeps.length ? `${sleeps.length} noites registradas` : '');
+  if (!sleeps.length) sec1.append(el('p', 'mt-1 text-xs text-zinc-500', 'Nenhuma noite registrada neste mês.'));
+  else {
+    const goalH = sleepHabit()?.target || 7.5;
+    const bins = [['menos de 6h', (v) => v < 6], ['6h a 7h', (v) => v >= 6 && v < 7], ['7h a 8h', (v) => v >= 7 && v < 8], ['8h ou mais', (v) => v >= 8]];
+    const wrap = el('div', 'mt-2 space-y-1.5');
+    for (const [l, f] of bins) { const n = sleeps.filter(f).length; wrap.append(bar(l, n, sleeps.length, `${n} ${n === 1 ? 'noite' : 'noites'}`, 'var(--c-goal)')); }
+    const hit = sleeps.filter((v) => v >= goalH).length;
+    wrap.append(el('p', 'pt-1 text-xs text-zinc-500', `Na meta de ${fmtSleep(goalH)}: ${hit} de ${sleeps.length} (${fmtPct(hit / sleeps.length)}) · menor ${fmtSleep(Math.min(...sleeps))} · maior ${fmtSleep(Math.max(...sleeps))}`));
+    sec1.append(wrap);
+  }
+
+  // Check-in
+  const sec2 = section('Check-in');
+  const qWrap = el('div', 'mt-2 space-y-1.5');
+  let anyQ = false;
+  for (const q of S.questions) {
+    if (q.type === 'text') continue;
+    const vals = recs.map(([, r]) => r.answers?.[q.id]).filter((v) => typeof v === 'number');
+    if (!vals.length) continue;
+    anyQ = true;
+    if (q.type === 'scale') qWrap.append(bar(q.text, avg(vals), 5, `${fmtNum(+avg(vals).toFixed(1))}/5 · ${vals.length}d`));
+    else { const sum = vals.reduce((a, b) => a + b, 0); qWrap.append(bar(q.text, 1, 1, `${fmtNum(+sum.toFixed(2))}${q.unit ? ' ' + q.unit : ''}`, 'var(--c-goal)')); }
+  }
+  const ch = checkinHabit();
+  if (ch) { const n = recs.filter(([, r]) => habitDone(r, ch.id) >= 1).length; qWrap.append(el('p', 'pt-1 text-xs text-zinc-500', `Check-in completo em ${n} de ${dayKeys.length} dias`)); anyQ = true; }
+  if (!anyQ) qWrap.append(el('p', 'text-xs text-zinc-500', 'Nenhuma resposta neste mês.'));
+  sec2.append(qWrap);
+
+  // Hábitos
+  const sec3 = section('Hábitos', 'quanto de cada hábito você cumpriu no mês');
+  const hw = el('div', 'mt-2 space-y-1.5');
+  const hs = [...st.habits].sort((a, b) => b.a - a.a);
+  if (!hs.length) hw.append(el('p', 'text-xs text-zinc-500', 'Sem hábitos previstos neste mês.'));
+  for (const x of hs) hw.append(bar(x.t.title, x.a, 1, fmtPct(x.a)));
+  sec3.append(hw);
+
+  // Estudos + aprendizados
+  const sec4 = section('Estudos & aprendizados');
+  const subs = Object.entries(st.bySubject).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (subs.length) {
+    const sw = el('div', 'mt-2 space-y-1.5');
+    const mx = Math.max(...subs.map(([, v]) => v));
+    for (const [id, v] of subs) sw.append(bar(id ? subjectName(id) : 'Sem matéria', v, mx, fmtMin(v), 'var(--c-goal)'));
+    sec4.append(sw);
+  }
+  const topics = S.topics.filter((t) => t.created >= first && t.created <= last).sort((a, b) => (a.created < b.created ? -1 : 1));
+  sec4.append(el('p', 'mt-3 eyebrow', `O que aprendi (${topics.length})`),
+    list(topics.map((t) => [dayLbl(t.created), `${t.title} · ${subjectName(t.subjectId)}${t.mastered ? ' · dominado ✓' : ''}`]), 'Nenhum tópico registrado neste mês.'));
+  if (st.retention.n) sec4.append(el('p', 'mt-1 text-xs text-zinc-500', `Revisões: ${st.retention.ok} de ${st.retention.n} lembradas (${fmtPct(st.retention.rate)})`));
+
+  // Metas
+  const sec5 = section('Metas');
+  const mg = S.months[mk]?.goals || [];
+  sec5.append(el('p', 'mt-2 eyebrow', 'Do mês'),
+    list(mg.map((g) => `${g.done ? '✓' : '○'} ${g.title}${g.rating ? ` · nota ${g.rating}/5` : ''}`), 'Sem metas do mês.'));
+  const weekItems = [];
+  for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
+    const g = S.weeks[keyOf(w)]?.goals || [];
+    if (g.length) weekItems.push([`sem. ${fmtShort.format(w).replace('.', '')}`, g.map((x) => `${x.done ? '✓' : '○'} ${x.title}`).join('\n')]);
+  }
+  sec5.append(el('p', 'mt-3 eyebrow', 'Semanais'), list(weekItems, 'Sem metas semanais.'));
+
+  // Métricas e projetos
+  const sec6 = section('Resultados & projetos');
+  sec6.append(list(st.metrics.map(({ m: mt, before, after }) => [mt.name,
+    before == null || before === after ? fmtVal(mt, after) : `${fmtNum(before)} → ${fmtVal(mt, after)} (${signed(mt, after - before)})`]), 'Nenhuma métrica.'));
+  const projItems = S.projects.map((p) => {
+    const daily = projectDaily(p);
+    const ks = Object.keys(daily).filter((k) => k >= first && k <= last);
+    const min = ks.reduce((a, k) => a + daily[k].min, 0), ms = ks.reduce((a, k) => a + daily[k].ms, 0);
+    return ks.length ? [p.name, [`${ks.length} ${ks.length === 1 ? 'dia' : 'dias'} com avanço`, min ? fmtMin(min) : '', ms ? `${ms} ${ms === 1 ? 'marco' : 'marcos'}` : ''].filter(Boolean).join(' · ')] : null;
+  }).filter(Boolean);
+  sec6.append(el('p', 'mt-3 eyebrow', 'Projetos'), list(projItems, 'Nenhum avanço em projetos.'));
+
+  // Pontuais / pendentes
+  const pont = S.tasks.filter((t) => t.once && t.once >= first && t.once <= last);
+  if (pont.length) {
+    const sent = pont.filter((t) => wentPending(t)), onDay = pont.filter((t) => t.once < tk && !wentPending(t));
+    const sec7 = section('Tarefas pontuais', `${pont.length} no mês · ${onDay.length} feitas no dia · ${sent.length} foram para Pendentes · ${sent.filter((t) => t.lateK).length} concluídas depois`);
+    sec7.append(list(pont.sort((a, b) => (a.once < b.once ? -1 : 1)).map((t) => [dayLbl(t.once),
+      `${t.title} — ${t.once >= tk && !wentPending(t) ? (peek(t.once)?.done?.includes(t.id) ? 'feita' : 'hoje') : !wentPending(t) ? 'feita no dia' : t.lateK ? `concluída ${daysBetween(t.once, t.lateK)} d depois` : t.dropK ? 'descartada' : 'pendente'}`]), ''));
+  }
+
+  // Reflexões
+  const sec8 = section('Reflexões');
+  const R = S.months[mk]?.refl;
+  const reflLines = (r) => [r?.wins && `Conquistas: ${r.wins}`, r?.sins && `Onde pequei: ${r.sins}`, r?.better && `Onde melhorei: ${r.better}`,
+    r?.improve?.length && `Melhorar: ${r.improve.map((x) => (typeof x === 'string' ? x : x.text)).join('; ')}`].filter(Boolean);
+  sec8.append(el('p', 'mt-2 eyebrow', 'Do mês'), list(reflLines(R), 'Reflexão do mês ainda não escrita.'));
+  const wr = [];
+  for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
+    const W = S.weeks[keyOf(w)];
+    const lines = [...reflLines(W?.refl), W?.review && `Foco: ${W.review}`].filter(Boolean);
+    if (lines.length) wr.push([`sem. ${fmtShort.format(w).replace('.', '')}`, lines.join('\n')]);
+  }
+  sec8.append(el('p', 'mt-3 eyebrow', 'Das semanas'), list(wr, 'Nenhuma revisão semanal escrita.'));
+
+  // Diário: tudo que foi escrito em cada dia
+  const textQs = S.questions.filter((q) => q.type === 'text');
+  const diary = recs.map(([k, r]) => {
+    const parts = [r.oneThing && `One Thing: ${r.oneThing}${r.oneDone ? ' ✓' : ''}`, r.win && `Vitória: ${r.win}`, r.improve && `Melhorar: ${r.improve}`,
+      ...textQs.map((q) => r.answers?.[q.id] && `${q.text}: ${r.answers[q.id]}`),
+      (r.tags || []).length && `Tags: ${r.tags.map((t) => '#' + normTag(t)).join(' ')}`].filter(Boolean);
+    return parts.length ? [dayLbl(k), parts.join('\n')] : null;
+  }).filter(Boolean);
+  const sec9 = section('Diário', 'One Thing, reflexão noturna, respostas escritas e tags de cada dia');
+  sec9.append(list(diary, 'Nada escrito nos dias deste mês.'));
+
+  // Tags
+  const tagCount = {};
+  for (const [, r] of recs) for (const t of dayTags(r)) tagCount[t] = (tagCount[t] || 0) + 1;
+  const tags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
+  if (tags.length) {
+    const sec10 = section('Tags do mês');
+    const tw = el('div', 'mt-2 flex flex-wrap gap-1.5');
+    for (const [t, n] of tags) tw.append(el('span', 'rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400', `#${t} · ${n}`));
+    sec10.append(tw);
   }
 }
 
@@ -4693,6 +5073,8 @@ function toggleTask(id) {
   const d = wday();
   syncDay(selKey);
   const t = S.tasks.find((x) => x.id === id);
+  if (t?.checkin) { $('#checkin').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (t?.sleep) return setSleep(d.done.includes(id) ? null : Math.max(d.sleep || 0, t.target));
   if (t?.target) {
     d.qty[id] = d.done.includes(id) ? 0 : t.target;   // marcar = meta cheia; desmarcar = zero
     syncDay(selKey);
@@ -4749,7 +5131,7 @@ function setTaskDays(id, days) {
   resync();
   commit(renderTasks, renderProgress);
 }
-/** patch: { target, unit, metricId, projectId, metricAdd, projectMin } — null remove o campo. */
+/** patch: { target, unit, metricId, projectId, metricAdd, projectMin (min por vez), study, studySubject } — null remove o campo. */
 function setTaskConfig(id, patch) {
   const t = S.tasks.find((x) => x.id === id);
   if (!t) return;
@@ -4800,6 +5182,7 @@ function removeMetricEntry(id, k) {
 function removeMetric(id) {
   S.metrics = S.metrics.filter((m) => m.id !== id);
   for (const t of S.tasks) if (t.metricId === id) { delete t.metricId; delete t.metricAdd; }
+  for (const q of S.questions) if (q.metricId === id) delete q.metricId;
   editingMetric = null;
   commit(renderMetrics, renderTasks, renderReview, renderInsights);
 }
@@ -4850,7 +5233,15 @@ function setEnergy(i) {
 function setSleep(v) {
   const d = wday();
   d.sleep = v == null || isNaN(v) ? null : Math.min(16, Math.max(0, Math.round(v * 4) / 4));
-  commit(renderSleep, renderInsights);
+  syncDay(selKey);
+  commit(renderSleep, renderInsights, renderTasks, renderProgress);
+}
+const sleepHabit = () => S.tasks.find((t) => t.sleep);
+function addSleepHabit() {
+  if (sleepHabit()) return;
+  S.tasks.push({ id: uid(), title: 'Dormir bem', sleep: true, target: 7.5, unit: 'h de sono' });
+  resync();
+  commit(renderTasks, renderProgress, renderSleep);
 }
 /** Registro manual de estudo no dia em edição, na matéria selecionada. */
 function addStudy(min) {
