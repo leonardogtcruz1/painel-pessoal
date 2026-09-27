@@ -357,11 +357,24 @@
           </div>
           <ul id="task-list" class="mt-3 space-y-0.5"></ul>
           <form id="task-form" class="mt-3 flex gap-2">
-            <input id="task-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Novo hábito ou tarefa…" />
+            <input id="task-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Nova tarefa (pontual; vira hábito no ⚙)…" />
             <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           </form>
+        </section>
+
+        <!-- Pendentes: tarefas pontuais que ficaram para trás -->
+        <section id="pending-card" class="card">
+          <div class="flex items-baseline justify-between gap-2">
+            <div class="flex items-baseline gap-2">
+              <h2 class="text-sm font-semibold">Pendentes</h2>
+              <span id="pending-count" class="text-xs tabular-nums text-zinc-500"></span>
+            </div>
+            <span class="text-xs text-zinc-500">pontuais não feitas no dia · 30 dias</span>
+          </div>
+          <div id="pending-stats" class="mt-3 grid grid-cols-3 gap-2"></div>
+          <ul id="pending-list" class="mt-3 space-y-0.5"></ul>
         </section>
 
         <!-- Estudos -->
@@ -1009,9 +1022,16 @@ function wday() {
  */
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
-const isWeekly = (t) => t.weekly > 0;
-const isDaily = (t) => !isWeekly(t) && (!t.days || t.days.length === 7);
-const scheduledOn = (t, date) => !isWeekly(t) && (isDaily(t) || t.days.includes(date.getDay()));
+const isWeekly = (t) => !t.once && t.weekly > 0;
+const isDaily = (t) => !t.once && !isWeekly(t) && (!t.days || t.days.length === 7);
+const scheduledOn = (t, date) => t.once ? keyOf(date) === t.once : !isWeekly(t) && (isDaily(t) || t.days.includes(date.getDay()));
+/*
+ * Tarefa pontual: `t.once` = o dia dela. Feita no dia → fica no registro do dia, como um hábito.
+ * Não feita → vai para Pendentes; concluir depois grava `t.lateK`, descartar grava `t.dropK`.
+ */
+const habits = () => S.tasks.filter((t) => !t.once);
+const wentPending = (t, tk = todayKey()) => !!t.once && t.once < tk && !peek(t.once)?.done?.includes(t.id);
+const pendingTasks = () => S.tasks.filter((t) => wentPending(t) && !t.lateK && !t.dropK).sort((a, b) => (a.once < b.once ? -1 : 1));
 const tasksFor = (date) => S.tasks.filter((t) => scheduledOn(t, date));
 const weeklyTasks = () => S.tasks.filter(isWeekly);
 /** Quantas vezes um hábito semanal foi feito na semana que começa em `ws`. */
@@ -1021,6 +1041,7 @@ function weeklyCount(t, ws) {
   return n;
 }
 function schedLabel(t) {
+  if (t.once) return 'pontual';
   if (isWeekly(t)) return `${t.weekly}× por semana`;
   if (isDaily(t)) return '';
   const d = [...t.days].sort().join();
@@ -1468,7 +1489,7 @@ function emptyRow(text) {
 let taskDraft = null;
 function scheduleEditor(t) {
   if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '', metricAdd: !!t.metricAdd, projectMin: t.projectMin || '',
-                                              weeklyMode: isWeekly(t), weekly: t.weekly || 3 };
+                                              weeklyMode: isWeekly(t), onceMode: !!t.once, weekly: t.weekly || 3 };
   const dr = taskDraft;
   const wrapLi = document.createElement('li');
   wrapLi.className = 'mb-3 ml-8 space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800';
@@ -1511,12 +1532,17 @@ function scheduleEditor(t) {
   const dBox = document.createElement('div');
   const fRow = document.createElement('div');
   fRow.className = 'mt-1.5 flex flex-wrap items-center gap-1.5';
-  fRow.append(chip('Dias fixos', !dr.weeklyMode, () => { dr.weeklyMode = false; renderTasks(); }),
-              chip('X vezes por semana', dr.weeklyMode, () => { dr.weeklyMode = true; renderTasks(); }));
-  dBox.append(sectionLabel('Frequência', dr.weeklyMode
+  fRow.append(chip('Dias fixos', !dr.weeklyMode && !dr.onceMode, () => { dr.weeklyMode = false; dr.onceMode = false; renderTasks(); }),
+              chip('X vezes por semana', dr.weeklyMode && !dr.onceMode, () => { dr.weeklyMode = true; dr.onceMode = false; renderTasks(); }),
+              chip('Pontual (padrão)', dr.onceMode, () => { dr.onceMode = true; dr.weeklyMode = false; renderTasks(); }));
+  dBox.append(sectionLabel('Frequência', dr.onceMode
+    ? `Vale só para ${t.once ? fmtShort.format(parseKey(t.once)).replace('.', '') : 'este dia'}. Se não fizer, vai para Pendentes. Para repetir, escolha "Dias fixos" ou "X vezes por semana".`
+    : dr.weeklyMode
     ? 'Faça em qualquer dia; conta na semana e não entra no % diário. Bom para treino e coisas flexíveis.'
     : 'Aparece nos dias escolhidos e entra no % de cada dia.'), fRow);
-  if (dr.weeklyMode) {
+  if (dr.onceMode) {
+    // sem dias da semana
+  } else if (dr.weeklyMode) {
     const wRow = document.createElement('div');
     wRow.className = 'mt-2 flex items-center gap-1.5';
     for (let n = 1; n <= 7; n++) wRow.append(chip(String(n), dr.weekly === n, () => { dr.weekly = n; renderTasks(); }));
@@ -1627,9 +1653,10 @@ function scheduleEditor(t) {
     if (!dr.weeklyMode && dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 20).'; return; }
     taskDraft = null; editingTask = null;
     const qty = !dr.weeklyMode && dr.qty;
-    setTaskConfig(t.id, { target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
+    const once = dr.onceMode ? t.once || selKey : null;
+    setTaskConfig(t.id, { once, ...(once ? {} : { lateK: null, dropK: null }), target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
                           metricAdd: dr.metricId && dr.metricAdd ? true : null, projectMin: dr.projectId && Number(dr.projectMin) > 0 ? Math.round(Number(dr.projectMin)) : null,
-                          weekly: dr.weeklyMode ? dr.weekly : null, ...(dr.weeklyMode ? { days: null } : {}) });
+                          weekly: dr.weeklyMode && !once ? dr.weekly : null, ...(dr.weeklyMode || once ? { days: null } : {}) });
   };
   act.append(err, cancel, saveBtn);
 
@@ -1643,7 +1670,7 @@ function renderTasks() {
   $('#tasks-title').textContent = isToday() ? 'Hábitos de hoje' : `Hábitos · ${fmtDay.format(now).replace(/\./g, '')}`;
   const ul = $('#task-list');
   ul.replaceChildren();
-  const today = tasksFor(now), off = S.tasks.filter((t) => !isWeekly(t) && !scheduledOn(t, now)), weekly = weeklyTasks();
+  const today = tasksFor(now), off = habits().filter((t) => !isWeekly(t) && !scheduledOn(t, now)), weekly = weeklyTasks();
   if (!S.tasks.length) ul.append(emptyRow('Nenhum hábito ainda. Adicione o primeiro abaixo.'));
   else if (!today.length && !weekly.length) ul.append(emptyRow(`Nenhum hábito previsto para ${isToday() ? 'hoje' : 'este dia'} — dia livre.`));
 
@@ -1691,12 +1718,75 @@ function renderTasks() {
   }
   $('#task-count').textContent = today.length ? `${d.done.length}/${today.length}` : '';
   // Hábito que não move nenhum número é candidato a sair (ou a ganhar uma métrica)
-  const loose = S.metrics.length ? S.tasks.filter((t) => !t.metricId && !t.projectId).length : 0;
+  const loose = S.metrics.length ? habits().filter((t) => !t.metricId && !t.projectId).length : 0;
   if (loose) {
     const li = document.createElement('li');
     li.className = 'pt-2 text-xs text-zinc-500';
     li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica nem projeto — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
     ul.append(li);
+  }
+}
+
+// ---------- Pendentes ----------
+/** Das pontuais dos últimos 30 dias: quantas vieram para Pendentes, quantas foram concluídas depois e em quanto tempo. */
+function pendingStats() {
+  const tk = todayKey(), from = keyOf(addDays(new Date(), -30));
+  const pont = S.tasks.filter((t) => t.once && t.once >= from && t.once < tk);
+  const sent = pont.filter((t) => wentPending(t, tk));
+  const late = sent.filter((t) => t.lateK);
+  const delays = late.map((t) => daysBetween(t.once, t.lateK));
+  return { total: pont.length, sent: sent.length, late: late.length, dropped: sent.filter((t) => t.dropK).length,
+           sentPct: pont.length ? sent.length / pont.length : null,
+           latePct: sent.length ? late.length / sent.length : null,
+           avgDelay: delays.length ? avg(delays) : null };
+}
+let showDoneLate = false;
+function renderPending() {
+  const tk = todayKey(), list = pendingTasks(), st = pendingStats();
+  $('#pending-count').textContent = list.length ? String(list.length) : '';
+  const stat = (label, value, hint) => {
+    const d = document.createElement('div');
+    d.className = 'rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40';
+    d.innerHTML = '<p class="text-[11px] text-zinc-500"></p><p class="text-base font-semibold tabular-nums"></p><p class="text-[11px] text-zinc-500"></p>';
+    d.children[0].textContent = label; d.children[1].textContent = value; d.children[2].textContent = hint;
+    return d;
+  };
+  const dias = (v) => (v < 1 ? 'menos de 1 dia' : `${fmtNum(+v.toFixed(1))} ${v >= 1 && v < 2 ? 'dia' : 'dias'}`);
+  $('#pending-stats').replaceChildren(
+    stat('Vieram pra cá', st.sentPct == null ? '—' : fmtPct(st.sentPct), st.total ? `${st.sent} de ${st.total} pontuais` : 'nenhuma pontual ainda'),
+    stat('Concluídas depois', st.latePct == null ? '—' : fmtPct(st.latePct), st.sent ? `${st.late} de ${st.sent}` : 'nada ficou pra trás'),
+    stat('Tempo médio', st.avgDelay == null ? '—' : dias(st.avgDelay), 'até concluir'),
+  );
+
+  const ul = $('#pending-list');
+  ul.replaceChildren();
+  if (!list.length) {
+    const hasOnce = S.tasks.some((t) => t.once);
+    ul.append(emptyRow(hasOnce ? 'Nada pendente 🎉' : 'Tarefas pontuais não feitas no dia aparecem aqui. Toda tarefa nova é pontual até você definir dias no ⚙.'));
+  }
+  for (const t of list) {
+    const age = daysBetween(t.once, tk);
+    ul.append(checkRow(t.title, false, () => completeLate(t.id), () => dropPending(t.id), undefined, {
+      badge: `de ${fmtShort.format(parseKey(t.once)).replace('.', '')} · há ${age} ${age === 1 ? 'dia' : 'dias'}`,
+    }));
+  }
+  // Concluídas/descartadas recentemente (para desfazer)
+  const recent = S.tasks.filter((t) => (t.lateK && daysBetween(t.lateK, tk) <= 7) || (t.dropK && daysBetween(t.dropK, tk) <= 7))
+    .sort((a, b) => ((a.lateK || a.dropK) < (b.lateK || b.dropK) ? 1 : -1));
+  if (recent.length) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.className = 'btn-ghost -mx-2.5 mt-1 text-xs';
+    b.textContent = `${showDoneLate ? '▾' : '▸'} ${recent.length} ${recent.length === 1 ? 'resolvida' : 'resolvidas'} nos últimos 7 dias`;
+    b.onclick = () => { showDoneLate = !showDoneLate; renderPending(); };
+    li.append(b);
+    ul.append(li);
+    if (showDoneLate) for (const t of recent) {
+      const when = fmtShort.format(parseKey(t.lateK || t.dropK)).replace('.', '');
+      ul.append(checkRow(t.title, !!t.lateK, () => (t.lateK ? completeLate(t.id) : dropPending(t.id)), () => removeTask(t.id), undefined, {
+        badge: t.lateK ? `concluída em ${when} · ${daysBetween(t.once, t.lateK)} d depois` : `descartada em ${when} · clique para voltar`,
+      }));
+    }
   }
 }
 
@@ -2303,7 +2393,7 @@ function computeInsights() {
   };
   const energy = (x) => (x.r.energy > 0 ? x.r.energy : null);
 
-  for (const t of S.tasks) {
+  for (const t of habits()) {
     const sched = rec.filter((x) => (isWeekly(t) || scheduledOn(t, x.date)) && (x.r.total || isWeekly(t)));
     const did = (x) => habitDone(x.r, t.id) >= 1;
     const e = split(sched, did, energy);
@@ -2447,7 +2537,7 @@ function periodStats(fromK, toK) {
   res.habitAvg = ps.length ? avg(ps) : null;
   res.sleepAvg = sleeps.length ? avg(sleeps) : null;
   res.energyAvg = energies.length ? avg(energies) : null;
-  res.habits = S.tasks.map((t) => ({ t, a: taskAdherence(t, fromK, toK) })).filter((x) => x.a != null);
+  res.habits = habits().map((t) => ({ t, a: taskAdherence(t, fromK, toK) })).filter((x) => x.a != null);
   res.learned = S.topics.filter((t) => t.created >= fromK && t.created <= toK).length;
   res.retention = retention(fromK, toK);
   res.bySubject = subjectMinutes(fromK, toK);
@@ -3514,7 +3604,7 @@ function setSelDay(k) {
   selKey = k;
   editingTask = null;
   renderDayNav(); renderOne(); renderTasks(); renderSleep(); renderStudy(); renderReflection(); renderMetrics(); renderSubjects();
-  renderCheckin(); renderProjects();
+  renderCheckin(); renderProjects(); renderPending(); paintOnce();
 }
 
 // ---------- Matérias ----------
@@ -4597,7 +4687,7 @@ function renderTabs() {
    AÇÕES
    ========================================================= */
 function commit(...renders) { save(); renders.forEach((r) => r()); }
-const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); renderProjects(); };
+const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); renderProjects(); renderPending(); };
 
 function toggleTask(id) {
   const d = wday();
@@ -4624,12 +4714,25 @@ function setQty(id, v) {
   syncDay(selKey);
   commit(renderTasks, renderProgress);
 }
+/** Toda tarefa nasce pontual (só no dia aberto); escolher dias ou "X por semana" no ⚙ a torna um hábito. */
 function addTask(title) {
   title = title.trim();
   if (!title) return;
-  S.tasks.push({ id: uid(), title });
+  S.tasks.push({ id: uid(), title, once: selKey });
   resync();
   commit(renderTasks, renderProgress);
+}
+function completeLate(id) {
+  const t = S.tasks.find((x) => x.id === id);
+  if (!t) return;
+  if (t.lateK) delete t.lateK; else t.lateK = todayKey();
+  commit(renderPending);
+}
+function dropPending(id) {
+  const t = S.tasks.find((x) => x.id === id);
+  if (!t) return;
+  if (t.dropK) delete t.dropK; else t.dropK = todayKey();
+  commit(renderPending);
 }
 function removeTask(id) {
   S.tasks = S.tasks.filter((t) => t.id !== id);
@@ -4640,6 +4743,7 @@ function removeTask(id) {
 function setTaskDays(id, days) {
   const t = S.tasks.find((x) => x.id === id);
   if (!t || !days.length) return;
+  delete t.once; delete t.lateK; delete t.dropK;   // escolheu dias → vira hábito recorrente
   if (days.length === 7) delete t.days;
   else t.days = [...new Set(days)].sort();
   resync();
@@ -4790,6 +4894,10 @@ $('#one-check').onclick = () => {
   commit(renderOne, renderHeatmap, renderStudy, renderInsights);
 };
 
+const paintOnce = () => {
+  $('#task-input').placeholder = `Nova tarefa para ${isToday() ? 'hoje' : 'este dia'} (vira hábito no ⚙)…`;
+};
+paintOnce();
 $('#task-form').onsubmit = (e) => {
   e.preventDefault();
   addTask($('#task-input').value);
@@ -5216,7 +5324,7 @@ function renderAll(openReflection = true) {
   renderDayNav();
   renderSleep(); renderStudy(); renderReflection(); renderMonth(); renderReview(); renderSync();
   renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview(); renderSubjects(); renderLearning();
-  renderCheckin(); renderProjects();
+  renderCheckin(); renderProjects(); renderPending();
   renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
