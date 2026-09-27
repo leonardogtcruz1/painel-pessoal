@@ -90,6 +90,13 @@
       </div>
     </header>
 
+    <!-- ============ ABAS ============ -->
+    <nav id="tabs" role="tablist" aria-label="Seções" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-sm font-medium dark:bg-zinc-800/70">
+      <button role="tab" data-tab="hoje" class="rounded-md px-4 py-1.5 transition">Hoje</button>
+      <button role="tab" data-tab="meses" class="rounded-md px-4 py-1.5 transition">Meses</button>
+    </nav>
+
+    <div id="view-hoje" role="tabpanel" class="space-y-4 sm:space-y-5">
     <!-- ============ THE ONE THING ============ -->
     <section id="one-card" class="card relative overflow-hidden transition">
       <span id="one-accent" class="absolute inset-y-0 left-0 w-1 bg-zinc-200 transition dark:bg-zinc-800"></span>
@@ -488,6 +495,63 @@
         </div>
       </div>
     </section>
+
+    </div><!-- /view-hoje -->
+
+    <!-- ============ ABA MESES — todos os meses do ano ============ -->
+    <div id="view-meses" role="tabpanel" class="hidden space-y-4 sm:space-y-5">
+      <section class="card">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold">Visão anual</h2>
+          <div class="flex items-center gap-1">
+            <button id="year-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Ano anterior">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <span id="year-title" class="min-w-[56px] text-center text-sm font-medium tabular-nums"></span>
+            <button id="year-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo ano">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
+          <div><p class="eyebrow">Média de hábitos</p><p id="yr-habits" class="mt-1 text-2xl font-semibold">—</p><p id="yr-habits-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Dias 100%</p><p id="yr-perfect" class="mt-1 text-2xl font-semibold">0</p><p id="yr-perfect-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Metas semanais</p><p id="yr-wgoals" class="mt-1 text-2xl font-semibold">—</p><p id="yr-wgoals-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Metas do mês</p><p id="yr-mgoals" class="mt-1 text-2xl font-semibold">—</p><p id="yr-mgoals-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Estudo</p><p id="yr-study" class="mt-1 text-2xl font-semibold">0m</p><p id="yr-study-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Melhor mês</p><p id="yr-best" class="mt-1 text-2xl font-semibold capitalize">—</p><p id="yr-best-sub" class="text-xs text-zinc-500"></p></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold">O ano em dias</h2>
+          <div class="flex items-center gap-1 text-[10px] text-zinc-500">
+            <span class="mr-1">0%</span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-300 dark:bg-emerald-800"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
+            <span class="ml-1">100%</span>
+          </div>
+        </div>
+        <div id="year-grid" class="mt-4 overflow-x-auto pb-2"></div>
+      </section>
+
+      <section class="card">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="text-sm font-semibold">Evolução mês a mês</h2>
+          <div class="flex items-center gap-3 text-xs text-zinc-500">
+            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Hábitos (média)</span>
+            <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Metas semanais</span>
+          </div>
+        </div>
+        <div id="chart-year" class="relative mt-3 h-52"></div>
+      </section>
+
+      <div id="month-cards" class="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4"></div>
+    </div>
 
     <!-- ============ FOOTER ============ -->
     <footer class="flex flex-col items-center justify-between gap-2 pt-4 text-xs text-zinc-500 sm:flex-row">
@@ -1607,6 +1671,11 @@ function renderCharts() {
 let resizeRaf;
 new ResizeObserver(() => { cancelAnimationFrame(resizeRaf); resizeRaf = requestAnimationFrame(renderCharts); })
   .observe($('#chart-month'));
+let resizeRafYear;
+new ResizeObserver(() => {
+  cancelAnimationFrame(resizeRafYear);
+  resizeRafYear = requestAnimationFrame(() => { if (currentTab() === 'meses') { renderYearGrid(viewYear); renderYearChart(); } });
+}).observe($('#chart-year'));
 
 // ---------- Tooltip ----------
 const tipEl = $('#tip');
@@ -1652,6 +1721,250 @@ function moveTip(e) {
   tipEl.style.top = `${top}px`;
 }
 function hideTip() { tipEl.classList.add('hidden'); }
+
+// ---------- Aba "Meses": todos os meses do ano ----------
+let viewYear = new Date().getFullYear();
+const fmtMonthLong = new Intl.DateTimeFormat('pt-BR', { month: 'long' });
+const fmtMonthShort = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
+const cap = (t) => t[0].toUpperCase() + t.slice(1);
+let yearCache = null;
+
+/** Estatísticas de cada mês do ano + totais. */
+function yearStats(y) {
+  const tk = todayKey(), startY = Number(S.startDate.slice(0, 4));
+  const months = [];
+  for (let m = 0; m < 12; m++) {
+    const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0));
+    const status = first > tk ? 'future' : last < S.startDate ? 'before' : 'active';
+    const ms = monthStats(y, m);
+    const scored = ms.days.map((d) => d.p).filter((p) => p != null);
+    const wks = ms.weeks.filter((w) => w.total);
+    months.push({ m, ms, status,
+      habitAvg: scored.length ? avg(scored) : null,
+      goalPct: wks.length ? ms.goalsDone / ms.goalsTotal : null });
+  }
+  // Totais do ano (semanas contadas pela segunda-feira, para não duplicar entre meses)
+  let wDone = 0, wTotal = 0, study = 0;
+  for (const [wk, w] of Object.entries(S.weeks)) {
+    if (!wk.startsWith(`${y}-`)) continue;
+    wDone += (w.goals || []).filter((g) => g.done).length;
+    wTotal += (w.goals || []).length;
+  }
+  for (const [k, d] of Object.entries(S.days)) if (k.startsWith(`${y}-`)) study += d.studyMin || 0;
+  const mDone = months.reduce((a, x) => a + x.ms.mDone, 0), mTotal = months.reduce((a, x) => a + x.ms.mTotal, 0);
+  const perfect = months.reduce((a, x) => a + x.ms.perfect, 0);
+  const yearAvg = averageBetween(new Date(y, 0, 1), new Date(Math.min(new Date(y, 11, 31), new Date())));
+  const active = months.filter((x) => x.status === 'active');
+  const best = active.length ? active.reduce((a, b) => (b.ms.fill > a.ms.fill ? b : a)) : null;
+  return { y, months, wDone, wTotal, mDone, mTotal, study, perfect, yearAvg, best,
+           hasPrev: y > startY, hasNext: y < new Date().getFullYear() };
+}
+
+function renderYear() {
+  const ys = yearStats(viewYear);
+  yearCache = ys;
+  $('#year-title').textContent = viewYear;
+  $('#year-prev').disabled = !ys.hasPrev;
+  $('#year-next').disabled = !ys.hasNext;
+
+  $('#yr-habits').textContent = ys.yearAvg ? fmtPct(ys.yearAvg.value) : '—';
+  $('#yr-habits-sub').textContent = ys.yearAvg ? `em ${ys.yearAvg.days} ${ys.yearAvg.days === 1 ? 'dia' : 'dias'}` : 'sem registros';
+  $('#yr-perfect').textContent = ys.perfect;
+  $('#yr-perfect-sub').textContent = ys.yearAvg ? `de ${ys.yearAvg.days}` : '';
+  $('#yr-wgoals').textContent = ys.wTotal ? `${ys.wDone}/${ys.wTotal}` : '—';
+  $('#yr-wgoals-sub').textContent = ys.wTotal ? `${fmtPct(ys.wDone / ys.wTotal)} concluídas` : 'sem metas';
+  $('#yr-mgoals').textContent = ys.mTotal ? `${ys.mDone}/${ys.mTotal}` : '—';
+  $('#yr-mgoals-sub').textContent = ys.mTotal ? `${fmtPct(ys.mDone / ys.mTotal)} concluídas` : 'sem metas';
+  $('#yr-study').textContent = fmtMin(ys.study);
+  $('#yr-study-sub').textContent = 'no ano';
+  $('#yr-best').textContent = ys.best ? fmtMonthLong.format(new Date(viewYear, ys.best.m, 1)) : '—';
+  $('#yr-best-sub').textContent = ys.best ? `${fmtPct(ys.best.ms.fill)} preenchido` : '';
+
+  renderYearGrid(viewYear);
+  renderYearChart();
+  renderMonthCards(ys);
+}
+
+/** Grade do ano inteiro estilo GitHub: colunas = semanas, linhas = seg→dom. */
+function renderYearGrid(y) {
+  const wrap = $('#year-grid');
+  wrap.replaceChildren();
+  const tk = todayKey(), jan1 = new Date(y, 0, 1), dec31 = new Date(y, 11, 31);
+  const first = weekStart(jan1), nWeeks = Math.round((weekStart(dec31) - first) / (7 * 864e5)) + 1;
+  // Quadradinhos se ajustam à largura do card (10–16px); no celular, rola na horizontal
+  const size = Math.max(10, Math.min(16, Math.floor((wrap.clientWidth - 26) / nWeeks) - 3));
+  const grid = document.createElement('div');
+  grid.className = 'inline-grid gap-[3px]';
+  grid.style.gridTemplateColumns = `26px repeat(${nWeeks}, ${size}px)`;
+  grid.style.gridAutoRows = `${size}px`;
+
+  // Linha dos meses: rótulo na coluna onde o mês começa
+  grid.append(document.createElement('span'));
+  for (let w = 0; w < nWeeks; w++) {
+    const ws = addDays(first, 7 * w), lbl = document.createElement('span');
+    lbl.className = 'overflow-visible whitespace-nowrap text-[10px] leading-none text-zinc-500';
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(ws, i);
+      if (d.getDate() === 1 && d.getFullYear() === y) { lbl.textContent = fmtMonthShort.format(d).replace('.', ''); break; }
+    }
+    grid.append(lbl);
+  }
+  const rowLabels = ['Seg', '', 'Qua', '', 'Sex', '', 'Dom'];
+  for (let r = 0; r < 7; r++) {
+    const l = document.createElement('span');
+    l.className = 'self-center text-[10px] leading-none text-zinc-500';
+    l.textContent = rowLabels[r];
+    grid.append(l);
+    for (let w = 0; w < nWeeks; w++) {
+      const date = addDays(first, 7 * w + r), k = keyOf(date);
+      const cell = document.createElement('span');
+      if (date.getFullYear() !== y) { grid.append(cell); continue; }
+      let cls = 'rounded-[3px] ';
+      if (k > tk) cls += 'bg-zinc-50 dark:bg-zinc-900';
+      else if (k < S.startDate) cls += 'bg-zinc-100/60 dark:bg-zinc-800/50';
+      else {
+        const p = completion(k);
+        cls += p == null ? 'border border-zinc-200 dark:border-zinc-700' : HEAT[heatLevel(p)];
+      }
+      if (k === tk) cls += ' ring-1 ring-zinc-900 dark:ring-zinc-100';
+      cell.className = cls;
+      cell.dataset.k = k;
+      grid.append(cell);
+    }
+  }
+  // Tooltip por delegação (um listener para o ano todo)
+  grid.addEventListener('pointerover', (e) => {
+    const k = e.target.dataset?.k;
+    if (!k) return;
+    const date = parseKey(k), rec = peek(k), rows = [];
+    if (k > todayKey()) rows.push({ value: 'ainda não chegou', label: '' });
+    else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: '' });
+    else {
+      const p = completion(k);
+      if (p == null) rows.push({ value: 'dia livre', label: 'sem hábitos previstos' });
+      else rows.push({ value: fmtPct(p), label: 'hábitos', color: 'var(--c-habit)', box: true });
+      if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
+      if (rec?.studyMin) rows.push({ value: fmtMin(rec.studyMin), label: 'de estudo' });
+    }
+    showTip(e, fmtDay.format(date), rows);
+  });
+  grid.addEventListener('pointermove', (e) => { if (e.target.dataset?.k) moveTip(e); });
+  grid.addEventListener('pointerout', hideTip);
+  wrap.append(grid);
+  // No celular, rola até o mês atual
+  if (y === new Date().getFullYear()) {
+    const col = Math.round((weekStart(new Date()) - first) / (7 * 864e5));
+    wrap.scrollLeft = Math.max(0, 26 + col * (size + 3) - wrap.clientWidth + 60);
+  }
+}
+
+function renderYearChart() {
+  const ys = yearCache;
+  if (!ys) return;
+  columnChart($('#chart-year'), {
+    n: 12,
+    series: [{ values: ys.months.map((x) => (x.habitAvg == null ? null : x.habitAvg * 100)), color: 'var(--c-habit)' },
+             { values: ys.months.map((x) => (x.goalPct == null ? null : x.goalPct * 100)), color: 'var(--c-goal)' }],
+    xLabel: (i) => fmtMonthShort.format(new Date(ys.y, i, 1)).replace('.', ''),
+    showX: () => true,
+    tip: (i) => {
+      const x = ys.months[i], title = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(ys.y, i, 1)));
+      if (x.status !== 'active') return { title, rows: [{ value: x.status === 'future' ? 'ainda não chegou' : 'sem dados', label: '' }] };
+      return { title, rows: [
+        { value: x.habitAvg == null ? '—' : fmtPct(x.habitAvg), label: 'hábitos (média)', color: 'var(--c-habit)', box: true },
+        { value: x.ms.goalsTotal ? `${x.ms.goalsDone}/${x.ms.goalsTotal}` : '—', label: x.ms.goalsTotal ? 'metas semanais' : 'sem metas semanais', color: 'var(--c-goal)', box: true },
+        { value: fmtPct(x.ms.fill), label: 'mês preenchido' },
+      ] };
+    },
+  });
+}
+
+/** Um card por mês: preenchimento, mini calendário e números. Clique abre o mês na aba Hoje. */
+function renderMonthCards(ys) {
+  const wrap = $('#month-cards');
+  wrap.replaceChildren();
+  const tk = todayKey();
+  for (const x of ys.months) {
+    const { ms } = x, active = x.status === 'active';
+    const card = document.createElement(active ? 'button' : 'div');
+    card.className = 'card flex flex-col gap-3 !p-4 text-left transition ' +
+      (active ? 'hover:border-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:border-zinc-700' : 'opacity-50');
+    if (active) {
+      card.setAttribute('aria-label', `Abrir ${fmtMonthLong.format(new Date(ys.y, x.m, 1))} na visão mensal`);
+      card.onclick = () => { view = { y: ys.y, m: x.m }; setTab('hoje'); renderMonth(); $('#month-card').scrollIntoView({ behavior: 'smooth' }); };
+    }
+    const head = document.createElement('div');
+    head.className = 'flex items-baseline justify-between';
+    const name = document.createElement('span');
+    name.className = 'text-sm font-semibold';
+    name.textContent = cap(fmtMonthLong.format(new Date(ys.y, x.m, 1)));
+    const val = document.createElement('span');
+    val.className = 'text-lg font-semibold tracking-tight';
+    val.textContent = active ? fmtPct(ms.fill) : '';
+    head.append(name, val);
+
+    const track = document.createElement('div');
+    track.className = 'track';
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.width = active ? `${ms.fill * 100}%` : '0';
+    track.append(fill);
+
+    // Mini calendário (seg → dom)
+    const cal = document.createElement('div');
+    cal.className = 'grid grid-cols-7 gap-[3px]';
+    const lead = (new Date(ys.y, x.m, 1).getDay() + 6) % 7;
+    for (let i = 0; i < lead; i++) cal.append(document.createElement('span'));
+    for (const d of ms.days) {
+      const c = document.createElement('span');
+      let cls = 'aspect-square rounded-[3px] ';
+      if (d.future) cls += 'bg-zinc-50 dark:bg-zinc-900';
+      else if (d.k < S.startDate) cls += 'bg-zinc-100/60 dark:bg-zinc-800/50';
+      else if (d.free) cls += 'border border-zinc-200 dark:border-zinc-700';
+      else cls += HEAT[heatLevel(d.p ?? 0)];
+      if (d.k === tk) cls += ' ring-1 ring-zinc-900 dark:ring-zinc-100';
+      c.className = cls;
+      c.title = `${d.date.getDate()} · ${d.future ? 'ainda não chegou' : d.free ? 'dia livre' : d.p == null ? 'sem dados' : fmtPct(d.p)}`;
+      cal.append(c);
+    }
+
+    const foot = document.createElement('div');
+    foot.className = 'space-y-0.5 text-xs text-zinc-500';
+    const lines = x.status === 'future' ? ['ainda não chegou']
+      : x.status === 'before' ? ['antes do 1º uso']
+      : [[x.habitAvg == null ? null : `hábitos ${fmtPct(x.habitAvg)}`, ms.study ? `estudo ${fmtMin(ms.study)}` : null],
+         [ms.goalsTotal ? `metas semanais ${ms.goalsDone}/${ms.goalsTotal}` : null, ms.mTotal ? `do mês ${ms.mDone}/${ms.mTotal}` : null]]
+          .map((l) => l.filter(Boolean).join(' · ')).filter(Boolean);
+    for (const t of lines.length ? lines : ['sem registros']) {
+      const p = document.createElement('p');
+      p.textContent = t;
+      foot.append(p);
+    }
+    card.append(head, track, cal, foot);
+    wrap.append(card);
+  }
+}
+
+// ---------- Abas ----------
+function currentTab() { return location.hash === '#meses' ? 'meses' : 'hoje'; }
+function setTab(tab) {
+  if (tab === 'meses') location.hash = 'meses';
+  else history.replaceState(null, '', location.pathname + location.search);
+  renderTabs();
+}
+function renderTabs() {
+  const tab = currentTab();
+  $('#view-hoje').classList.toggle('hidden', tab !== 'hoje');
+  $('#view-meses').classList.toggle('hidden', tab !== 'meses');
+  $$('#tabs [data-tab]').forEach((b) => {
+    const on = b.dataset.tab === tab;
+    b.setAttribute('aria-selected', String(on));
+    b.className = 'rounded-md px-4 py-1.5 transition ' +
+      (on ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200');
+  });
+  if (tab === 'meses') renderYear();
+  else renderCharts();   // gráficos da aba Hoje precisam da largura visível
+}
 
 /* =========================================================
    AÇÕES
@@ -1797,6 +2110,11 @@ $('#copy-goals').onclick = copyLastWeekGoals;
 
 $('#month-prev').onclick = () => { view.m--; if (view.m < 0) { view.m = 11; view.y--; } renderMonth(); };
 $('#month-next').onclick = () => { view.m++; if (view.m > 11) { view.m = 0; view.y++; } renderMonth(); };
+
+$$('#tabs [data-tab]').forEach((b) => b.onclick = () => setTab(b.dataset.tab));
+window.addEventListener('hashchange', renderTabs);
+$('#year-prev').onclick = () => { viewYear--; renderYear(); };
+$('#year-next').onclick = () => { viewYear++; renderYear(); };
 
 $('#mgoal-form').onsubmit = (e) => {
   e.preventDefault();
@@ -2076,6 +2394,7 @@ function renderAll(openReflection = true) {
   save();
   renderHeader(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
   renderSleep(); renderStudy(); renderTimer(); renderReflection(); renderMonth(); renderReview(); renderSync();
+  renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
 }
