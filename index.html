@@ -90,6 +90,12 @@
       </div>
     </header>
 
+    <!-- ============ FRASE DO DIA ============ -->
+    <figure id="quote" class="max-w-2xl border-l-2 border-emerald-500/60 pl-4">
+      <blockquote id="quote-text" class="text-[15px] leading-relaxed text-zinc-700 sm:text-base dark:text-zinc-300"></blockquote>
+      <figcaption id="quote-author" class="mt-1 text-xs text-zinc-500"></figcaption>
+    </figure>
+
     <!-- ============ ABAS ============ -->
     <nav id="tabs" role="tablist" aria-label="Seções" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-sm font-medium dark:bg-zinc-800/70">
       <button role="tab" data-tab="hoje" class="rounded-md px-4 py-1.5 transition">Hoje</button>
@@ -921,6 +927,115 @@ function renderHeader() {
   const now = new Date(), h = now.getHours();
   $('#greeting').textContent = h < 5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
   $('#date-label').textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
+}
+
+// ---------- Frase do dia ----------
+// [frase, autor]. Autoria incerta → "atribuída a" ou "Autor desconhecido".
+const QUOTES = [
+  ['Para uma estrela brilhar, ela deve queimar primeiro.', 'Autor desconhecido'],
+  ['As estrelas não podem brilhar sem escuridão.', 'Autor desconhecido'],
+  ['É preciso ter o caos dentro de si para dar à luz uma estrela dançante.', 'Friedrich Nietzsche'],
+  ['Para renascer das próprias cinzas, a fênix primeiro precisa queimar.', 'Octavia E. Butler'],
+  ['Para uma semente alcançar sua maior expressão, ela precisa se desfazer por completo.', 'Cynthia Occelli'],
+  ['Um diamante é um pedaço de carvão que se saiu bem sob pressão.', 'Autor desconhecido'],
+  ['O ouro se prova no fogo.', 'Sêneca'],
+  ['Uma pedra preciosa não pode ser polida sem atrito, nem uma pessoa aperfeiçoada sem provações.', 'Provérbio chinês'],
+  ['O mar calmo nunca fez um bom marinheiro.', 'Provérbio inglês'],
+  ['O maior carvalho já foi uma pequena bolota que não desistiu.', 'Autor desconhecido'],
+  ['Somos feitos de poeira de estrelas.', 'Carl Sagan'],
+  ['A lagarta chama de fim do mundo o que o mestre chama de borboleta.', 'Richard Bach'],
+  ['Nós somos o que fazemos repetidamente. A excelência, portanto, não é um ato, mas um hábito.', 'Will Durant, sobre Aristóteles'],
+  ['O sucesso é a soma de pequenos esforços repetidos dia após dia.', 'Robert Collier'],
+  ['A disciplina é a ponte entre metas e realizações.', 'Jim Rohn'],
+  ['Pequenas disciplinas repetidas com consistência todos os dias levam a grandes conquistas.', 'John C. Maxwell'],
+  ['A motivação faz você começar. A disciplina faz você crescer.', 'John C. Maxwell'],
+  ['O segredo do seu futuro está escondido na sua rotina diária.', 'Mike Murdock'],
+  ['Motivação é o que faz você começar. Hábito é o que faz você continuar.', 'Jim Ryun'],
+  ['Você não sobe ao nível das suas metas; você cai ao nível dos seus sistemas.', 'James Clear'],
+  ['Cada ação que você toma é um voto no tipo de pessoa que deseja se tornar.', 'James Clear'],
+  ['Melhorar 1% por dia, ao fim de um ano, deixa você quase 37 vezes melhor.', 'James Clear'],
+  ['Os hábitos são primeiro teias de aranha, depois cabos de aço.', 'Provérbio espanhol'],
+  ['Semeie uma ação e colha um hábito; semeie um hábito e colha um caráter; semeie um caráter e colha um destino.', 'atribuída a Charles Reade'],
+  ['Uma jornada de mil milhas começa com um único passo.', 'Lao-Tsé'],
+  ['Não importa o quão devagar você vá, desde que não pare.', 'atribuída a Confúcio'],
+  ['Quem move montanhas começa carregando pequenas pedras.', 'atribuída a Confúcio'],
+  ['A gota d’água fura a pedra não pela força, mas pela constância.', 'Ovídio'],
+  ['Pouco a pouco, o pássaro faz seu ninho.', 'Provérbio francês'],
+  ['Devagar se vai ao longe.', 'Provérbio popular'],
+  ['Roma não foi construída em um dia.', 'Provérbio'],
+  ['O melhor momento para plantar uma árvore foi há 20 anos. O segundo melhor é agora.', 'Provérbio chinês'],
+  ['Cai sete vezes, levanta-te oito.', 'Provérbio japonês'],
+  ['O bambu que se curva é mais forte que o carvalho que resiste.', 'Provérbio japonês'],
+  ['A persistência realiza o impossível.', 'Provérbio chinês'],
+  ['Se quer ir rápido, vá sozinho. Se quer ir longe, vá acompanhado.', 'Provérbio africano'],
+  ['Quem quer faz um jeito; quem não quer arruma uma desculpa.', 'Provérbio popular'],
+  ['Depois da tempestade vem a bonança.', 'Provérbio popular'],
+  ['Tenha paciência. Todas as coisas são difíceis antes de se tornarem fáceis.', 'Saadi'],
+  ['A paciência é amarga, mas seu fruto é doce.', 'atribuída a Jean-Jacques Rousseau'],
+  ['Nenhuma grande coisa é criada de repente.', 'Epicteto'],
+  ['Primeiro diga a si mesmo o que você seria; depois faça o que tem de fazer.', 'Epicteto'],
+  ['A dificuldade mostra o que as pessoas são.', 'Epicteto'],
+  ['O impedimento à ação faz avançar a ação. O que fica no caminho torna-se o caminho.', 'Marco Aurélio'],
+  ['Não é porque as coisas são difíceis que não ousamos; é porque não ousamos que elas são difíceis.', 'Sêneca'],
+  ['Sorte é o que acontece quando a preparação encontra a oportunidade.', 'atribuída a Sêneca'],
+  ['Enquanto adiamos, a vida passa.', 'Sêneca'],
+  ['Ninguém pisa duas vezes no mesmo rio, pois nem o rio nem a pessoa são os mesmos.', 'Heráclito'],
+  ['Conhece-te a ti mesmo.', 'Inscrição do Templo de Delfos'],
+  ['Tudo o que somos é resultado do que pensamos.', 'Buda'],
+  ['Quem tem um porquê enfrenta quase qualquer como.', 'Friedrich Nietzsche'],
+  ['O que não me mata me fortalece.', 'Friedrich Nietzsche'],
+  ['A vida só pode ser compreendida olhando para trás, mas só pode ser vivida olhando para frente.', 'Søren Kierkegaard'],
+  ['Tente de novo. Fracasse de novo. Fracasse melhor.', 'Samuel Beckett'],
+  ['Não é a espécie mais forte que sobrevive, nem a mais inteligente, mas a que melhor se adapta à mudança.', 'Leon C. Megginson, sobre Darwin'],
+  ['A natureza não dá saltos.', 'Máxima citada por Darwin'],
+  ['Se vi mais longe, foi por estar sobre ombros de gigantes.', 'Isaac Newton'],
+  ['O que sabemos é uma gota; o que ignoramos é um oceano.', 'atribuída a Isaac Newton'],
+  ['A vida é como andar de bicicleta: para manter o equilíbrio, é preciso seguir em frente.', 'Albert Einstein'],
+  ['A mente que se abre a uma nova ideia jamais volta ao seu tamanho original.', 'Oliver Wendell Holmes'],
+  ['Aprender é a única coisa de que a mente nunca se cansa, nunca tem medo e nunca se arrepende.', 'atribuída a Leonardo da Vinci'],
+  ['Ainda estou aprendendo.', 'Michelangelo, aos 87 anos'],
+  ['A inspiração existe, mas precisa te encontrar trabalhando.', 'Pablo Picasso'],
+  ['Eu não falhei. Apenas descobri 10 mil maneiras que não funcionam.', 'atribuída a Thomas Edison'],
+  ['O fracasso é apenas a oportunidade de recomeçar, desta vez de forma mais inteligente.', 'Henry Ford'],
+  ['Quer você pense que pode, quer pense que não pode, você está certo.', 'atribuída a Henry Ford'],
+  ['Tudo parece impossível até que seja feito.', 'atribuída a Nelson Mandela'],
+  ['A coragem não é a ausência do medo, mas o triunfo sobre ele.', 'atribuída a Nelson Mandela'],
+  ['Seja a mudança que você deseja ver no mundo.', 'atribuída a Gandhi'],
+  ['Viva como se fosse morrer amanhã. Aprenda como se fosse viver para sempre.', 'atribuída a Gandhi'],
+  ['Não conte os dias; faça os dias contarem.', 'Muhammad Ali'],
+  ['Quanto mais eu treino, mais sorte eu tenho.', 'atribuída a Gary Player'],
+  ['Campeões continuam jogando até acertar.', 'Billie Jean King'],
+  ['Trabalho duro vence o talento quando o talento não trabalha duro.', 'Tim Notke'],
+  ['A perfeição não é alcançável, mas se a buscarmos podemos alcançar a excelência.', 'Vince Lombardi'],
+  ['A diferença entre o comum e o extraordinário é aquele pequeno extra.', 'Jimmy Johnson'],
+  ['Não há atalhos para nenhum lugar que valha a pena ir.', 'Beverly Sills'],
+  ['O único lugar onde o sucesso vem antes do trabalho é no dicionário.', 'Vidal Sassoon'],
+  ['Você não precisa ser ótimo para começar, mas precisa começar para ser ótimo.', 'Zig Ziglar'],
+  ['Tudo vale a pena se a alma não é pequena.', 'Fernando Pessoa'],
+  ['Tenho em mim todos os sonhos do mundo.', 'Fernando Pessoa (Álvaro de Campos)'],
+  ['O que a vida quer da gente é coragem.', 'Guimarães Rosa'],
+  ['Mestre não é quem sempre ensina, mas quem de repente aprende.', 'Guimarães Rosa'],
+  ['O conhecimento é como um jardim: se não for cultivado, não pode ser colhido.', 'Provérbio africano'],
+  ['O crescimento começa onde termina a zona de conforto.', 'Autor desconhecido'],
+  ['Grandes coisas nunca vêm de zonas de conforto.', 'Autor desconhecido'],
+  ['Disciplina é escolher entre o que você quer agora e o que você mais quer.', 'Autor desconhecido'],
+  ['O preço da disciplina é sempre menor que o custo do arrependimento.', 'Autor desconhecido'],
+  ['Compare-se apenas com quem você foi ontem.', 'Autor desconhecido'],
+  ['Descanse se precisar, mas não desista.', 'Autor desconhecido'],
+  ['Feito é melhor que perfeito.', 'Autor desconhecido'],
+  ['Um dia ou dia um. Você decide.', 'Autor desconhecido'],
+];
+
+/** Uma frase por dia, igual em todos os aparelhos; percorre a lista inteira antes de repetir. */
+function renderQuote() {
+  const now = new Date(), n = QUOTES.length;
+  const dayNum = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 864e5);
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  let step = 37;
+  while (gcd(step, n) !== 1) step++;           // passo coprimo → visita todas antes de repetir
+  const [text, author] = QUOTES[(dayNum * step) % n];
+  $('#quote-text').textContent = `“${text}”`;
+  $('#quote-author').textContent = `— ${author}`;
 }
 
 // ---------- One Thing ----------
@@ -2392,7 +2507,7 @@ let currentDay = todayKey();
 function renderAll(openReflection = true) {
   syncToday();
   save();
-  renderHeader(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
+  renderHeader(); renderQuote(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
   renderSleep(); renderStudy(); renderTimer(); renderReflection(); renderMonth(); renderReview(); renderSync();
   renderTabs();
   // Reflexão abre sozinha à noite
