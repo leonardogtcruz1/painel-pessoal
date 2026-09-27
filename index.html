@@ -1897,8 +1897,11 @@ function metricStats(m) {
   }
   const res = { e, first, cur, lastK, up, good, delta30, deltaLabel, slope, sinceLast: daysBetween(lastK, tk) };
   if (m.target != null) {
-    const span = m.target - first, remaining = m.target - cur;
-    res.progress = span ? Math.max(0, Math.min(1, (cur - first) / span)) : 1;
+    // Metas de crescimento contam a partir do zero (ex.: patrimônio 43k de 100k = 43%);
+    // metas de redução contam a partir do primeiro registro.
+    const base = up && m.target > 0 && first >= 0 ? 0 : first;
+    const span = m.target - base, remaining = m.target - cur;
+    res.progress = span ? Math.max(0, Math.min(1, (cur - base) / span)) : 1;
     res.reached = up ? cur >= m.target : cur <= m.target;
     res.remaining = remaining;
     if (!res.reached && slope && Math.sign(slope) === Math.sign(remaining)) res.eta = addDays(new Date(), Math.ceil(remaining / slope));
