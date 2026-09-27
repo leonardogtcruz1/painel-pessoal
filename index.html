@@ -137,6 +137,15 @@
       </div>
     </section>
 
+    <!-- ============ PRIORIDADES DE MELHORIA ============ -->
+    <section id="prio-card" class="card hidden">
+      <div class="flex items-center justify-between">
+        <p class="eyebrow">Prioridades de melhoria</p>
+        <span class="text-xs text-zinc-500">escolhidas nas suas reflexões</span>
+      </div>
+      <ol id="prio-list" class="mt-3 space-y-1"></ol>
+    </section>
+
     <!-- ============ REVISÃO DA SEMANA (domingo) ============ -->
     <section id="review-card" class="card hidden">
       <div class="flex items-start justify-between gap-4">
@@ -182,12 +191,40 @@
         </div>
       </div>
 
+      <div id="rv-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
+
       <div class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800">
         <label for="review-note" class="eyebrow">Foco da próxima semana</label>
         <textarea id="review-note" rows="2" class="field mt-1.5 resize-none" placeholder="Uma frase: no que vou me concentrar?"></textarea>
         <div class="mt-3 flex justify-end">
           <button id="review-done" class="btn-primary">Concluir revisão</button>
         </div>
+      </div>
+    </section>
+
+    <!-- ============ REFLEXÃO DO MÊS ============ -->
+    <section id="mreview-card" class="card hidden">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="eyebrow">Reflexão do mês</p>
+          <h2 id="mr-title" class="mt-1 text-lg font-semibold capitalize tracking-tight"></h2>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="mr-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Mês anterior">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button id="mr-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo mês">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <button id="mr-close" class="btn-ghost h-7 w-7 p-0" aria-label="Fechar reflexão do mês">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="mr-stats" class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5"></div>
+      <div id="mr-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
+      <div class="mt-5 flex justify-end">
+        <button id="mr-done" class="btn-primary">Concluir reflexão do mês</button>
       </div>
     </section>
 
@@ -340,8 +377,19 @@
                   <button class="chip" data-add="15">+15m</button>
                   <button class="chip" data-add="30">+30m</button>
                   <button class="chip" data-add="60">+1h</button>
-                  <button class="chip" data-add="-15" title="Corrigir">−15m</button>
                 </div>
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
+                  <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-15">−15m</button>
+                  <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-30">−30m</button>
+                  <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-60">−1h</button>
+                </div>
+                <form id="study-fix" class="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+                  <label for="study-total">Corrigir total <span id="study-fix-day">de hoje</span>:</label>
+                  <input id="study-total" type="number" min="0" max="1440" step="1" inputmode="numeric"
+                    class="w-14 rounded-md border border-zinc-200 bg-transparent px-1.5 py-0.5 text-right text-sm font-medium text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:text-zinc-100" />
+                  <span>min</span>
+                  <button type="submit" class="chip">Salvar</button>
+                </form>
               </div>
               <div>
                 <div class="flex items-baseline justify-between">
@@ -469,7 +517,10 @@
     <!-- ============ VISÃO MENSAL ============ -->
     <section id="month-card" class="card">
       <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold">Visão mensal</h2>
+        <div class="flex items-baseline gap-3">
+          <h2 class="text-sm font-semibold">Visão mensal</h2>
+          <button id="mreview-open" class="btn-ghost -ml-1 text-xs">Reflexão do mês →</button>
+        </div>
         <div class="flex items-center gap-1">
           <button id="month-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Mês anterior">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -731,7 +782,8 @@ function freshState() {
     days: {},
     weeks: {},   // metas semanais + revisão, chave = segunda-feira da semana
     months: {},  // metas do mês, chave = AAAA-MM
-    metrics: [], // métricas de resultado: { id, name, unit, target, deadline, entries: { AAAA-MM-DD: valor } }
+    metrics: [], // métricas de resultado: { id, name, unit, start, startKey, target, deadline, entries: { AAAA-MM-DD: valor } }
+    priorities: [], // até 3 pontos de melhoria escolhidos nas reflexões: { id, text, src }
     settings: { theme: null, studyGoalH: 10 },
     timer: { mode: 25, status: 'idle', endAt: null, remaining: 25 * 60 },
   };
@@ -764,6 +816,7 @@ function rememberSigs() {
   for (const col of SYNCED) for (const [k, rec] of Object.entries(S[col])) sigs.set(`${col}:${k}`, sigOf(rec));
   sigs.set('tasks', JSON.stringify(S.tasks));
   sigs.set('metrics', JSON.stringify(S.metrics));
+  sigs.set('priorities', JSON.stringify(S.priorities));
   sigs.set('settings', settingsSig());
 }
 function stampChanges() {
@@ -779,6 +832,8 @@ function stampChanges() {
   if (sigs.get('tasks') !== ts) { S.tasksU = now; sigs.set('tasks', ts); changed = true; }
   const ms = JSON.stringify(S.metrics);
   if (sigs.get('metrics') !== ms) { S.metricsU = now; sigs.set('metrics', ms); changed = true; }
+  const ps = JSON.stringify(S.priorities);
+  if (sigs.get('priorities') !== ps) { S.prioritiesU = now; sigs.set('priorities', ps); changed = true; }
   const ss = settingsSig();
   if (sigs.get('settings') !== ss) { S.settingsU = now; sigs.set('settings', ss); changed = true; }
   return changed;
@@ -1244,15 +1299,26 @@ function emptyRow(text) {
   return li;
 }
 
-/** Editor de um hábito: dias da semana, quantidade diária e a métrica de resultado que ele move. */
+/*
+ * Editor de um hábito. Dias da semana salvam na hora; tipo, meta e métrica ficam num rascunho
+ * até "Salvar" (salvar campo a campo redesenhava a lista e engolia o próximo clique).
+ */
+let taskDraft = null;
 function scheduleEditor(t) {
+  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '' };
+  const dr = taskDraft;
   const wrapLi = document.createElement('li');
-  wrapLi.className = 'mb-3 ml-8 space-y-2.5 rounded-lg border border-zinc-100 p-3 dark:border-zinc-800';
-  const li = document.createElement('div');
-  li.className = 'flex flex-wrap items-center gap-1.5';
-  const days = t.days || [0, 1, 2, 3, 4, 5, 6];
+  wrapLi.className = 'mb-3 ml-8 space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800';
+  const sectionLabel = (txt, help) => {
+    const d = document.createElement('div');
+    const p = document.createElement('p'); p.className = 'text-xs font-medium text-zinc-700 dark:text-zinc-300'; p.textContent = txt;
+    d.append(p);
+    if (help) { const h = document.createElement('p'); h.className = 'text-[11px] leading-snug text-zinc-500'; h.textContent = help; d.append(h); }
+    return d;
+  };
   const chip = (text, on, onclick) => {
     const b = document.createElement('button');
+    b.type = 'button';
     b.className = 'rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
       ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-600 dark:bg-zinc-700 dark:text-white'
       : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600');
@@ -1261,52 +1327,90 @@ function scheduleEditor(t) {
     b.onclick = onclick;
     return b;
   };
+  const small = 'rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900';
+
+  // 1. Dias da semana
+  const days = t.days || [0, 1, 2, 3, 4, 5, 6];
+  const dRow = document.createElement('div');
+  dRow.className = 'mt-1.5 flex flex-wrap items-center gap-1.5';
   for (const dw of WEEK_ORDER) {
     const on = days.includes(dw);
-    li.append(chip(WD[dw], on, () => {
+    dRow.append(chip(WD[dw], on, () => {
       const next = on ? days.filter((x) => x !== dw) : [...days, dw];
       if (next.length) setTaskDays(t.id, next);
     }));
   }
   const sep = document.createElement('span');
   sep.className = 'mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700';
-  li.append(sep,
+  dRow.append(sep,
     chip('todo dia', isDaily(t), () => setTaskDays(t.id, [0, 1, 2, 3, 4, 5, 6])),
     chip('seg–sex', schedLabel(t) === 'seg–sex', () => setTaskDays(t.id, [1, 2, 3, 4, 5])));
+  const dBox = document.createElement('div');
+  dBox.append(sectionLabel('Dias'), dRow);
 
-  const small = 'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-emerald-500 dark:border-zinc-700';
-  const lbl = (txt) => { const s = document.createElement('span'); s.className = 'w-20 shrink-0 text-xs text-zinc-500'; s.textContent = txt; return s; };
+  // 2. Como medir: feito/não feito ou quantidade
+  const qBox = document.createElement('div');
+  qBox.append(sectionLabel('Como medir', dr.qty
+    ? 'Você anota quanto fez; o dia conta proporcional (14 de 20 pág = 70%).'
+    : 'Só marca feito ou não feito. Escolha "Quantidade" para anotar quanto fez (páginas, ml, km…).'));
+  const kRow = document.createElement('div');
+  kRow.className = 'mt-1.5 flex flex-wrap items-center gap-1.5';
+  kRow.append(chip('Feito / não feito', !dr.qty, () => { dr.qty = false; renderTasks(); }),
+              chip('Quantidade', dr.qty, () => { dr.qty = true; renderTasks(); }));
+  qBox.append(kRow);
+  if (dr.qty) {
+    const row = document.createElement('div');
+    row.className = 'mt-2 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500';
+    const tg = document.createElement('input');
+    tg.type = 'number'; tg.min = '0'; tg.step = 'any'; tg.inputMode = 'decimal';
+    tg.value = dr.target; tg.placeholder = '20';
+    tg.className = small + ' w-20';
+    tg.setAttribute('aria-label', 'Meta por dia');
+    tg.oninput = () => { dr.target = tg.value; };
+    const un = document.createElement('input');
+    un.value = dr.unit; un.placeholder = 'pág'; un.maxLength = 10;
+    un.className = small + ' w-24';
+    un.setAttribute('aria-label', 'Unidade');
+    un.oninput = () => { dr.unit = un.value; };
+    const l = document.createElement('span'); l.textContent = 'Meta por dia:';
+    row.append(l, tg, un);
+    qBox.append(row);
+  }
 
-  // Quantidade por dia (vazio = sim/não)
-  const qRow = document.createElement('div');
-  qRow.className = 'flex flex-wrap items-center gap-1.5';
-  const tg = document.createElement('input');
-  tg.type = 'number'; tg.min = '0'; tg.step = 'any'; tg.inputMode = 'decimal';
-  tg.value = t.target || ''; tg.placeholder = 'sim/não';
-  tg.className = small + ' w-20';
-  tg.setAttribute('aria-label', 'Quantidade por dia');
-  const un = document.createElement('input');
-  un.value = t.unit || ''; un.placeholder = 'unidade (pág, ml, km)'; un.maxLength = 10;
-  un.className = small + ' w-40';
-  un.setAttribute('aria-label', 'Unidade');
-  const applyQty = () => setTaskConfig(t.id, { target: Number(tg.value) > 0 ? Number(tg.value) : null, unit: un.value.trim() || null });
-  tg.onchange = applyQty; un.onchange = applyQty;
-  [tg, un].forEach((el) => el.onkeydown = (e) => { if (e.key === 'Enter') el.blur(); });
-  qRow.append(lbl('Meta diária'), tg, un);
-
-  // Métrica de resultado que o hábito move
-  const mRow = document.createElement('div');
-  mRow.className = 'flex flex-wrap items-center gap-1.5';
+  // 3. Métrica de resultado
+  const mBox = document.createElement('div');
+  mBox.append(sectionLabel('Métrica que este hábito move',
+    S.metrics.length ? 'A métrica passa a mostrar quanto você cumpriu deste hábito, e os insights comparam as duas coisas.'
+      : 'Crie uma métrica no card "Resultados" (ex.: Supino, R$ guardado) para ligar este hábito a ela.'));
   const sel = document.createElement('select');
-  sel.className = small + ' max-w-[220px] dark:bg-zinc-900';
+  sel.className = small + ' mt-1.5 w-full max-w-xs';
   sel.setAttribute('aria-label', 'Métrica que este hábito move');
-  sel.append(new Option(S.metrics.length ? 'nenhuma' : 'crie uma métrica em Resultados', ''));
-  for (const m of S.metrics) sel.append(new Option(m.name, m.id, false, t.metricId === m.id));
+  sel.append(new Option('Nenhuma', ''));
+  for (const m of S.metrics) sel.append(new Option(m.name, m.id, false, dr.metricId === m.id));
+  sel.value = dr.metricId;
   sel.disabled = !S.metrics.length;
-  sel.onchange = () => setTaskConfig(t.id, { metricId: sel.value || null });
-  mRow.append(lbl('Move a métrica'), sel);
+  sel.onchange = () => { dr.metricId = sel.value; };
+  mBox.append(sel);
 
-  wrapLi.append(li, qRow, mRow);
+  // Ações
+  const act = document.createElement('div');
+  act.className = 'flex items-center justify-end gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800';
+  const err = document.createElement('span');
+  err.className = 'mr-auto text-xs text-rose-500';
+  const cancel = document.createElement('button');
+  cancel.type = 'button'; cancel.className = 'btn-ghost text-xs'; cancel.textContent = 'Fechar';
+  cancel.onclick = () => { taskDraft = null; editingTask = null; renderTasks(); };
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button'; saveBtn.className = 'btn-primary !py-1.5 text-xs'; saveBtn.textContent = 'Salvar';
+  saveBtn.onclick = () => {
+    const target = Number(dr.target);
+    if (dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 20).'; return; }
+    taskDraft = null; editingTask = null;
+    setTaskConfig(t.id, { target: dr.qty ? target : null, unit: dr.qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null });
+  };
+  act.append(err, cancel, saveBtn);
+
+  wrapLi.append(dBox, qBox, mBox, act);
   return wrapLi;
 }
 
@@ -1326,7 +1430,7 @@ function renderTasks() {
     ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
       badge, off: isOff, editing: editingTask === t.id,
       qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => setQty(t.id, v) } : null,
-      onEdit: () => { editingTask = editingTask === t.id ? null : t.id; renderTasks(); },
+      onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
     }));
     if (editingTask === t.id) ul.append(scheduleEditor(t));
   };
@@ -1494,6 +1598,9 @@ function renderStudy() {
   const d = rday();
   $('#study-today').textContent = fmtMin(d.studyMin);
   $('#study-today-label').textContent = isToday() ? 'hoje' : 'neste dia';
+  $('#study-fix-day').textContent = isToday() ? 'de hoje' : 'deste dia';
+  const tot = $('#study-total');
+  if (document.activeElement !== tot) tot.value = d.studyMin || 0;
   const topic = $('#topic');
   if (document.activeElement !== topic) topic.value = d.topic;
   renderStudyTrend();
@@ -1554,23 +1661,46 @@ const metricEntries = (m) => Object.entries(m.entries || {}).sort(([a], [b]) => 
 /** Último valor registrado até a data `k` (inclusive). */
 function metricAt(m, k) {
   let v = null;
-  for (const [ek, ev] of metricEntries(m)) { if (ek > k) break; v = ev; }
+  for (const [ek, ev] of metricSeries(m)) { if (ek > k) break; v = ev; }
   return v;
+}
+/** Métricas antigas guardavam o valor inicial como primeiro registro; passa para `start`. */
+function migrateMetrics() {
+  for (const m of S.metrics) {
+    if (m.start != null) continue;
+    const e = metricEntries(m);
+    if (!e.length) continue;
+    [m.startKey, m.start] = e[0];
+    const { [e[0][0]]: _, ...rest } = m.entries;
+    m.entries = rest;
+  }
 }
 
 /**
  * Situação de uma métrica: valor inicial/atual, variação em 30 dias, progresso até a meta
  * e ritmo (regressão linear das entradas dos últimos 90 dias) → previsão de quando chega na meta.
  */
-function metricStats(m) {
+/**
+ * Série da métrica: o valor inicial (guardado à parte, para "atualizar hoje" não apagá-lo)
+ * seguido dos registros. Registro no mesmo dia do início substitui o ponto, mas não o início.
+ */
+function metricSeries(m) {
   const e = metricEntries(m);
+  if (m.start == null) return e;
+  const base = [m.startKey, m.start];
+  const at = e.findIndex(([k]) => k >= m.startKey);   // início vem antes dos registros do mesmo dia
+  return at === -1 ? [...e, base] : [...e.slice(0, at), base, ...e.slice(at)];
+}
+function metricStats(m) {
+  const e = metricSeries(m);
   if (!e.length) return null;
   const tk = todayKey(), first = e[0][1], [lastK, cur] = e[e.length - 1];
   const up = m.target == null ? true : m.target >= first;
   const good = (delta) => (up ? delta > 0 : delta < 0);
   const ref = metricAt(m, keyOf(addDays(new Date(), -30)));
-  const delta30 = ref != null && e[0][0] <= keyOf(addDays(new Date(), -30)) ? cur - ref : cur - first;
-  const deltaSpan = ref != null && e[0][0] <= keyOf(addDays(new Date(), -30)) ? 30 : daysBetween(e[0][0], lastK);
+  const old = ref != null && e[0][0] <= keyOf(addDays(new Date(), -30));
+  const delta30 = old ? cur - ref : cur - first;
+  const deltaLabel = old ? 'em 30 dias' : 'desde o início';
 
   const recent = e.filter(([k]) => daysBetween(k, tk) <= 90);
   let slope = null;   // unidades por dia
@@ -1580,7 +1710,7 @@ function metricStats(m) {
     const num = xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0), den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
     slope = den ? num / den : null;
   }
-  const res = { e, first, cur, lastK, up, good, delta30, deltaSpan, slope, sinceLast: daysBetween(lastK, tk) };
+  const res = { e, first, cur, lastK, up, good, delta30, deltaLabel, slope, sinceLast: daysBetween(lastK, tk) };
   if (m.target != null) {
     const span = m.target - first, remaining = m.target - cur;
     res.progress = span ? Math.max(0, Math.min(1, (cur - first) / span)) : 1;
@@ -1638,7 +1768,7 @@ function metricSpark(m, st) {
   return svg;
 }
 
-let editingMetric = null;
+let editingMetric = null, metricFlash = null;
 function renderMetrics() {
   const wrap = $('#metric-list');
   wrap.replaceChildren();
@@ -1665,7 +1795,7 @@ function renderMetrics() {
     gear.className = 'btn-ghost -mr-1.5 -mt-1 h-7 w-7 p-0' + (editingMetric === m.id ? ' text-zinc-900 dark:text-zinc-100' : '');
     gear.innerHTML = ICON_CAL;
     gear.setAttribute('aria-label', `Configurar ${m.name}`);
-    gear.onclick = () => { editingMetric = editingMetric === m.id ? null : m.id; renderMetrics(); };
+    gear.onclick = () => { editingMetric = editingMetric === m.id ? null : m.id; metricDraft = null; renderMetrics(); };
     head.append(name, gear);
     card.append(head);
 
@@ -1676,10 +1806,10 @@ function renderMetrics() {
       v.className = 'text-2xl font-semibold tabular-nums tracking-tight';
       v.textContent = fmtVal(m, st.cur);
       big.append(v);
-      if (st.e.length > 1 && st.deltaSpan > 0) {
+      if (st.e.length > 1) {
         const dl = document.createElement('span');
         dl.className = 'text-xs font-medium tabular-nums ' + (st.delta30 === 0 ? 'text-zinc-500' : st.good(st.delta30) ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500');
-        dl.textContent = `${signed(m, st.delta30)} em ${st.deltaSpan} ${st.deltaSpan === 1 ? 'dia' : 'dias'}`;
+        dl.textContent = `${signed(m, st.delta30)} ${st.deltaLabel}`;
         big.append(dl);
       }
       card.append(big, metricSpark(m, st));
@@ -1757,7 +1887,8 @@ function renderMetrics() {
     if (st) {
       const when = document.createElement('p');
       when.className = 'mt-1.5 text-xs ' + (st.sinceLast >= 7 ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-zinc-500');
-      when.textContent = st.sinceLast === 0 ? 'último registro: hoje'
+      if (metricFlash === m.id) when.className = 'mt-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400';
+      when.textContent = metricFlash === m.id ? `Registrado ✓ ${fmtVal(m, st.cur)}` : st.sinceLast === 0 ? 'último registro: hoje'
         : st.sinceLast >= 7 ? `último registro há ${st.sinceLast} dias — registre o valor desta semana`
         : `último registro há ${st.sinceLast} ${st.sinceLast === 1 ? 'dia' : 'dias'}`;
       card.append(when);
@@ -1768,36 +1899,63 @@ function renderMetrics() {
   }
 }
 
-/** Editar nome, unidade, meta e prazo; apagar registros ou a métrica. */
+/** Editar nome, unidade, valor inicial, meta e prazo (com Salvar); apagar registros ou a métrica. */
+let metricDraft = null;
 function metricEditor(m, st) {
+  if (metricDraft?.id !== m.id) {
+    metricDraft = { id: m.id, name: m.name, unit: m.unit || '', start: m.start ?? '', startKey: m.startKey || todayKey(),
+                    target: m.target ?? '', deadline: m.deadline || '' };
+  }
+  const dr = metricDraft;
   const box = document.createElement('div');
   box.className = 'mt-4 space-y-3 border-t border-zinc-100 pt-4 dark:border-zinc-800';
-  const small = 'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-emerald-500 dark:border-zinc-700';
-  const field = (label, attrs, key, parse) => {
+  const small = 'rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900';
+  const field = (label, key, attrs = {}) => {
     const l = document.createElement('label');
-    l.className = 'flex items-center gap-2 text-xs text-zinc-500';
-    const s = document.createElement('span'); s.className = 'w-14 shrink-0'; s.textContent = label;
+    l.className = 'block text-xs text-zinc-500';
     const i = document.createElement('input');
     Object.assign(i, attrs);
-    i.className = small + ' min-w-0 flex-1';
-    i.value = m[key] ?? '';
-    i.onchange = () => updateMetric(m.id, { [key]: parse(i.value) });
-    l.append(s, i);
+    i.className = small + ' mt-1 w-full';
+    i.value = dr[key];
+    i.oninput = () => { dr[key] = i.value; };
+    l.append(label, i);
     return l;
   };
   const grid = document.createElement('div');
-  grid.className = 'grid gap-2 sm:grid-cols-2';
+  grid.className = 'grid grid-cols-2 gap-2';
   grid.append(
-    field('Nome', { maxLength: 40 }, 'name', (v) => v.trim() || m.name),
-    field('Unidade', { maxLength: 10 }, 'unit', (v) => v.trim() || null),
-    field('Meta', { type: 'number', step: 'any' }, 'target', (v) => (v === '' ? null : Number(v))),
-    field('Prazo', { type: 'date' }, 'deadline', (v) => v || null));
-  box.append(grid);
+    field('Nome', 'name', { maxLength: 40 }),
+    field('Unidade', 'unit', { maxLength: 10 }),
+    field('Valor inicial', 'start', { type: 'number', step: 'any' }),
+    field('Data do início', 'startKey', { type: 'date', max: todayKey() }),
+    field('Meta', 'target', { type: 'number', step: 'any' }),
+    field('Prazo', 'deadline', { type: 'date' }));
+  const act = document.createElement('div');
+  act.className = 'flex items-center justify-end gap-2';
+  const err = document.createElement('span');
+  err.className = 'mr-auto text-xs text-rose-500';
+  const close = document.createElement('button');
+  close.type = 'button'; close.className = 'btn-ghost text-xs'; close.textContent = 'Fechar';
+  close.onclick = () => { metricDraft = null; editingMetric = null; renderMetrics(); };
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button'; saveBtn.className = 'btn-primary !py-1.5 text-xs'; saveBtn.textContent = 'Salvar';
+  saveBtn.onclick = () => {
+    const start = Number(dr.start), target = dr.target === '' ? null : Number(dr.target);
+    if (!dr.name.trim()) { err.textContent = 'Dê um nome à métrica.'; return; }
+    if (dr.start === '' || !Number.isFinite(start)) { err.textContent = 'Informe o valor inicial.'; return; }
+    if (target != null && !Number.isFinite(target)) { err.textContent = 'Meta inválida.'; return; }
+    metricDraft = null; editingMetric = null;
+    updateMetric(m.id, { name: dr.name.trim(), unit: dr.unit.trim() || null, start, startKey: dr.startKey || todayKey(),
+                         target, deadline: dr.deadline || null });
+  };
+  act.append(err, close, saveBtn);
+  box.append(grid, act);
 
-  if (st) {
+  const e = metricEntries(m);
+  if (e.length) {
     const h = document.createElement('p'); h.className = 'eyebrow'; h.textContent = 'Registros';
     const ul = document.createElement('ul'); ul.className = 'max-h-40 space-y-0.5 overflow-y-auto';
-    for (const [k, v] of [...st.e].reverse()) {
+    for (const [k, v] of [...e].reverse()) {
       const li = document.createElement('li');
       li.className = 'group flex items-center justify-between rounded-md px-1 py-0.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
       const t = document.createElement('span');
@@ -1889,7 +2047,7 @@ function computeInsights() {
 
   // Aderência aos hábitos ligados × evolução da métrica, entre registros consecutivos
   for (const m of S.metrics) {
-    const e = metricEntries(m), st = metricStats(m);
+    const e = metricSeries(m), st = metricStats(m);
     if (!st || e.length < 4 || !S.tasks.some((t) => t.metricId === m.id)) continue;
     const hi = [], lo = [];
     for (let i = 1; i < e.length; i++) {
@@ -1939,6 +2097,298 @@ function renderInsights() {
     li.append(dot, t);
     ul.append(li);
   }
+}
+
+// ---------- Reflexões da semana e do mês ----------
+/** Números de um período (dias entre fromK e toK, até hoje e a partir do 1º uso). */
+function periodStats(fromK, toK) {
+  const tk = todayKey();
+  if (toK > tk) toK = tk;
+  if (fromK < S.startDate) fromK = S.startDate;
+  const res = { fromK, toK, days: 0, habitAvg: null, perfect: 0, zero: 0, study: 0, sleepAvg: null, energyAvg: null, habits: [], metrics: [] };
+  if (fromK > toK) return res;
+  const ps = [], sleeps = [], energies = [];
+  for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
+    const k = keyOf(d), p = completion(k), r = peek(k);
+    if (k === tk && (p == null || p < 1)) { res.study += r?.studyMin || 0; continue; }   // hoje ainda está em andamento
+    if (p != null) { ps.push(p); if (p === 1) res.perfect++; if (p === 0) res.zero++; }
+    res.study += r?.studyMin || 0;
+    if (r?.sleep != null) sleeps.push(r.sleep);
+    if (r?.energy > 0) energies.push(r.energy);
+  }
+  res.days = ps.length;
+  res.habitAvg = ps.length ? avg(ps) : null;
+  res.sleepAvg = sleeps.length ? avg(sleeps) : null;
+  res.energyAvg = energies.length ? avg(energies) : null;
+  res.habits = S.tasks.map((t) => ({ t, a: taskAdherence(t, fromK, toK) })).filter((x) => x.a != null);
+  const dayBefore = keyOf(addDays(parseKey(fromK), -1));
+  for (const m of S.metrics) {
+    const before = metricAt(m, dayBefore), after = metricAt(m, toK);
+    const logged = metricSeries(m).some(([k]) => k >= fromK && k <= toK);
+    if (after != null) res.metrics.push({ m, before, after, logged, st: metricStats(m) });
+  }
+  return res;
+}
+
+/** Sugestões tiradas dos dados para cada parte da reflexão. goals = [{title, done}] do período. */
+function reflectionHints(cur, prev, goals, studyGoalMin) {
+  const H = { wins: [], sins: [], better: [], improve: [] };
+  const q = (t) => `“${t}”`;
+  for (const g of goals) (g.done ? H.wins : H.sins).push(`${g.done ? 'Meta cumprida' : 'Meta não cumprida'}: ${q(g.title)}`);
+  for (const x of cur.metrics) {
+    if (x.before == null || x.before === x.after) continue;
+    const txt = `${x.m.name}: ${fmtNum(x.before)} → ${fmtVal(x.m, x.after)}`;
+    (x.st.good(x.after - x.before) ? H.wins : H.sins).push(x.st.good(x.after - x.before) ? txt : `${txt} (direção contrária da meta)`);
+  }
+  for (const x of cur.metrics) if (!x.logged) H.sins.push(`Não registrei ${q(x.m.name)} no período`);
+  for (const { t, a } of cur.habits) {
+    if (a >= 0.9) H.wins.push(`${q(t.title)} em ${fmtPct(a)} dos dias`);
+    else if (a < 0.5) H.sins.push(`${q(t.title)} em só ${fmtPct(a)} dos dias`);
+  }
+  if (cur.perfect) H.wins.push(`${cur.perfect} ${cur.perfect === 1 ? 'dia' : 'dias'} com 100% dos hábitos`);
+  if (cur.zero) H.sins.push(`${cur.zero} ${cur.zero === 1 ? 'dia zerado' : 'dias zerados'} (0% dos hábitos)`);
+  if (studyGoalMin) (cur.study >= studyGoalMin ? H.wins : H.sins).push(`Estudo: ${fmtMin(cur.study)} de ${fmtMin(studyGoalMin)} planejados`);
+  if (cur.sleepAvg != null && cur.sleepAvg < 7) H.sins.push(`Sono médio de ${fmtSleep(cur.sleepAvg)}`);
+
+  if (prev.habitAvg != null && cur.habitAvg != null) {
+    const d = Math.round((cur.habitAvg - prev.habitAvg) * 100);
+    if (d >= 5) H.better.push(`Hábitos: ${fmtPct(prev.habitAvg)} → ${fmtPct(cur.habitAvg)} (+${d} pts)`);
+  }
+  for (const { t, a } of cur.habits) {
+    const b = prev.habits.find((x) => x.t.id === t.id)?.a;
+    if (b != null && a - b >= 0.15) H.better.push(`${q(t.title)}: ${fmtPct(b)} → ${fmtPct(a)} dos dias`);
+  }
+  if (prev.study > 0 && cur.study >= prev.study * 1.15) H.better.push(`Estudo: ${fmtMin(prev.study)} → ${fmtMin(cur.study)}`);
+  if (prev.sleepAvg != null && cur.sleepAvg != null && cur.sleepAvg - prev.sleepAvg >= 0.25) H.better.push(`Sono médio: ${fmtSleep(prev.sleepAvg)} → ${fmtSleep(cur.sleepAvg)}`);
+  if (prev.energyAvg != null && cur.energyAvg != null && cur.energyAvg - prev.energyAvg >= 0.3) H.better.push(`Energia média: ${fmtNum(+prev.energyAvg.toFixed(1))} → ${fmtNum(+cur.energyAvg.toFixed(1))}`);
+  for (const x of cur.metrics) {
+    if (x.before != null && x.before !== x.after && x.st.good(x.after - x.before)) H.better.push(`${x.m.name} evoluiu ${signed(x.m, x.after - x.before)}`);
+  }
+
+  const weak = [...cur.habits].sort((a, b) => a.a - b.a).filter((x) => x.a < 0.8).slice(0, 2);
+  for (const { t } of weak) H.improve.push(`Fazer ${q(t.title)} em pelo menos 80% dos dias`);
+  if (cur.zero) H.improve.push('Não zerar nenhum dia: ao menos 1 hábito, mesmo no dia ruim');
+  if (cur.sleepAvg != null && cur.sleepAvg < 7) H.improve.push('Dormir 7h ou mais');
+  for (const x of cur.metrics) {
+    if (!x.logged) H.improve.push(`Registrar ${q(x.m.name)} toda semana`);
+    else if (x.before != null && x.before !== x.after && !x.st.good(x.after - x.before)) H.improve.push(`Virar o jogo em ${q(x.m.name)}`);
+  }
+  if (studyGoalMin && cur.study < studyGoalMin) H.improve.push(`Bater a meta de estudo (${fmtMin(studyGoalMin)})`);
+  for (const k of Object.keys(H)) H[k] = [...new Set(H[k])];
+  return H;
+}
+
+const REFL_PARTS = [
+  { key: 'wins', title: 'Conquistas', ph: 'O que deu certo? Do que você se orgulha?' },
+  { key: 'sins', title: 'Onde pequei', ph: 'Onde falhei, fui inconsistente ou me sabotei?' },
+  { key: 'better', title: 'Onde melhorei', ph: 'O que evoluiu em relação ao período anterior?' },
+];
+const blankRefl = () => ({ wins: '', sins: '', better: '', improve: [] });
+
+/**
+ * Painel de reflexão (semana ou mês). ctx: { label, src, get(), rec() → registro com `.refl` (cria), hints, rerender }.
+ * Texto salva enquanto digita; sugestões dos dados entram com um clique.
+ */
+function reflectionPanel(host, ctx) {
+  host.replaceChildren();
+  const R = { ...blankRefl(), ...(ctx.get()?.refl || {}) };
+  const write = () => { const rec = ctx.rec(); rec.refl ||= blankRefl(); return rec.refl; };
+
+  const head = document.createElement('div');
+  const h = document.createElement('p'); h.className = 'text-sm font-semibold'; h.textContent = `Reflexão ${ctx.label}`;
+  const sub = document.createElement('p'); sub.className = 'text-xs text-zinc-500';
+  sub.textContent = 'Escreva com suas palavras. As sugestões abaixo de cada campo vêm dos seus dados — toque para adicionar.';
+  head.append(h, sub);
+
+  const grid = document.createElement('div');
+  grid.className = 'mt-4 grid gap-5 sm:grid-cols-2';
+  const hintChips = (items, isUsed, onPick) => {
+    const w = document.createElement('div');
+    w.className = 'mt-1.5 flex flex-wrap gap-1';
+    for (const txt of items) {
+      const used = isUsed(txt);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-snug transition ' + (used
+        ? 'border-transparent text-zinc-400 line-through dark:text-zinc-600'
+        : 'border-dashed border-zinc-300 text-zinc-600 hover:border-emerald-500 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-emerald-400');
+      b.textContent = (used ? '' : '+ ') + txt;
+      b.disabled = used;
+      b.onclick = () => onPick(txt);
+      w.append(b);
+    }
+    return w;
+  };
+
+  for (const part of REFL_PARTS) {
+    const sec = document.createElement('div');
+    const l = document.createElement('p'); l.className = 'eyebrow'; l.textContent = part.title;
+    const ta = document.createElement('textarea');
+    ta.rows = 3; ta.className = 'field mt-1.5 resize-y'; ta.placeholder = part.ph; ta.value = R[part.key];
+    ta.oninput = () => { write()[part.key] = ta.value; save(); };
+    sec.append(l, ta);
+    const hints = ctx.hints[part.key];
+    if (hints.length) {
+      sec.append(hintChips(hints, (txt) => ta.value.includes(txt), (txt) => {
+        const cur = ta.value.trimEnd();
+        write()[part.key] = (cur ? cur + '\n' : '') + '• ' + txt;
+        save(); ctx.rerender();
+      }));
+    }
+    grid.append(sec);
+  }
+
+  // Onde posso melhorar: lista de itens; ★ promove a prioridade (máx. 3)
+  const imp = document.createElement('div');
+  const il = document.createElement('p'); il.className = 'eyebrow'; il.textContent = 'Onde posso melhorar';
+  const ih = document.createElement('p'); ih.className = 'mt-0.5 text-[11px] text-zinc-500';
+  ih.textContent = `Marque ★ em 1 a ${MAX_PRIO} para virarem prioridade na página inicial (${S.priorities.length}/${MAX_PRIO} em uso).`;
+  const ul = document.createElement('ul'); ul.className = 'mt-2 space-y-0.5';
+  if (!R.improve.length) { const li = document.createElement('li'); li.className = 'py-1 text-xs text-zinc-500'; li.textContent = 'Nenhum ponto ainda.'; ul.append(li); }
+  for (const it of R.improve) {
+    const li = document.createElement('li');
+    li.className = 'group -mx-1 flex items-center gap-2 rounded-md px-1 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+    const on = S.priorities.some((p) => p.id === it.id);
+    const full = !on && S.priorities.length >= MAX_PRIO;
+    const star = document.createElement('button');
+    star.type = 'button';
+    star.className = 'shrink-0 text-base leading-none transition ' + (on ? 'text-amber-500' : full ? 'cursor-not-allowed text-zinc-200 dark:text-zinc-700' : 'text-zinc-300 hover:text-amber-500 dark:text-zinc-600');
+    star.textContent = on ? '★' : '☆';
+    star.title = on ? 'Tirar das prioridades' : full ? `Já há ${MAX_PRIO} prioridades — tire uma para escolher esta` : 'Tornar prioridade';
+    star.setAttribute('aria-pressed', String(on));
+    star.onclick = () => { if (!full) togglePriority(it, ctx.src); };
+    const t = document.createElement('span'); t.className = 'min-w-0 flex-1 text-sm'; t.textContent = it.text;
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Remover “${it.text}”`);
+    rm.onclick = () => {
+      const r = write();
+      r.improve = r.improve.filter((x) => x.id !== it.id);
+      S.priorities = S.priorities.filter((p) => p.id !== it.id);
+      commit(ctx.rerender, renderPriorities);
+    };
+    li.append(star, t, rm);
+    ul.append(li);
+  }
+  const addItem = (text) => {
+    text = text.trim();
+    if (!text) return;
+    write().improve.push({ id: uid(), text });
+    commit(ctx.rerender);
+  };
+  const form = document.createElement('form');
+  form.className = 'mt-2 flex gap-2';
+  const inp = document.createElement('input');
+  inp.className = 'field'; inp.maxLength = 120; inp.placeholder = 'Um ponto concreto para melhorar…';
+  const add = document.createElement('button');
+  add.type = 'submit'; add.className = 'btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800'; add.textContent = 'Adicionar';
+  form.onsubmit = (e) => { e.preventDefault(); addItem(inp.value); };
+  form.append(inp, add);
+  imp.append(il, ih, ul, form);
+  const ihints = ctx.hints.improve;
+  if (ihints.length) imp.append(hintChips(ihints, (txt) => R.improve.some((x) => x.text === txt), addItem));
+  const wide = document.createElement('div');
+  wide.className = 'sm:col-span-2';
+  wide.append(imp);
+  grid.append(wide);
+
+  host.append(head, grid);
+}
+
+// ---------- Prioridades ----------
+const MAX_PRIO = 3;
+function togglePriority(item, src) {
+  if (S.priorities.some((p) => p.id === item.id)) S.priorities = S.priorities.filter((p) => p.id !== item.id);
+  else if (S.priorities.length < MAX_PRIO) S.priorities.push({ id: item.id, text: item.text, src, since: todayKey() });
+  commit(renderPriorities, renderReview, renderMonthReview);
+}
+function renderPriorities() {
+  const card = $('#prio-card'), ol = $('#prio-list');
+  card.classList.toggle('hidden', !S.priorities.length);
+  ol.replaceChildren();
+  S.priorities.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.className = 'group -mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+    const n = document.createElement('span');
+    n.className = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-semibold text-amber-700 dark:text-amber-400';
+    n.textContent = i + 1;
+    const body = document.createElement('div');
+    body.className = 'min-w-0 flex-1';
+    const t = document.createElement('p'); t.className = 'text-sm font-medium'; t.textContent = p.text;
+    const s = document.createElement('p'); s.className = 'text-[11px] text-zinc-500';
+    const days = daysBetween(p.since, todayKey());
+    s.textContent = `${p.src} · ${days === 0 ? 'desde hoje' : `há ${days} ${days === 1 ? 'dia' : 'dias'}`}`;
+    body.append(t, s);
+    const ok = document.createElement('button');
+    ok.className = 'btn-ghost shrink-0 text-xs';
+    ok.textContent = 'Resolvido ✓';
+    ok.title = 'Tirar das prioridades (continua na reflexão)';
+    ok.onclick = () => { S.priorities = S.priorities.filter((x) => x.id !== p.id); commit(renderPriorities, renderReview, renderMonthReview); };
+    li.append(n, body, ok);
+    ol.append(li);
+  });
+}
+
+// ---------- Reflexão do mês ----------
+let mreview = null;          // { y, m } aberto
+let mreviewManual = false;
+const monthRec = (mk) => { const r = (S.months[mk] ||= { goals: [] }); r.goals ||= []; return r; };
+/** Aparece sozinha nos 2 últimos dias do mês (mês atual) e nos 5 primeiros (mês anterior). */
+function autoMonthReview() {
+  const now = new Date(), d = now.getDate(), daysIn = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  let y = now.getFullYear(), m = now.getMonth();
+  if (d <= 5) { m--; if (m < 0) { m = 11; y--; } }
+  else if (d < daysIn - 1) return null;
+  const mk = monthKey(y, m), last = keyOf(new Date(y, m + 1, 0));
+  if (S.months[mk]?.reflDone || last < S.startDate || S.startDate === todayKey()) return null;
+  return { y, m };
+}
+function renderMonthReview() {
+  const card = $('#mreview-card');
+  if (!mreviewManual) mreview = autoMonthReview();
+  card.classList.toggle('hidden', !mreview);
+  if (!mreview) return;
+  const { y, m } = mreview, mk = monthKey(y, m);
+  const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0));
+  const pm = m ? [y, m - 1] : [y - 1, 11];
+  const cur = periodStats(first, last), prev = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
+  $('#mr-title').textContent = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1));
+  const now = new Date();
+  $('#mr-next').disabled = y > now.getFullYear() || (y === now.getFullYear() && m >= now.getMonth());
+  $('#mr-prev').disabled = keyOf(new Date(y, m, 0)) < S.startDate;
+
+  const ms = monthStats(y, m);
+  const stat = (label, value, sub) => {
+    const d = document.createElement('div');
+    d.innerHTML = '<p class="eyebrow"></p><p class="mt-1 text-xl font-semibold"></p><p class="text-xs text-zinc-500"></p>';
+    d.children[0].textContent = label; d.children[1].textContent = value; d.children[2].textContent = sub || '';
+    return d;
+  };
+  const dh = cur.habitAvg != null && prev.habitAvg != null ? Math.round((cur.habitAvg - prev.habitAvg) * 100) : null;
+  $('#mr-stats').replaceChildren(
+    stat('Hábitos', cur.habitAvg == null ? '—' : fmtPct(cur.habitAvg), dh == null ? `${cur.days} dias` : `${dh > 0 ? '+' : ''}${dh} pts vs mês anterior`),
+    stat('Metas semanais', ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—', ms.goalsTotal ? '' : 'sem metas'),
+    stat('Metas do mês', ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : '—', ms.mTotal ? '' : 'sem metas'),
+    stat('Estudo', fmtMin(cur.study), prev.study ? `antes: ${fmtMin(prev.study)}` : ''),
+    stat('Sono médio', cur.sleepAvg == null ? '—' : fmtSleep(cur.sleepAvg), prev.sleepAvg == null ? '' : `antes: ${fmtSleep(prev.sleepAvg)}`));
+
+  const goals = [...(S.months[mk]?.goals || [])];
+  for (const w of ms.weeks) if (w.start.getMonth() === m) goals.push(...(S.weeks[w.wk]?.goals || []));
+  const weeksIn = ms.weeks.filter((w) => w.start.getMonth() === m).length;
+  const src = `Reflexão de ${new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(y, m, 1))}`;
+  reflectionPanel($('#mr-refl'), {
+    label: 'do mês', src,
+    get: () => S.months[mk], rec: () => monthRec(mk),
+    hints: reflectionHints(cur, prev, goals, (S.settings.studyGoalH || 10) * 60 * weeksIn),
+    rerender: renderMonthReview,
+  });
+  $('#mr-done').textContent = S.months[mk]?.reflDone ? 'Reflexão concluída ✓' : 'Concluir reflexão do mês';
+}
+
+// ---------- Estudo: corrigir o total do dia ----------
+function setStudyTotal(min) {
+  if (!Number.isFinite(min) || min < 0) return;
+  wday().studyMin = Math.min(1440, Math.round(min));
+  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights);
 }
 
 // ---------- Dia em edição ----------
@@ -2213,6 +2663,14 @@ function renderReview() {
 
   list($('#rv-wins'), r.wins, 'win', 'Nenhuma vitória registrada na Reflexão noturna.');
   list($('#rv-improves'), r.improves, 'improve', 'Nada anotado para melhorar.');
+
+  reflectionPanel($('#rv-refl'), {
+    label: 'da semana', src: `Revisão de ${fmtRange(ws)}`,
+    get: () => S.weeks[r.wk], rec: () => week(r.wk),
+    hints: reflectionHints(periodStats(r.wk, endK), periodStats(keyOf(addDays(ws, -7)), prevK),
+                           S.weeks[r.wk]?.goals || [], (S.settings.studyGoalH || 10) * 60),
+    rerender: renderReview,
+  });
 
   const note = $('#review-note');
   if (document.activeElement !== note) note.value = S.weeks[r.wk]?.review || '';
@@ -2727,7 +3185,7 @@ function renderTabs() {
    AÇÕES
    ========================================================= */
 function commit(...renders) { save(); renders.forEach((r) => r()); }
-const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMetrics(); renderInsights(); };
+const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); };
 
 function toggleTask(id) {
   const d = wday();
@@ -2780,7 +3238,7 @@ function setTaskConfig(id, patch) {
 
 // Métricas de resultado
 function addMetric({ name, unit, cur, target, deadline }) {
-  const m = { id: uid(), name, unit: unit || null, target, deadline: deadline || null, entries: { [selKey]: cur } };
+  const m = { id: uid(), name, unit: unit || null, start: cur, startKey: selKey, target, deadline: deadline || null, entries: {} };
   S.metrics.push(m);
   commit(renderMetrics, renderTasks, renderReview);
 }
@@ -2795,6 +3253,9 @@ function logMetric(id, v) {
   const m = findMetric(id);
   if (!m || !Number.isFinite(v)) return;
   m.entries = { ...m.entries, [selKey]: v };
+  metricFlash = id;
+  clearTimeout(logMetric.t);
+  logMetric.t = setTimeout(() => { metricFlash = null; renderMetrics(); }, 2500);
   commit(renderMetrics, renderReview, renderInsights);
 }
 function removeMetricEntry(id, k) {
@@ -2997,6 +3458,29 @@ $('#sleep-input').addEventListener('change', (e) => setSleep(e.target.value === 
 $('#topic').addEventListener('input', (e) => { wday().topic = e.target.value; save(); });
 $$('[data-add]').forEach((b) => b.onclick = () => addStudy(Number(b.dataset.add), false, true));
 
+$('#study-fix').onsubmit = (e) => { e.preventDefault(); setStudyTotal(Number($('#study-total').value)); $('#study-total').blur(); };
+
+// Reflexão do mês
+$('#mreview-open').onclick = () => {
+  mreviewManual = true; mreview = { ...view };
+  renderMonthReview();
+  $('#mreview-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+const shiftMonth = (n) => { let { y, m } = mreview; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } mreviewManual = true; mreview = { y, m }; renderMonthReview(); };
+$('#mr-prev').onclick = () => shiftMonth(-1);
+$('#mr-next').onclick = () => shiftMonth(1);
+$('#mr-close').onclick = () => {
+  if (!mreviewManual && mreview) monthRec(monthKey(mreview.y, mreview.m)).reflDone = true;   // não reaparece sozinha
+  mreviewManual = false; mreview = null;
+  save();
+  $('#mreview-card').classList.add('hidden');
+};
+$('#mr-done').onclick = () => {
+  monthRec(monthKey(mreview.y, mreview.m)).reflDone = true;
+  mreviewManual = false; mreview = null;
+  commit(renderMonthReview);
+};
+
 // Dia em edição
 $('#day-prev').onclick = () => setSelDay(keyOf(addDays(parseKey(selKey), -1)));
 $('#day-next').onclick = () => setSelDay(keyOf(addDays(parseKey(selKey), 1)));
@@ -3080,6 +3564,7 @@ let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syn
 function syncPayload() {
   return { version: 1, startDate: S.startDate, tasks: S.tasks, tasksU: S.tasksU || 0,
            metrics: S.metrics, metricsU: S.metricsU || 0,
+           priorities: S.priorities, prioritiesU: S.prioritiesU || 0,
            days: S.days, weeks: S.weeks, months: S.months,
            settings: { studyGoalH: S.settings.studyGoalH }, settingsU: S.settingsU || 0 };
 }
@@ -3095,6 +3580,7 @@ function mergeRemote(r) {
   }
   if ((r.tasksU || 0) > (S.tasksU || 0)) { S.tasks = r.tasks; S.tasksU = r.tasksU; changed = true; }
   if (Array.isArray(r.metrics) && (r.metricsU || 0) > (S.metricsU || 0)) { S.metrics = r.metrics; S.metricsU = r.metricsU; changed = true; }
+  if (Array.isArray(r.priorities) && (r.prioritiesU || 0) > (S.prioritiesU || 0)) { S.priorities = r.priorities; S.prioritiesU = r.prioritiesU; changed = true; }
   if ((r.settingsU || 0) > (S.settingsU || 0)) {
     S.settings.studyGoalH = r.settings?.studyGoalH ?? S.settings.studyGoalH;
     S.settingsU = r.settingsU; changed = true;
@@ -3229,12 +3715,13 @@ function rollDay() {
   renderAll();
 }
 function renderAll(openReflection = true) {
+  migrateMetrics();
   syncToday();
   save();
   renderHeader(); renderQuote(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
   renderDayNav();
   renderSleep(); renderStudy(); renderTimer(); renderReflection(); renderMonth(); renderReview(); renderSync();
-  renderMetrics(); renderInsights();
+  renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview();
   renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
