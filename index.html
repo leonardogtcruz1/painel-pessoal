@@ -22,6 +22,7 @@
   </script>
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -766,7 +767,7 @@
 
     <!-- ============ FOOTER ============ -->
     <footer class="flex flex-col items-center justify-between gap-2 pt-4 text-xs text-zinc-500 sm:flex-row">
-      <p>Salvo localmente neste navegador · reinicia sozinho à meia-noite</p>
+      <p id="storage-note">Salvo localmente neste navegador · reinicia sozinho à meia-noite</p>
       <div class="flex gap-1">
         <button id="export-btn" class="btn-ghost text-xs">Exportar backup</button>
         <button id="import-btn" class="btn-ghost text-xs">Importar</button>
@@ -827,42 +828,46 @@
     <ul id="topics-list" class="max-h-[60vh] space-y-1 overflow-y-auto px-5 py-4"></ul>
   </dialog>
 
-  <!-- Sincronização (GitHub Gist) -->
-  <dialog id="sync-dialog" class="m-auto w-[min(480px,calc(100%-32px))] rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+  <!-- Conta e sincronização (Supabase) -->
+  <dialog id="sync-dialog" class="m-auto w-[min(440px,calc(100%-32px))] rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
     <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
-      <h2 class="text-base font-semibold">Sincronizar aparelhos</h2>
+      <h2 class="text-base font-semibold">Conta e sincronização</h2>
       <button class="btn-ghost h-7 w-7 p-0" data-close aria-label="Fechar">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
     <div class="space-y-4 px-5 py-5 text-sm">
-      <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">
-        Os dados ficam num <strong class="font-medium text-zinc-900 dark:text-zinc-100">gist secreto</strong> da sua conta do GitHub.
-        Conecte com o mesmo token em cada aparelho — o painel encontra o gist sozinho e mescla dia a dia (vale a edição mais recente).
+      <p id="sync-none" class="leading-relaxed text-zinc-600 dark:text-zinc-400">
+        Este painel está salvo só neste navegador. A sincronização na nuvem funciona na versão hospedada.
       </p>
       <div id="sync-off" class="space-y-3">
-        <div>
-          <label for="sync-token" class="eyebrow">Token do GitHub (permissão “gist”)</label>
-          <input id="sync-token" autofocus class="field mt-1.5 font-mono" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…" />
-          <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Painel%20Pessoal" target="_blank" rel="noopener"
-            class="mt-1.5 inline-block text-xs text-zinc-500 underline decoration-dotted hover:text-zinc-900 dark:hover:text-zinc-100">Criar um token com só a permissão de gist →</a>
+        <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">Entre com seu e-mail para ter os mesmos dados, em tempo real, no celular e no computador.</p>
+        <div id="otp-step1" class="space-y-3">
+          <div>
+            <label for="sync-email" class="eyebrow">E-mail</label>
+            <input id="sync-email" class="field mt-1.5" type="email" autocomplete="email" placeholder="voce@email.com" />
+          </div>
+          <button id="sync-send" class="btn-primary w-full">Enviar código de acesso</button>
         </div>
-        <button id="sync-connect" class="btn-primary w-full">Conectar</button>
+        <div id="otp-step2" class="hidden space-y-3">
+          <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">Enviamos um e-mail para <strong id="otp-sent-to" class="font-medium text-zinc-900 dark:text-zinc-100"></strong>. Digite o código de 6 dígitos — ou toque no link do e-mail <em>neste</em> aparelho.</p>
+          <input id="sync-code" class="field text-center font-mono text-lg tracking-[0.4em]" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="000000" />
+          <button id="sync-verify" class="btn-primary w-full">Entrar</button>
+          <button id="sync-other" class="btn-ghost w-full text-xs">Usar outro e-mail</button>
+        </div>
       </div>
       <div id="sync-on" class="hidden space-y-3">
-        <div class="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-800/60">
-          <span class="flex items-center gap-2"><span id="sync-dot2" class="h-2 w-2 rounded-full bg-emerald-500"></span><span id="sync-status" class="text-zinc-700 dark:text-zinc-300"></span></span>
-          <a id="sync-gist-link" href="#" target="_blank" rel="noopener" class="text-xs text-zinc-500 underline decoration-dotted">ver gist</a>
+        <div class="rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-800/60">
+          <p id="sync-user" class="font-medium"></p>
+          <p class="mt-0.5 flex items-center gap-2 text-xs text-zinc-500"><span id="sync-dot2" class="h-2 w-2 rounded-full bg-emerald-500"></span><span id="sync-status"></span></p>
         </div>
         <div class="flex gap-2">
           <button id="sync-now" class="btn-primary flex-1">Sincronizar agora</button>
-          <button id="sync-disconnect" class="btn-ghost border border-zinc-200 dark:border-zinc-700">Desconectar</button>
+          <button id="sync-disconnect" class="btn-ghost border border-zinc-200 dark:border-zinc-700">Sair</button>
         </div>
+        <p class="text-xs leading-relaxed text-zinc-500">Sair não apaga nada: os dados continuam neste navegador e na nuvem.</p>
       </div>
       <p id="sync-error" class="hidden text-xs text-rose-500"></p>
-      <p class="text-xs leading-relaxed text-zinc-500">
-        O token fica salvo só neste navegador e nunca entra no backup exportado. “Desconectar” apaga o token deste aparelho; o gist continua na sua conta.
-      </p>
     </div>
   </dialog>
 
@@ -889,6 +894,7 @@ const weekKey = (d) => keyOf(weekStart(d));
 function freshState() {
   return {
     version: 1,
+    pristine: true,  // aparelho novo, ainda sem uso: no 1º login adota os dados da nuvem
     resetAt: 0,  // "época" dos dados: importar um backup cria uma nova, que prevalece sobre a sincronização antiga
     startDate: todayKey(),
     tasks: DEFAULT_TASKS.map((title) => ({ id: uid(), title })),
@@ -916,6 +922,7 @@ function loadState() {
       const st = { ...base, ...s, settings: { ...base.settings, ...s.settings } };
       if (s.timer?.subject && !st.settings.studySubject) st.settings.studySubject = s.timer.subject;   // vinha do timer (removido)
       delete st.timer;
+      if (!s.pristine) delete st.pristine;   // dados já salvos não são "aparelho novo"
       return st;
     }
   } catch (e) {}
@@ -941,6 +948,7 @@ function rememberSigs() {
   for (const l of LISTS) sigs.set(l, JSON.stringify(S[l]));
   sigs.set('settings', settingsSig());
 }
+let booted = false;   // depois da 1ª renderização, qualquer mudança é uso de verdade
 function stampChanges() {
   const now = Date.now();
   let changed = false;
@@ -962,6 +970,7 @@ rememberSigs();
 
 function save() {
   const changed = stampChanges();
+  if (changed && booted) delete S.pristine;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
   if (changed) scheduleSync();
 }
@@ -4702,7 +4711,8 @@ $('#import-file').onchange = async (e) => {
     const data = JSON.parse(await file.text());
     if (data.version !== 1 || !Array.isArray(data.tasks) || typeof data.days !== 'object') throw new Error();
     if (!confirm('Substituir todos os dados atuais por este backup?')) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, resetAt: Date.now() }));   // nova época: o backup substitui o gist
+    const { pristine, ...clean } = data;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...clean, resetAt: Date.now() }));   // nova época: o backup substitui a nuvem
     S = loadState();
     sigs.clear();   // tudo conta como editado agora → o backup vence na sincronização
     renderAll();
@@ -4712,35 +4722,53 @@ $('#import-file').onchange = async (e) => {
 };
 
 /* =========================================================
-   SINCRONIZAÇÃO — GitHub Gist secreto
-   Ciclo: baixa o gist → mescla (registro mais recente vence) → sobe o resultado.
+   SINCRONIZAÇÃO — Supabase (login por e-mail + tempo real)
+   Os dados ficam numa linha por usuário (tabela dashboard_state, protegida por RLS).
+   Ciclo: baixa a linha → mescla (registro mais recente vence) → sobe o resultado se mudou.
+   Cada envio avisa os outros aparelhos pelo Realtime, que baixam e mesclam na hora.
    ========================================================= */
-const SYNC_KEY = 'evolution-dashboard-sync';
-const GIST_FILE = 'painel-pessoal.json';
-let syncCfg = (() => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch (e) { return {}; } })();
-const saveSyncCfg = () => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg)); } catch (e) {} };
-let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syncTimer;
+// Project URL e chave publishable (sb_publishable_…) do Supabase. A chave pode ficar no código:
+// quem não fizer login não lê nem grava nada (RLS). Vazio = painel só local, sem nuvem.
+const CLOUD = { url: '', key: '' };
+const TABLE = 'dashboard_state';
+const DEVICE = (() => {
+  try { let d = localStorage.getItem('evolution-device'); if (!d) { d = uid(); localStorage.setItem('evolution-device', d); } return d; }
+  catch (e) { return uid(); }
+})();
+const cloud = CLOUD.url && CLOUD.key && window.supabase ? window.supabase.createClient(CLOUD.url, CLOUD.key) : null;
+let session = null, channel = null, realtimeOn = false;
+let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syncTimer, lastSyncAt = null;
+let otpEmail = '', otpSent = false, authBusy = false, authError = '';
 
-/** O que vai para o gist: tudo menos o tema e a matéria selecionada (esses são por aparelho). */
+/** O que vai para a nuvem: tudo menos o tema e a matéria selecionada (esses são por aparelho). */
 function syncPayload() {
   const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
   return { version: 1, resetAt: S.resetAt || 0, startDate: S.startDate, ...lists,
            days: S.days, weeks: S.weeks, months: S.months,
            settings: { studyGoalH: S.settings.studyGoalH }, settingsU: S.settingsU || 0 };
 }
+/** JSON com as chaves ordenadas: o Postgres (jsonb) reordena as chaves, então é assim que se compara. */
+const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)
+  ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
+
+/** Substitui os dados deste aparelho pelos da nuvem (mantém tema e matéria selecionada). */
+function adoptRemote(r) {
+  const keep = { theme: S.settings.theme, studySubject: S.settings.studySubject };
+  const base = freshState();
+  S = { ...base, ...r, tasks: r.tasks || [], settings: { ...base.settings, ...r.settings, ...keep } };
+  delete S.pristine;
+  rememberSigs();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+  return true;
+}
 
 function mergeRemote(r) {
   if (!r || r.version !== 1) return false;
+  // Aparelho novo, ainda sem uso: adota a nuvem (senão os hábitos de exemplo sobrescreveriam os seus)
+  if (S.pristine) return adoptRemote(r);
   // Épocas diferentes: não mescla. A mais nova substitui a outra por inteiro.
-  if ((S.resetAt || 0) > (r.resetAt || 0)) return false;   // este aparelho importou um backup → o envio sobrescreve o gist
-  if ((r.resetAt || 0) > (S.resetAt || 0)) {                 // outro aparelho importou um backup → adota o gist
-    const keep = { theme: S.settings.theme, studySubject: S.settings.studySubject };
-    const base = freshState();
-    S = { ...base, ...r, tasks: r.tasks || [], settings: { ...base.settings, ...r.settings, ...keep } };
-    rememberSigs();
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
-    return true;
-  }
+  if ((S.resetAt || 0) > (r.resetAt || 0)) return false;   // este aparelho importou um backup → o envio sobrescreve a nuvem
+  if ((r.resetAt || 0) > (S.resetAt || 0)) return adoptRemote(r);   // outro aparelho importou um backup → adota
   let changed = false;
   for (const col of SYNCED) {
     const L = S[col], R = r[col] || {};
@@ -4757,123 +4785,139 @@ function mergeRemote(r) {
   }
   if (r.startDate && r.startDate < S.startDate) { S.startDate = r.startDate; changed = true; }
   if (changed) {
-    rememberSigs();   // o que veio do gist não conta como edição local
+    rememberSigs();   // o que veio da nuvem não conta como edição local
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
   }
   return changed;
 }
 
-async function gh(path, opts = {}) {
-  const res = await fetch('https://api.github.com' + path, {
-    ...opts,
-    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${syncCfg.token}`,
-               'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
-  });
-  if (!res.ok) { const e = new Error(`GitHub ${res.status}`); e.status = res.status; throw e; }
-  return res.json();
-}
-
-/** Procura o gist do painel na conta (para o 2º aparelho achar sozinho) ou cria um. */
-async function findOrCreateGist() {
-  for (let page = 1; page <= 10; page++) {
-    const list = await gh(`/gists?per_page=100&page=${page}`);
-    const found = list.find((g) => g.files && g.files[GIST_FILE]);
-    if (found) return found.id;
-    if (list.length < 100) break;
-  }
-  const g = await gh('/gists', { method: 'POST', body: JSON.stringify({
-    description: 'Painel Pessoal — dados sincronizados', public: false,
-    files: { [GIST_FILE]: { content: JSON.stringify(syncPayload()) } } }) });
-  return g.id;
-}
+const cloudError = (e) => {
+  const m = String(e?.message || e || '');
+  if (navigator.onLine === false || /fetch|network/i.test(m)) return 'Sem internet — tento de novo quando voltar.';
+  if (e?.code === '42501' || e?.code === '42P01' || /permission|does not exist|schema cache/i.test(m)) return 'A tabela da nuvem não está configurada (rode o SQL de configuração no Supabase).';
+  if (/JWT|token|session/i.test(m)) return 'Sessão expirada — entre de novo.';
+  return `Falha ao sincronizar (${m}).`;
+};
 
 async function syncNow() {
-  if (!syncCfg.token) return;
+  if (!cloud || !session) return;
   if (syncBusy) { syncAgain = true; return; }
   syncBusy = true; clearTimeout(syncTimer);
   setSyncStatus('syncing');
   try {
-    if (!syncCfg.gistId) { syncCfg.gistId = await findOrCreateGist(); saveSyncCfg(); }
-    let remoteText = '';
-    try {
-      const g = await gh(`/gists/${syncCfg.gistId}`);
-      const f = g.files?.[GIST_FILE];
-      if (f) remoteText = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
-    } catch (e) {
-      if (e.status !== 404) throw e;
-      syncCfg.gistId = null; saveSyncCfg();       // gist apagado: recria na próxima volta
-      syncAgain = true;
-      throw Object.assign(new Error('gist não encontrado'), { status: 404 });
+    const { data: row, error } = await cloud.from(TABLE).select('data').eq('user_id', session.user.id).maybeSingle();
+    if (error) throw error;
+    if (row?.data && mergeRemote(row.data)) renderAll(false);
+    const payload = syncPayload();
+    if (!row || canon(row.data) !== canon(payload)) {
+      clearTimeout(syncTimer);   // o que foi carimbado até aqui já vai neste envio
+      const { error: e2 } = await cloud.from(TABLE).upsert({ user_id: session.user.id, data: payload, device: DEVICE, updated_at: new Date().toISOString() });
+      if (e2) throw e2;
     }
-    if (remoteText && mergeRemote(JSON.parse(remoteText))) renderAll(false);
-    const out = JSON.stringify(syncPayload());
-    clearTimeout(syncTimer);   // o que foi carimbado até aqui já vai neste envio
-    if (out !== remoteText) {
-      await gh(`/gists/${syncCfg.gistId}`, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: out } } }) });
-    }
-    syncCfg.last = Date.now(); saveSyncCfg();
+    lastSyncAt = Date.now();
     setSyncStatus('ok');
   } catch (e) {
-    setSyncStatus('error',
-      e.status === 401 ? 'Token inválido ou expirado.'
-      : e.status === 403 ? 'O token não tem permissão de gist (ou o limite da API foi atingido).'
-      : e.status === 404 ? 'Gist não encontrado — vou criar outro.'
-      : navigator.onLine === false ? 'Sem internet — tento de novo quando voltar.'
-      : `Falha ao sincronizar (${e.message}).`);
+    setSyncStatus('error', cloudError(e));
   } finally {
     syncBusy = false;
-    if (syncAgain) { syncAgain = false; syncTimer = setTimeout(syncNow, 1500); }
+    if (syncAgain) { syncAgain = false; syncTimer = setTimeout(syncNow, 800); }
   }
 }
 function scheduleSync() {
-  if (!syncCfg.token) return;
+  if (!cloud || !session) return;
   clearTimeout(syncTimer);
   setSyncStatus('pending');
-  syncTimer = setTimeout(syncNow, 4000);
+  syncTimer = setTimeout(syncNow, 1500);
+}
+
+/** Tempo real: quando outro aparelho grava, baixa e mescla na hora. */
+function subscribeRealtime() {
+  if (channel) cloud.removeChannel(channel);
+  realtimeOn = false;
+  channel = cloud.channel(`dash-${session.user.id}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE, filter: `user_id=eq.${session.user.id}` }, (p) => {
+      if (p.new?.device === DEVICE) return;   // eco do próprio envio
+      syncNow();
+    })
+    .subscribe((status) => { realtimeOn = status === 'SUBSCRIBED'; renderSync(); });
 }
 
 function setSyncStatus(st, err = '') {
-  syncStatus = syncCfg.token ? st : 'off';
+  syncStatus = session ? st : 'off';
   syncError = err;
   renderSync();
 }
 function renderSync() {
-  const on = !!syncCfg.token;
-  const color = { ok: 'bg-emerald-500', syncing: 'bg-sky-500', pending: 'bg-amber-400', error: 'bg-rose-500' }[syncStatus] || '';
-  $('#sync-dot').className = `absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${on ? color : 'hidden'}`;
-  $('#sync-dot2').className = `h-2 w-2 rounded-full ${color || 'bg-zinc-400'}`;
-  const time = syncCfg.last ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(syncCfg.last) : '';
-  const label = { ok: `Sincronizado às ${time}`, syncing: 'Sincronizando…', pending: 'Alterações a enviar…',
-                  error: 'Erro na sincronização' }[syncStatus] || 'Conectado';
-  $('#sync-btn').title = on ? label : 'Sincronização desligada';
-  $('#sync-off').classList.toggle('hidden', on);
+  const on = !!session;
+  const color = { ok: 'bg-emerald-500', syncing: 'bg-sky-500', pending: 'bg-amber-400', error: 'bg-rose-500' }[syncStatus] || 'bg-emerald-500';
+  $('#sync-dot').className = `absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${on ? color : cloud ? 'bg-amber-400' : 'hidden'}`;
+  const time = lastSyncAt ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(lastSyncAt) : '';
+  const label = { ok: `Sincronizado às ${time}`, syncing: 'Sincronizando…', pending: 'Enviando alterações…', error: 'Erro na sincronização' }[syncStatus] || 'Conectado';
+  $('#sync-btn').title = on ? label : cloud ? 'Entrar para sincronizar' : 'Salvo só neste navegador';
+  $('#storage-note').textContent = on ? `Na nuvem · ${realtimeOn ? 'tempo real entre aparelhos' : 'sincronizando'} · reinicia sozinho à meia-noite`
+    : cloud ? 'Salvo só neste navegador — entre (☁ no topo) para sincronizar' : 'Salvo localmente neste navegador · reinicia sozinho à meia-noite';
+
+  $('#sync-none').classList.toggle('hidden', !!cloud);
+  $('#sync-off').classList.toggle('hidden', !cloud || on);
   $('#sync-on').classList.toggle('hidden', !on);
-  $('#sync-status').textContent = label;
-  $('#sync-gist-link').href = syncCfg.gistId ? `https://gist.github.com/${syncCfg.gistId}` : '#';
-  $('#sync-gist-link').classList.toggle('hidden', !syncCfg.gistId);
-  $('#sync-error').classList.toggle('hidden', !syncError);
-  $('#sync-error').textContent = syncError;
-  $('#sync-now').disabled = syncStatus === 'syncing';
+  if (cloud && !on) {
+    $('#otp-step1').classList.toggle('hidden', otpSent);
+    $('#otp-step2').classList.toggle('hidden', !otpSent);
+    $('#otp-sent-to').textContent = otpEmail;
+    $('#sync-send').disabled = authBusy;
+    $('#sync-verify').disabled = authBusy;
+  }
+  if (on) {
+    $('#sync-dot2').className = `h-2 w-2 rounded-full ${color}`;
+    $('#sync-user').textContent = session.user.email || '';
+    $('#sync-status').textContent = label + (realtimeOn ? ' · tempo real ativo' : '');
+    $('#sync-now').disabled = syncStatus === 'syncing';
+  }
+  const err = on ? syncError : authError;
+  $('#sync-error').classList.toggle('hidden', !err);
+  $('#sync-error').textContent = err;
 }
 
-$('#sync-btn').onclick = () => { renderSync(); $('#sync-dialog').showModal(); };
-$('#sync-connect').onclick = () => {
-  const token = $('#sync-token').value.trim();
-  if (!token) return;
-  syncCfg = { token };
-  saveSyncCfg();
-  $('#sync-token').value = '';
-  syncNow();
+$('#sync-btn').onclick = () => { authError = ''; renderSync(); $('#sync-dialog').showModal(); };
+$('#sync-send').onclick = async () => {
+  const email = $('#sync-email').value.trim();
+  if (!email || !cloud) return;
+  authBusy = true; authError = ''; renderSync();
+  const { error } = await cloud.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+  authBusy = false;
+  if (error) authError = /signups? not allowed|not allowed/i.test(error.message) ? 'Este e-mail não tem acesso a este painel.' : /rate|seconds/i.test(error.message) ? 'Espere 1 minuto para pedir outro e-mail.' : error.message;
+  else { otpEmail = email; otpSent = true; setTimeout(() => $('#sync-code').focus()); }
+  renderSync();
 };
+$('#sync-verify').onclick = async () => {
+  const token = $('#sync-code').value.replace(/\D/g, '');
+  if (token.length < 6) { authError = 'Digite o código de 6 dígitos do e-mail.'; renderSync(); return; }
+  authBusy = true; authError = ''; renderSync();
+  const { error } = await cloud.auth.verifyOtp({ email: otpEmail, token, type: 'email' });
+  authBusy = false;
+  if (error) authError = 'Código inválido ou expirado.';
+  renderSync();
+};
+$('#sync-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#sync-verify').click(); });
+$('#sync-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#sync-send').click(); });
+$('#sync-other').onclick = () => { otpSent = false; authError = ''; renderSync(); };
 $('#sync-now').onclick = syncNow;
-$('#sync-disconnect').onclick = () => {
-  syncCfg = {};
-  try { localStorage.removeItem(SYNC_KEY); } catch (e) {}
-  clearTimeout(syncTimer);
-  setSyncStatus('off');
-};
+$('#sync-disconnect').onclick = async () => { await cloud.auth.signOut(); };   // os dados continuam neste navegador
+
+if (cloud) {
+  cloud.auth.onAuthStateChange((event, s) => {
+    const was = session?.user?.id;
+    session = s;
+    // fora do callback: chamar o Supabase aqui dentro pode travar o cliente
+    setTimeout(() => {
+      if (s && s.user.id !== was) { otpSent = false; $('#sync-dialog').open && $('#sync-dialog').close(); subscribeRealtime(); syncNow(); }
+      if (!s) { if (channel) cloud.removeChannel(channel); channel = null; realtimeOn = false; syncStatus = 'off'; }
+      renderSync();
+    });
+  });
+}
 window.addEventListener('online', () => { if (syncStatus === 'error' || syncStatus === 'pending') syncNow(); });
-setInterval(() => { if (!document.hidden && syncCfg.token) syncNow(); }, 5 * 60 * 1000);
+setInterval(() => { if (!document.hidden) syncNow(); }, 5 * 60 * 1000);   // rede de segurança, se o tempo real cair
 
 /* =========================================================
    CICLO DE VIDA — virada do dia à meia-noite
@@ -4905,13 +4949,13 @@ setInterval(() => {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     if (todayKey() !== currentDay) rollDay(); else renderAll(false);
-    if (syncCfg.token) syncNow();
+    syncNow();
   }
 });
 setInterval(renderHeader, 60000);
 
 renderAll();
-if (syncCfg.token) syncNow();
+booted = true;
 </script>
 </body>
 </html>
