@@ -333,22 +333,46 @@
           </div>
 
           <div class="mt-5 grid gap-6 sm:grid-cols-2 sm:gap-8">
-            <!-- Pomodoro -->
-            <div>
-              <div id="mode-toggle" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800/70">
-                <button data-mode="25" class="rounded-md px-3 py-1 transition">25 min</button>
-                <button data-mode="50" class="rounded-md px-3 py-1 transition">50 min</button>
+            <!-- Revisão espaçada + registro de aprendizado + timer compacto -->
+            <div class="space-y-5">
+              <div>
+                <div class="flex items-baseline justify-between">
+                  <p class="text-sm font-semibold">Revisar hoje <span id="rv-due-count" class="font-normal text-zinc-500"></span></p>
+                  <button id="topics-open" class="btn-ghost -mr-2.5 text-xs">Todos os tópicos →</button>
+                </div>
+                <ul id="review-queue" class="mt-2 space-y-1.5"></ul>
               </div>
-              <p id="timer-digits" class="mt-4 text-5xl font-semibold tabular-nums tracking-tight">25:00</p>
-              <div class="track mt-3"><div id="timer-bar" class="fill" style="width:0"></div></div>
-              <div class="mt-4 flex items-center gap-2">
-                <button id="timer-main" class="btn-primary min-w-[96px]"></button>
-                <button id="timer-stop" class="btn-ghost" title="Encerra e registra o tempo já estudado">Encerrar</button>
+
+              <form id="learn-form" class="space-y-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+                <label for="learn-title" class="eyebrow">O que você aprendeu?</label>
+                <input id="learn-title" class="field" maxlength="120" autocomplete="off" placeholder="Ex.: juros compostos — fórmula e exemplos" required />
+                <div class="flex flex-wrap items-center gap-2">
+                  <select id="learn-subject" aria-label="Matéria" class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900"></select>
+                  <span class="text-xs text-zinc-500">Entendi:</span>
+                  <div id="learn-grade" class="flex gap-1" role="radiogroup" aria-label="Quanto entendeu, de 1 a 5"></div>
+                  <button type="submit" class="btn-primary ml-auto !py-1 text-xs">Registrar</button>
+                </div>
+                <p class="text-[11px] leading-snug text-zinc-500">Vou te pedir para revisar em 1, 3, 7, 21 e 60 dias — é o que fixa na memória.</p>
+              </form>
+
+              <div class="rounded-xl bg-zinc-50 px-3 py-2.5 dark:bg-zinc-800/40">
+                <div class="flex flex-wrap items-center gap-2">
+                  <div id="mode-toggle" class="inline-flex rounded-md bg-zinc-200/60 p-0.5 text-[11px] font-medium dark:bg-zinc-700/50">
+                    <button data-mode="25" class="rounded px-2 py-0.5 transition">25</button>
+                    <button data-mode="50" class="rounded px-2 py-0.5 transition">50</button>
+                  </div>
+                  <p id="timer-digits" class="text-lg font-semibold tabular-nums tracking-tight">25:00</p>
+                  <div class="ml-auto flex items-center gap-1">
+                    <button id="timer-main" class="btn-primary !px-2.5 !py-1 text-xs"></button>
+                    <button id="timer-stop" class="btn-ghost !px-2 !py-1 text-xs" title="Encerra e registra o tempo já estudado">Encerrar</button>
+                  </div>
+                </div>
+                <div class="track mt-2 !h-1"><div id="timer-bar" class="fill" style="width:0"></div></div>
+                <p id="timer-note" class="mt-1.5 min-h-[1rem] text-[11px] text-zinc-500"></p>
               </div>
-              <p id="timer-note" class="mt-3 min-h-[1rem] text-xs text-zinc-500"></p>
             </div>
 
-            <!-- Tópico + tendência -->
+            <!-- Meta, matéria, registro manual e distribuição -->
             <div class="space-y-5 sm:border-l sm:border-zinc-100 sm:pl-6 dark:sm:border-zinc-800">
               <div class="flex items-center gap-3">
                 <svg class="h-11 w-11 shrink-0 -rotate-90" viewBox="0 0 44 44" aria-hidden="true">
@@ -368,8 +392,9 @@
                 </div>
               </div>
               <div>
-                <label for="topic" class="eyebrow">Tópico em foco</label>
-                <input id="topic" class="field mt-1.5" type="text" maxlength="120" autocomplete="off" placeholder="O que você estudou hoje?" />
+                <p class="eyebrow">Estudando agora</p>
+                <div id="subject-chips" class="mt-1.5 flex flex-wrap gap-1.5"></div>
+                <p class="mt-1.5 text-[11px] text-zinc-500">O timer e o registro manual vão para esta matéria.</p>
               </div>
               <div>
                 <p class="eyebrow">Registro manual</p>
@@ -377,8 +402,6 @@
                   <button class="chip" data-add="15">+15m</button>
                   <button class="chip" data-add="30">+30m</button>
                   <button class="chip" data-add="60">+1h</button>
-                </div>
-                <div class="mt-1.5 flex flex-wrap gap-1.5">
                   <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-15">−15m</button>
                   <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-30">−30m</button>
                   <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-60">−1h</button>
@@ -393,6 +416,13 @@
               </div>
               <div>
                 <div class="flex items-baseline justify-between">
+                  <p class="text-sm font-semibold">Por matéria <span class="font-normal text-zinc-500">· esta semana</span></p>
+                  <button id="subjects-manage" class="btn-ghost -mr-2.5 text-xs">Gerenciar</button>
+                </div>
+                <div id="subject-bars" class="mt-2 space-y-2.5"></div>
+              </div>
+              <div>
+                <div class="flex items-baseline justify-between">
                   <p class="text-sm font-semibold">Estudo <span class="font-normal text-zinc-500">· 8 semanas</span></p>
                   <p id="st-trend" class="text-xs font-medium tabular-nums"></p>
                 </div>
@@ -400,6 +430,14 @@
                 <p id="st-sub" class="mt-1.5 text-xs text-zinc-500"></p>
               </div>
             </div>
+          </div>
+
+          <!-- Números da memória -->
+          <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-zinc-100 pt-5 sm:grid-cols-4 dark:border-zinc-800">
+            <div><p class="eyebrow">Aprendidos</p><p id="lm-learned" class="mt-1 text-xl font-semibold tabular-nums">0</p><p id="lm-learned-sub" class="text-xs text-zinc-500"></p></div>
+            <div><p class="eyebrow">Retenção</p><p id="lm-retention" class="mt-1 text-xl font-semibold tabular-nums">—</p><p id="lm-retention-sub" class="text-xs text-zinc-500"></p></div>
+            <div><p class="eyebrow">Atrasadas</p><p id="lm-overdue" class="mt-1 text-xl font-semibold tabular-nums">0</p><p id="lm-overdue-sub" class="text-xs text-zinc-500"></p></div>
+            <div><p class="eyebrow">Dominados</p><p id="lm-mastered" class="mt-1 text-xl font-semibold tabular-nums">0</p><p id="lm-mastered-sub" class="text-xs text-zinc-500"></p></div>
           </div>
         </section>
 
@@ -715,6 +753,24 @@
     <div id="journal-list" class="max-h-[60vh] space-y-6 overflow-y-auto px-5 py-5"></div>
   </dialog>
 
+  <!-- Todos os tópicos aprendidos -->
+  <dialog id="topics-dialog" class="m-auto max-h-[85vh] w-[min(640px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+    <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+      <div class="flex items-baseline gap-2">
+        <h2 class="text-base font-semibold">Tópicos aprendidos</h2>
+        <span id="topics-count" class="text-xs text-zinc-500"></span>
+      </div>
+      <button class="btn-ghost h-7 w-7 p-0" data-close aria-label="Fechar">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-2 px-5 pt-4">
+      <input id="topics-search" class="field min-w-0 flex-1" type="search" placeholder="Buscar tópico…" autocomplete="off" />
+      <select id="topics-filter" aria-label="Filtrar por matéria" class="rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"></select>
+    </div>
+    <ul id="topics-list" class="max-h-[60vh] space-y-1 overflow-y-auto px-5 py-4"></ul>
+  </dialog>
+
   <!-- Sincronização (GitHub Gist) -->
   <dialog id="sync-dialog" class="m-auto w-[min(480px,calc(100%-32px))] rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
     <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
@@ -784,6 +840,8 @@ function freshState() {
     months: {},  // metas do mês, chave = AAAA-MM
     metrics: [], // métricas de resultado: { id, name, unit, start, startKey, target, deadline, entries: { AAAA-MM-DD: valor } }
     priorities: [], // até 3 pontos de melhoria escolhidos nas reflexões: { id, text, src }
+    subjects: [],   // matérias: { id, name, goalH } — goalH = meta semanal em horas (opcional)
+    topics: [],     // tópicos aprendidos (revisão espaçada): { id, title, subjectId, grade, created, stage, due, mastered, reviews: [{ k, ok }] }
     settings: { theme: null, studyGoalH: 10 },
     timer: { mode: 25, status: 'idle', endAt: null, remaining: 25 * 60 },
   };
@@ -808,15 +866,15 @@ let S = loadState();
  * com a anterior e carimba só o que mudou — as ações não precisam lembrar disso.
  */
 const SYNCED = ['days', 'weeks', 'months'];
+/** Listas sincronizadas inteiras (vale a versão editada por último), cada uma com carimbo `<nome>U`. */
+const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics'];
 const sigs = new Map();
 const sigOf = (rec) => { const { u, ...rest } = rec; return JSON.stringify(rest); };
 const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH });
 function rememberSigs() {
   sigs.clear();
   for (const col of SYNCED) for (const [k, rec] of Object.entries(S[col])) sigs.set(`${col}:${k}`, sigOf(rec));
-  sigs.set('tasks', JSON.stringify(S.tasks));
-  sigs.set('metrics', JSON.stringify(S.metrics));
-  sigs.set('priorities', JSON.stringify(S.priorities));
+  for (const l of LISTS) sigs.set(l, JSON.stringify(S[l]));
   sigs.set('settings', settingsSig());
 }
 function stampChanges() {
@@ -828,12 +886,10 @@ function stampChanges() {
       if (sigs.get(key) !== sig) { rec.u = now; sigs.set(key, sig); changed = true; }
     }
   }
-  const ts = JSON.stringify(S.tasks);
-  if (sigs.get('tasks') !== ts) { S.tasksU = now; sigs.set('tasks', ts); changed = true; }
-  const ms = JSON.stringify(S.metrics);
-  if (sigs.get('metrics') !== ms) { S.metricsU = now; sigs.set('metrics', ms); changed = true; }
-  const ps = JSON.stringify(S.priorities);
-  if (sigs.get('priorities') !== ps) { S.prioritiesU = now; sigs.set('priorities', ps); changed = true; }
+  for (const l of LISTS) {
+    const sig = JSON.stringify(S[l]);
+    if (sigs.get(l) !== sig) { S[l + 'U'] = now; sigs.set(l, sig); changed = true; }
+  }
   const ss = settingsSig();
   if (sigs.get('settings') !== ss) { S.settingsU = now; sigs.set('settings', ss); changed = true; }
   return changed;
@@ -1601,8 +1657,6 @@ function renderStudy() {
   $('#study-fix-day').textContent = isToday() ? 'de hoje' : 'deste dia';
   const tot = $('#study-total');
   if (document.activeElement !== tot) tot.value = d.studyMin || 0;
-  const topic = $('#topic');
-  if (document.activeElement !== topic) topic.value = d.topic;
   renderStudyTrend();
 
   // Meta de horas da semana
@@ -2105,7 +2159,8 @@ function periodStats(fromK, toK) {
   const tk = todayKey();
   if (toK > tk) toK = tk;
   if (fromK < S.startDate) fromK = S.startDate;
-  const res = { fromK, toK, days: 0, habitAvg: null, perfect: 0, zero: 0, study: 0, sleepAvg: null, energyAvg: null, habits: [], metrics: [] };
+  const res = { fromK, toK, days: 0, habitAvg: null, perfect: 0, zero: 0, study: 0, sleepAvg: null, energyAvg: null, habits: [], metrics: [],
+                learned: 0, retention: { ok: 0, n: 0, rate: null }, bySubject: {} };
   if (fromK > toK) return res;
   const ps = [], sleeps = [], energies = [];
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
@@ -2121,6 +2176,9 @@ function periodStats(fromK, toK) {
   res.sleepAvg = sleeps.length ? avg(sleeps) : null;
   res.energyAvg = energies.length ? avg(energies) : null;
   res.habits = S.tasks.map((t) => ({ t, a: taskAdherence(t, fromK, toK) })).filter((x) => x.a != null);
+  res.learned = S.topics.filter((t) => t.created >= fromK && t.created <= toK).length;
+  res.retention = retention(fromK, toK);
+  res.bySubject = subjectMinutes(fromK, toK);
   const dayBefore = keyOf(addDays(parseKey(fromK), -1));
   for (const m of S.metrics) {
     const before = metricAt(m, dayBefore), after = metricAt(m, toK);
@@ -2131,7 +2189,7 @@ function periodStats(fromK, toK) {
 }
 
 /** Sugestões tiradas dos dados para cada parte da reflexão. goals = [{title, done}] do período. */
-function reflectionHints(cur, prev, goals, studyGoalMin) {
+function reflectionHints(cur, prev, goals, studyGoalMin, weeks = 1) {
   const H = { wins: [], sins: [], better: [], improve: [] };
   const q = (t) => `“${t}”`;
   for (const g of goals) (g.done ? H.wins : H.sins).push(`${g.done ? 'Meta cumprida' : 'Meta não cumprida'}: ${q(g.title)}`);
@@ -2149,6 +2207,28 @@ function reflectionHints(cur, prev, goals, studyGoalMin) {
   if (cur.zero) H.sins.push(`${cur.zero} ${cur.zero === 1 ? 'dia zerado' : 'dias zerados'} (0% dos hábitos)`);
   if (studyGoalMin) (cur.study >= studyGoalMin ? H.wins : H.sins).push(`Estudo: ${fmtMin(cur.study)} de ${fmtMin(studyGoalMin)} planejados`);
   if (cur.sleepAvg != null && cur.sleepAvg < 7) H.sins.push(`Sono médio de ${fmtSleep(cur.sleepAvg)}`);
+
+  // Aprendizado e matérias
+  const rt = cur.retention, prt = prev.retention;
+  if (cur.learned) H.wins.push(`Aprendi ${cur.learned} ${cur.learned === 1 ? 'tópico novo' : 'tópicos novos'}`);
+  else if (cur.study >= 60) H.sins.push(`Estudei ${fmtMin(cur.study)} mas não registrei nada aprendido`);
+  if (rt.n >= 3 && rt.rate >= 0.8) H.wins.push(`Retenção de ${fmtPct(rt.rate)} nas revisões`);
+  if (rt.n >= 3 && rt.rate < 0.6) H.sins.push(`Retenção de só ${fmtPct(rt.rate)} — esqueci ${rt.n - rt.ok} de ${rt.n} revisões`);
+  const overdue = S.topics.filter((t) => !t.mastered && t.due && t.due < todayKey()).length;
+  if (cur.toK >= keyOf(addDays(new Date(), -1)) && overdue) H.sins.push(`${overdue} ${overdue === 1 ? 'revisão atrasada' : 'revisões atrasadas'}`);
+  for (const sub of S.subjects) {
+    if (!sub.goalH) continue;
+    const got = cur.bySubject[sub.id] || 0, goal = sub.goalH * 60 * weeks;
+    if (got >= goal) H.wins.push(`${sub.name}: ${fmtMin(got)} de ${fmtMin(goal)} ✓`);
+    else if (got < goal * 0.6) {
+      H.sins.push(`${sub.name}: só ${fmtMin(got)} de ${fmtMin(goal)}`);
+      H.improve.push(`Dar mais tempo a “${sub.name}” (meta ${fmtMin(goal)})`);
+    }
+  }
+  if (prev.learned != null && cur.learned > prev.learned && prev.learned >= 0 && cur.learned - prev.learned >= 2) H.better.push(`Tópicos aprendidos: ${prev.learned} → ${cur.learned}`);
+  if (rt.n >= 3 && prt.n >= 3 && rt.rate - prt.rate >= 0.1) H.better.push(`Retenção: ${fmtPct(prt.rate)} → ${fmtPct(rt.rate)}`);
+  if (overdue >= 3) H.improve.push('Zerar as revisões atrasadas antes de aprender coisa nova');
+  if (!cur.learned && cur.study >= 60) H.improve.push('Registrar em 1 linha o que aprendi em cada sessão');
 
   if (prev.habitAvg != null && cur.habitAvg != null) {
     const d = Math.round((cur.habitAvg - prev.habitAvg) * 100);
@@ -2378,7 +2458,7 @@ function renderMonthReview() {
   reflectionPanel($('#mr-refl'), {
     label: 'do mês', src,
     get: () => S.months[mk], rec: () => monthRec(mk),
-    hints: reflectionHints(cur, prev, goals, (S.settings.studyGoalH || 10) * 60 * weeksIn),
+    hints: reflectionHints(cur, prev, goals, (S.settings.studyGoalH || 10) * 60 * weeksIn, weeksIn),
     rerender: renderMonthReview,
   });
   $('#mr-done').textContent = S.months[mk]?.reflDone ? 'Reflexão concluída ✓' : 'Concluir reflexão do mês';
@@ -2387,8 +2467,10 @@ function renderMonthReview() {
 // ---------- Estudo: corrigir o total do dia ----------
 function setStudyTotal(min) {
   if (!Number.isFinite(min) || min < 0) return;
-  wday().studyMin = Math.min(1440, Math.round(min));
-  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights);
+  const d = wday();
+  d.studyMin = Math.min(1440, Math.round(min));
+  fitStudyBy(d);
+  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights, renderSubjects);
 }
 
 // ---------- Dia em edição ----------
@@ -2407,7 +2489,356 @@ function renderDayNav() {
 function setSelDay(k) {
   selKey = k;
   editingTask = null;
-  renderDayNav(); renderOne(); renderTasks(); renderSleep(); renderStudy(); renderReflection(); renderMetrics();
+  renderDayNav(); renderOne(); renderTasks(); renderSleep(); renderStudy(); renderReflection(); renderMetrics(); renderSubjects();
+}
+
+// ---------- Matérias ----------
+const subjectName = (id) => S.subjects.find((x) => x.id === id)?.name || 'Sem matéria';
+const curSubject = () => (S.subjects.some((x) => x.id === S.timer.subject) ? S.timer.subject : null);
+/** Minutos por matéria entre duas datas. Chave '' = estudo sem matéria (ou de matéria apagada). */
+function subjectMinutes(fromK, toK) {
+  const out = {}, known = new Set(S.subjects.map((x) => x.id));
+  for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
+    const r = peek(keyOf(d));
+    if (!r?.studyMin) continue;
+    let assigned = 0;
+    for (const [id, m] of Object.entries(r.studyBy || {})) {
+      if (!known.has(id)) continue;
+      out[id] = (out[id] || 0) + m;
+      assigned += m;
+    }
+    if (r.studyMin > assigned) out[''] = (out[''] || 0) + r.studyMin - assigned;
+  }
+  return out;
+}
+
+let addingSubject = false, managingSubjects = false, subjectDrafts = null;
+function renderSubjects() {
+  // Chips "Estudando agora"
+  const chips = $('#subject-chips');
+  chips.replaceChildren();
+  const cur = curSubject();
+  const chip = (label, on, onclick, extra = '') => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
+      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+      : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600') + ' ' + extra;
+    b.textContent = label;
+    b.setAttribute('aria-pressed', String(on));
+    b.onclick = onclick;
+    return b;
+  };
+  for (const sub of S.subjects) chips.append(chip(sub.name, cur === sub.id, () => { S.timer.subject = sub.id; commit(renderSubjects); }));
+  if (S.subjects.length) chips.append(chip('Nenhuma', cur == null, () => { S.timer.subject = null; commit(renderSubjects); }));
+  if (addingSubject) {
+    const f = document.createElement('form');
+    f.className = 'flex gap-1';
+    const i = document.createElement('input');
+    i.className = 'w-32 rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none focus:border-emerald-500 dark:border-zinc-700';
+    i.placeholder = 'Nome da matéria'; i.maxLength = 30;
+    const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'chip'; ok.textContent = 'OK';
+    f.onsubmit = (e) => { e.preventDefault(); addingSubject = false; addSubject(i.value); };
+    i.onkeydown = (e) => { if (e.key === 'Escape') { addingSubject = false; renderSubjects(); } };
+    f.append(i, ok);
+    chips.append(f);
+    setTimeout(() => i.focus());
+  } else {
+    chips.append(chip(S.subjects.length ? '+' : '+ Adicionar matéria', false, () => { addingSubject = true; renderSubjects(); }, 'border-dashed'));
+  }
+
+  // Select do registro de aprendizado
+  const sel = $('#learn-subject');
+  const keep = sel.value;
+  sel.replaceChildren(new Option('Sem matéria', ''));
+  for (const sub of S.subjects) sel.append(new Option(sub.name, sub.id));
+  sel.value = S.subjects.some((x) => x.id === keep) ? keep : cur || '';
+
+  // Barras por matéria (semana atual)
+  const ws = weekStart(new Date()), tk = todayKey();
+  const mins = subjectMinutes(keyOf(ws), tk);
+  const learned = {};
+  for (const t of S.topics) if (t.created >= keyOf(ws)) learned[t.subjectId || ''] = (learned[t.subjectId || ''] || 0) + 1;
+  const wrap = $('#subject-bars');
+  wrap.replaceChildren();
+  $('#subjects-manage').textContent = managingSubjects ? 'Fechar' : 'Gerenciar';
+  if (managingSubjects) { wrap.append(subjectManager()); return; }
+  const rows = S.subjects.map((x) => ({ id: x.id, name: x.name, min: mins[x.id] || 0, goal: x.goalH ? x.goalH * 60 : null }));
+  if (mins['']) rows.push({ id: '', name: 'Sem matéria', min: mins[''], goal: null });
+  if (!rows.length) {
+    const p = document.createElement('p');
+    p.className = 'text-xs text-zinc-500';
+    p.textContent = 'Adicione matérias em “Estudando agora” para ver como seu tempo se divide.';
+    wrap.append(p);
+    return;
+  }
+  const max = Math.max(60, ...rows.map((r) => r.goal || r.min));
+  const daysGone = ((new Date().getDay() + 6) % 7) + 1;   // 1 = segunda … 7 = domingo
+  for (const r of rows) {
+    const row = document.createElement('div');
+    const top = document.createElement('div');
+    top.className = 'flex items-baseline justify-between gap-2 text-xs';
+    const n = document.createElement('span'); n.className = 'truncate font-medium'; n.textContent = r.name;
+    const v = document.createElement('span'); v.className = 'shrink-0 tabular-nums text-zinc-500';
+    const behind = r.goal && r.min < (r.goal * daysGone) / 7 * 0.7;
+    v.textContent = (r.goal ? `${fmtMin(r.min)} / ${fmtMin(r.goal)}` : fmtMin(r.min)) + (learned[r.id] ? ` · ${learned[r.id]} ${learned[r.id] === 1 ? 'tópico' : 'tópicos'}` : '');
+    if (r.goal && r.min >= r.goal) v.className = 'shrink-0 tabular-nums font-medium text-emerald-600 dark:text-emerald-400';
+    else if (behind) v.className = 'shrink-0 tabular-nums font-medium text-amber-600 dark:text-amber-400';
+    top.append(n, v);
+    const tr = document.createElement('div');
+    tr.className = 'track relative mt-1';
+    const f = document.createElement('div');
+    f.className = 'fill';
+    f.style.width = `${Math.min(100, (r.min / (r.goal || max)) * 100)}%`;
+    tr.append(f);
+    row.append(top, tr);
+    wrap.append(row);
+  }
+}
+
+/** Renomear, definir meta semanal (h) e apagar matérias — com Salvar. */
+function subjectManager() {
+  subjectDrafts ||= S.subjects.map((x) => ({ id: x.id, name: x.name, goalH: x.goalH ?? '' }));
+  const box = document.createElement('div');
+  box.className = 'space-y-2';
+  const small = 'rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900';
+  if (!subjectDrafts.length) {
+    const p = document.createElement('p'); p.className = 'text-xs text-zinc-500'; p.textContent = 'Nenhuma matéria ainda.'; box.append(p);
+  }
+  for (const d of subjectDrafts) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-1.5';
+    const n = document.createElement('input');
+    n.className = small + ' min-w-0 flex-1'; n.value = d.name; n.maxLength = 30; n.setAttribute('aria-label', 'Nome da matéria');
+    n.oninput = () => { d.name = n.value; };
+    const g = document.createElement('input');
+    g.type = 'number'; g.min = '0'; g.max = '80'; g.step = '0.5';
+    g.className = small + ' w-16'; g.value = d.goalH; g.placeholder = 'meta'; g.setAttribute('aria-label', 'Meta semanal em horas');
+    g.oninput = () => { d.goalH = g.value; };
+    const h = document.createElement('span'); h.className = 'text-xs text-zinc-500'; h.textContent = 'h/sem';
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-rose-500 dark:hover:bg-zinc-800';
+    rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar ${d.name}`);
+    rm.onclick = () => { subjectDrafts = subjectDrafts.filter((x) => x !== d); renderSubjects(); };
+    row.append(n, g, h, rm);
+    box.append(row);
+  }
+  const act = document.createElement('div');
+  act.className = 'flex items-center justify-between pt-1';
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'btn-ghost -ml-2.5 text-xs'; add.textContent = '+ Matéria';
+  add.onclick = () => { subjectDrafts.push({ id: uid(), name: '', goalH: '' }); renderSubjects(); };
+  const save_ = document.createElement('button');
+  save_.type = 'button'; save_.className = 'btn-primary !py-1 text-xs'; save_.textContent = 'Salvar';
+  save_.onclick = () => {
+    S.subjects = subjectDrafts.filter((d) => d.name.trim()).map((d) => ({ id: d.id, name: d.name.trim(), goalH: Number(d.goalH) > 0 ? Number(d.goalH) : null }));
+    const ids = new Set(S.subjects.map((x) => x.id));
+    for (const t of S.topics) if (t.subjectId && !ids.has(t.subjectId)) t.subjectId = null;
+    subjectDrafts = null; managingSubjects = false;
+    commit(renderSubjects, renderLearning);
+  };
+  act.append(add, save_);
+  box.append(act);
+  const note = document.createElement('p');
+  note.className = 'text-[11px] text-zinc-500';
+  note.textContent = 'Apagar uma matéria não apaga o tempo estudado nem os tópicos — eles passam para “Sem matéria”.';
+  box.append(note);
+  return box;
+}
+
+function addSubject(name) {
+  name = name.trim();
+  if (!name) { renderSubjects(); return; }
+  const sub = { id: uid(), name, goalH: null };
+  S.subjects.push(sub);
+  S.timer.subject = sub.id;
+  commit(renderSubjects, renderLearning);
+}
+
+// ---------- Revisão espaçada ----------
+const INTERVALS = [1, 3, 7, 21, 60];   // dias até cada revisão
+let learnGrade = 3, lastReview = null, topicsFilter = '';
+const isDue = (t, tk = todayKey()) => !t.mastered && t.due && t.due <= tk;
+
+function addTopic(title, subjectId, grade) {
+  title = title.trim();
+  if (!title) return;
+  const k = todayKey(), stage = grade >= 5 ? 1 : 0;   // entendeu muito bem: pula a revisão de 1 dia
+  S.topics.push({ id: uid(), title, subjectId: subjectId || null, grade, created: k, stage,
+                  due: keyOf(addDays(parseKey(k), INTERVALS[stage])), mastered: false, reviews: [] });
+  commit(renderLearning, renderSubjects);
+}
+/** Lembrei → próximo intervalo; esqueci → volta para o início (revisa amanhã). */
+function reviewTopic(id, ok) {
+  const t = S.topics.find((x) => x.id === id);
+  if (!t) return;
+  lastReview = { id, prev: JSON.parse(JSON.stringify(t)), ok };
+  const tk = todayKey();
+  t.reviews = [...(t.reviews || []), { k: tk, ok }];
+  if (ok) {
+    t.stage++;
+    if (t.stage >= INTERVALS.length) { t.mastered = true; t.due = null; }
+    else t.due = keyOf(addDays(new Date(), INTERVALS[t.stage]));
+  } else {
+    t.stage = 0;
+    t.due = keyOf(addDays(new Date(), INTERVALS[0]));
+  }
+  commit(renderLearning, renderInsights);
+}
+function undoReview() {
+  if (!lastReview) return;
+  const i = S.topics.findIndex((x) => x.id === lastReview.id);
+  if (i >= 0) S.topics[i] = lastReview.prev;
+  lastReview = null;
+  commit(renderLearning, renderInsights);
+}
+function removeTopic(id) {
+  S.topics = S.topics.filter((x) => x.id !== id);
+  commit(renderLearning, renderSubjects, renderTopicsDialog);
+}
+
+/** Retenção = revisões em que você lembrou ÷ revisões feitas, entre duas datas. */
+function retention(fromK, toK) {
+  let ok = 0, n = 0;
+  for (const t of S.topics) for (const r of t.reviews || []) if (r.k >= fromK && r.k <= toK) { n++; if (r.ok) ok++; }
+  return { ok, n, rate: n ? ok / n : null };
+}
+
+function renderLearning() {
+  const tk = todayKey();
+  const due = S.topics.filter((t) => isDue(t, tk)).sort((a, b) => (a.due < b.due ? -1 : 1));
+  $('#rv-due-count').textContent = due.length ? `· ${due.length}` : '';
+  const ul = $('#review-queue');
+  ul.replaceChildren();
+  if (lastReview) {
+    const li = document.createElement('li');
+    li.className = 'flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-1.5 text-xs text-zinc-500 dark:bg-zinc-800/40';
+    const t = document.createElement('span');
+    t.className = 'truncate';
+    t.textContent = `${lastReview.ok ? '✓ Lembrou' : '↺ Esqueceu'}: ${lastReview.prev.title}`;
+    const u = document.createElement('button');
+    u.className = 'shrink-0 font-medium underline decoration-dotted'; u.textContent = 'desfazer';
+    u.onclick = undoReview;
+    li.append(t, u);
+    ul.append(li);
+  }
+  if (!due.length) {
+    const li = document.createElement('li');
+    li.className = 'py-2 text-sm text-zinc-500';
+    const next = S.topics.filter((t) => !t.mastered && t.due).sort((a, b) => (a.due < b.due ? -1 : 1))[0];
+    li.textContent = !S.topics.length ? 'Registre abaixo o que aprendeu. As revisões aparecem aqui no dia certo.'
+      : next ? `Nada para revisar hoje ✓ Próxima: ${fmtShort.format(parseKey(next.due)).replace('.', '')}.` : 'Nada para revisar ✓';
+    ul.append(li);
+  }
+  for (const t of due.slice(0, 6)) {
+    const li = document.createElement('li');
+    li.className = 'rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800';
+    const top = document.createElement('div');
+    top.className = 'flex items-start justify-between gap-2';
+    const body = document.createElement('div');
+    body.className = 'min-w-0';
+    const title = document.createElement('p'); title.className = 'text-sm font-medium'; title.textContent = t.title;
+    const meta = document.createElement('p'); meta.className = 'text-[11px] text-zinc-500';
+    const late = daysBetween(t.due, tk);
+    meta.textContent = [subjectName(t.subjectId), `revisão ${t.stage + 1} de ${INTERVALS.length}`,
+      late > 0 ? `atrasada ${late} ${late === 1 ? 'dia' : 'dias'}` : ''].filter(Boolean).join(' · ');
+    if (late > 0) meta.className = 'text-[11px] text-amber-600 dark:text-amber-400';
+    body.append(title, meta);
+    const btns = document.createElement('div');
+    btns.className = 'flex shrink-0 gap-1';
+    const yes = document.createElement('button');
+    yes.className = 'rounded-md border border-emerald-500/40 px-2 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-500/10 dark:text-emerald-400';
+    yes.textContent = 'Lembrei'; yes.title = `Próxima revisão em ${INTERVALS[t.stage + 1] ?? '—'} dias`;
+    yes.onclick = () => reviewTopic(t.id, true);
+    const no = document.createElement('button');
+    no.className = 'rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-500 transition hover:border-rose-400/60 hover:text-rose-500 dark:border-zinc-700';
+    no.textContent = 'Esqueci'; no.title = 'Volta para o início: revisa amanhã';
+    no.onclick = () => reviewTopic(t.id, false);
+    btns.append(yes, no);
+    top.append(body, btns);
+    li.append(top);
+    ul.append(li);
+  }
+  if (due.length > 6) {
+    const li = document.createElement('li'); li.className = 'text-xs text-zinc-500'; li.textContent = `+ ${due.length - 6} na fila`; ul.append(li);
+  }
+
+  // Botões de nota 1–5
+  const g = $('#learn-grade');
+  g.replaceChildren();
+  const labels = ['', 'quase nada', 'pouco', 'razoável', 'bem', 'muito bem'];
+  for (let i = 1; i <= 5; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(i === learnGrade));
+    b.title = labels[i];
+    b.className = 'h-6 w-6 rounded-md border text-xs font-medium transition ' + (i === learnGrade
+      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+      : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-700');
+    b.textContent = i;
+    b.onclick = () => { learnGrade = i; renderLearning(); };
+    g.append(b);
+  }
+
+  // Números
+  const ws = keyOf(weekStart(new Date())), ms = tk.slice(0, 8) + '01';
+  const wk = S.topics.filter((t) => t.created >= ws).length, mo = S.topics.filter((t) => t.created >= ms).length;
+  $('#lm-learned').textContent = wk;
+  $('#lm-learned-sub').textContent = `na semana · ${mo} no mês`;
+  const r = retention(keyOf(addDays(new Date(), -29)), tk);
+  $('#lm-retention').textContent = r.rate == null ? '—' : fmtPct(r.rate);
+  $('#lm-retention').className = 'mt-1 text-xl font-semibold tabular-nums ' + (r.rate == null ? '' : r.rate >= 0.8 ? 'text-emerald-600 dark:text-emerald-400' : r.rate < 0.6 ? 'text-rose-500' : '');
+  $('#lm-retention-sub').textContent = r.n ? `${r.ok}/${r.n} revisões · 30 dias` : 'sem revisões ainda';
+  const overdue = S.topics.filter((t) => !t.mastered && t.due && t.due < tk).length;
+  $('#lm-overdue').textContent = overdue;
+  $('#lm-overdue').className = 'mt-1 text-xl font-semibold tabular-nums ' + (overdue ? 'text-amber-600 dark:text-amber-400' : '');
+  $('#lm-overdue-sub').textContent = overdue ? 'revise para não esquecer' : 'em dia ✓';
+  const mastered = S.topics.filter((t) => t.mastered).length;
+  $('#lm-mastered').textContent = mastered;
+  $('#lm-mastered-sub').textContent = `de ${S.topics.length} ${S.topics.length === 1 ? 'tópico' : 'tópicos'}`;
+}
+
+/** Lista completa dos tópicos, com busca e filtro por matéria. */
+function renderTopicsDialog() {
+  const sel = $('#topics-filter');
+  sel.replaceChildren(new Option('Todas as matérias', ''));
+  for (const sub of S.subjects) sel.append(new Option(sub.name, sub.id));
+  sel.append(new Option('Sem matéria', '_none'));
+  sel.value = topicsFilter;
+  const q = $('#topics-search').value.trim().toLowerCase();
+  const list = S.topics.filter((t) => (!topicsFilter || (topicsFilter === '_none' ? !t.subjectId : t.subjectId === topicsFilter))
+    && (!q || t.title.toLowerCase().includes(q))).sort((a, b) => (a.created < b.created ? 1 : -1));
+  $('#topics-count').textContent = `${S.topics.length} ${S.topics.length === 1 ? 'tópico' : 'tópicos'}`;
+  const ul = $('#topics-list');
+  ul.replaceChildren();
+  if (!list.length) { const li = document.createElement('li'); li.className = 'py-8 text-center text-sm text-zinc-500'; li.textContent = S.topics.length ? 'Nada encontrado.' : 'Nenhum tópico registrado ainda.'; ul.append(li); return; }
+  const tk = todayKey();
+  for (const t of list) {
+    const li = document.createElement('li');
+    li.className = 'group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+    const dots = document.createElement('span');
+    dots.className = 'flex shrink-0 gap-0.5';
+    dots.title = t.mastered ? 'Dominado' : `${t.stage} de ${INTERVALS.length} revisões`;
+    for (let i = 0; i < INTERVALS.length; i++) {
+      const d = document.createElement('span');
+      d.className = 'h-1.5 w-1.5 rounded-full ' + (t.mastered || i < t.stage ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700');
+      dots.append(d);
+    }
+    const body = document.createElement('div'); body.className = 'min-w-0 flex-1';
+    const ti = document.createElement('p'); ti.className = 'truncate text-sm'; ti.textContent = t.title;
+    const me = document.createElement('p'); me.className = 'text-[11px] text-zinc-500';
+    const fails = (t.reviews || []).filter((r) => !r.ok).length;
+    me.textContent = [subjectName(t.subjectId), `aprendido ${fmtShort.format(parseKey(t.created)).replace('.', '')}`, `nota ${t.grade}/5`,
+      t.mastered ? 'dominado ✓' : t.due <= tk ? 'revisar hoje' : `próxima ${fmtShort.format(parseKey(t.due)).replace('.', '')}`,
+      fails ? `esqueceu ${fails}×` : ''].filter(Boolean).join(' · ');
+    body.append(ti, me);
+    const rm = document.createElement('button');
+    rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar “${t.title}”`);
+    rm.onclick = () => removeTopic(t.id);
+    li.append(dots, body, rm);
+    ul.append(li);
+  }
 }
 
 // ---------- Pomodoro ----------
@@ -2425,13 +2856,15 @@ function renderTimer() {
   $('#timer-stop').disabled = t.status === 'idle';
   $$('#mode-toggle button').forEach((b) => {
     const on = Number(b.dataset.mode) === t.mode;
-    b.className = 'rounded-md px-3 py-1 transition ' +
+    b.className = 'rounded px-2 py-0.5 transition ' +
       (on ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200') +
       (t.status !== 'idle' ? ' cursor-not-allowed' : '');
   });
   const d = day();
   if (!$('#timer-note').dataset.flash) {
-    $('#timer-note').textContent = d.sessions ? `${d.sessions} ${d.sessions === 1 ? 'sessão concluída' : 'sessões concluídas'} hoje` : '';
+    const sub = curSubject();
+    $('#timer-note').textContent = [sub ? `Matéria: ${subjectName(sub)}` : '',
+      d.sessions ? `${d.sessions} ${d.sessions === 1 ? 'sessão concluída' : 'sessões concluídas'} hoje` : ''].filter(Boolean).join(' · ');
   }
   document.title = t.status === 'running' ? `${txt} · Foco` : 'Painel Pessoal';
 }
@@ -3185,7 +3618,7 @@ function renderTabs() {
    AÇÕES
    ========================================================= */
 function commit(...renders) { save(); renders.forEach((r) => r()); }
-const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); };
+const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); };
 
 function toggleTask(id) {
   const d = wday();
@@ -3323,9 +3756,25 @@ function setSleep(v) {
 /** Registro manual vai para o dia em edição; o pomodoro sempre conta para hoje. */
 function addStudy(min, session = false, manual = false) {
   const d = manual ? wday() : day();
+  const before = d.studyMin;
   d.studyMin = Math.max(0, d.studyMin + min);
+  const applied = d.studyMin - before;   // o que de fato entrou/saiu (não fica negativo)
+  const sub = curSubject();
+  if (sub && applied) {
+    d.studyBy ||= {};
+    d.studyBy[sub] = Math.max(0, (d.studyBy[sub] || 0) + applied);
+    if (!d.studyBy[sub]) delete d.studyBy[sub];
+  }
+  if (applied < 0) fitStudyBy(d);
   if (session) d.sessions++;
-  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights);
+  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights, renderSubjects);
+}
+/** Se o total ficou menor que a soma por matéria, reduz as matérias na mesma proporção. */
+function fitStudyBy(d) {
+  const by = d.studyBy || {}, sum = Object.values(by).reduce((a, b) => a + b, 0);
+  if (sum <= d.studyMin) return;
+  const f = d.studyMin / sum;
+  for (const k of Object.keys(by)) { by[k] = Math.round(by[k] * f); if (!by[k]) delete by[k]; }
 }
 
 const T = () => S.timer;
@@ -3455,9 +3904,19 @@ $$('[data-sleep]').forEach((b) => b.onclick = () => {
 });
 $('#sleep-input').addEventListener('change', (e) => setSleep(e.target.value === '' ? null : parseFloat(e.target.value)));
 
-$('#topic').addEventListener('input', (e) => { wday().topic = e.target.value; save(); });
 $$('[data-add]').forEach((b) => b.onclick = () => addStudy(Number(b.dataset.add), false, true));
 
+$('#learn-form').onsubmit = (e) => {
+  e.preventDefault();
+  addTopic($('#learn-title').value, $('#learn-subject').value, learnGrade);
+  $('#learn-title').value = '';
+  learnGrade = 3;
+  renderLearning();
+};
+$('#topics-open').onclick = () => { $('#topics-search').value = ''; topicsFilter = ''; renderTopicsDialog(); $('#topics-dialog').showModal(); };
+$('#topics-search').addEventListener('input', renderTopicsDialog);
+$('#topics-filter').onchange = (e) => { topicsFilter = e.target.value; renderTopicsDialog(); };
+$('#subjects-manage').onclick = () => { managingSubjects = !managingSubjects; subjectDrafts = null; renderSubjects(); };
 $('#study-fix').onsubmit = (e) => { e.preventDefault(); setStudyTotal(Number($('#study-total').value)); $('#study-total').blur(); };
 
 // Reflexão do mês
@@ -3562,9 +4021,8 @@ let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syn
 
 /** O que vai para o gist: tudo menos o timer e o tema (esses são por aparelho). */
 function syncPayload() {
-  return { version: 1, startDate: S.startDate, tasks: S.tasks, tasksU: S.tasksU || 0,
-           metrics: S.metrics, metricsU: S.metricsU || 0,
-           priorities: S.priorities, prioritiesU: S.prioritiesU || 0,
+  const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
+  return { version: 1, startDate: S.startDate, ...lists,
            days: S.days, weeks: S.weeks, months: S.months,
            settings: { studyGoalH: S.settings.studyGoalH }, settingsU: S.settingsU || 0 };
 }
@@ -3578,9 +4036,9 @@ function mergeRemote(r) {
       if (!L[k] || (rec.u || 0) > (L[k].u || 0)) { L[k] = rec; changed = true; }
     }
   }
-  if ((r.tasksU || 0) > (S.tasksU || 0)) { S.tasks = r.tasks; S.tasksU = r.tasksU; changed = true; }
-  if (Array.isArray(r.metrics) && (r.metricsU || 0) > (S.metricsU || 0)) { S.metrics = r.metrics; S.metricsU = r.metricsU; changed = true; }
-  if (Array.isArray(r.priorities) && (r.prioritiesU || 0) > (S.prioritiesU || 0)) { S.priorities = r.priorities; S.prioritiesU = r.prioritiesU; changed = true; }
+  for (const l of LISTS) {
+    if (Array.isArray(r[l]) && (r[l + 'U'] || 0) > (S[l + 'U'] || 0)) { S[l] = r[l]; S[l + 'U'] = r[l + 'U']; changed = true; }
+  }
   if ((r.settingsU || 0) > (S.settingsU || 0)) {
     S.settings.studyGoalH = r.settings?.studyGoalH ?? S.settings.studyGoalH;
     S.settingsU = r.settingsU; changed = true;
@@ -3721,7 +4179,7 @@ function renderAll(openReflection = true) {
   renderHeader(); renderQuote(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
   renderDayNav();
   renderSleep(); renderStudy(); renderTimer(); renderReflection(); renderMonth(); renderReview(); renderSync();
-  renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview();
+  renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview(); renderSubjects(); renderLearning();
   renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
