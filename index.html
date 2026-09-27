@@ -841,20 +841,20 @@
         Este painel está salvo só neste navegador. A sincronização na nuvem funciona na versão hospedada.
       </p>
       <div id="sync-off" class="space-y-3">
-        <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">Entre com seu e-mail para ter os mesmos dados, em tempo real, no celular e no computador.</p>
-        <div id="otp-step1" class="space-y-3">
+        <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">Entre para ter os mesmos dados, em tempo real, no celular e no computador.</p>
+        <form id="login-form" class="space-y-3">
           <div>
             <label for="sync-email" class="eyebrow">E-mail</label>
-            <input id="sync-email" class="field mt-1.5" type="email" autocomplete="email" placeholder="voce@email.com" />
+            <input id="sync-email" class="field mt-1.5" type="email" autocomplete="email" placeholder="voce@email.com" required />
           </div>
-          <button id="sync-send" class="btn-primary w-full">Enviar código de acesso</button>
-        </div>
-        <div id="otp-step2" class="hidden space-y-3">
-          <p class="leading-relaxed text-zinc-600 dark:text-zinc-400">Enviamos um e-mail para <strong id="otp-sent-to" class="font-medium text-zinc-900 dark:text-zinc-100"></strong>. Digite o código de 6 dígitos — ou toque no link do e-mail <em>neste</em> aparelho.</p>
-          <input id="sync-code" class="field text-center font-mono text-lg tracking-[0.4em]" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="000000" />
-          <button id="sync-verify" class="btn-primary w-full">Entrar</button>
-          <button id="sync-other" class="btn-ghost w-full text-xs">Usar outro e-mail</button>
-        </div>
+          <div>
+            <label for="sync-pass" class="eyebrow">Senha</label>
+            <input id="sync-pass" class="field mt-1.5" type="password" autocomplete="current-password" minlength="6" placeholder="mínimo 6 caracteres" required />
+          </div>
+          <button id="sync-login" type="submit" class="btn-primary w-full">Entrar</button>
+          <button id="sync-signup" type="button" class="btn-ghost w-full text-xs">Primeira vez? Criar conta com este e-mail e senha</button>
+        </form>
+        <p id="sync-info" class="hidden text-xs leading-relaxed text-emerald-600 dark:text-emerald-400"></p>
       </div>
       <div id="sync-on" class="hidden space-y-3">
         <div class="rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-800/60">
@@ -4738,7 +4738,7 @@ const DEVICE = (() => {
 const cloud = CLOUD.url && CLOUD.key && window.supabase ? window.supabase.createClient(CLOUD.url, CLOUD.key) : null;
 let session = null, channel = null, realtimeOn = false;
 let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syncTimer, lastSyncAt = null;
-let otpEmail = '', otpSent = false, authBusy = false, authError = '';
+let authBusy = false, authError = '', authInfo = '';
 
 /** O que vai para a nuvem: tudo menos o tema e a matéria selecionada (esses são por aparelho). */
 function syncPayload() {
@@ -4861,11 +4861,10 @@ function renderSync() {
   $('#sync-off').classList.toggle('hidden', !cloud || on);
   $('#sync-on').classList.toggle('hidden', !on);
   if (cloud && !on) {
-    $('#otp-step1').classList.toggle('hidden', otpSent);
-    $('#otp-step2').classList.toggle('hidden', !otpSent);
-    $('#otp-sent-to').textContent = otpEmail;
-    $('#sync-send').disabled = authBusy;
-    $('#sync-verify').disabled = authBusy;
+    $('#sync-login').disabled = authBusy;
+    $('#sync-signup').disabled = authBusy;
+    $('#sync-info').classList.toggle('hidden', !authInfo);
+    $('#sync-info').textContent = authInfo;
   }
   if (on) {
     $('#sync-dot2').className = `h-2 w-2 rounded-full ${color}`;
@@ -4879,28 +4878,36 @@ function renderSync() {
 }
 
 $('#sync-btn').onclick = () => { authError = ''; renderSync(); $('#sync-dialog').showModal(); };
-$('#sync-send').onclick = async () => {
-  const email = $('#sync-email').value.trim();
-  if (!email || !cloud) return;
-  authBusy = true; authError = ''; renderSync();
-  const { error } = await cloud.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+const authMsg = (e) => {
+  const m = String(e?.message || '');
+  if (/invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+  if (/email not confirmed/i.test(m)) return 'Confirme o e-mail pelo link que o Supabase enviou e tente de novo.';
+  if (/already registered|already exists/i.test(m)) return 'Esse e-mail já tem conta — use “Entrar”.';
+  if (/signups? not allowed|not allowed/i.test(m)) return 'Cadastro fechado: este painel só aceita a conta do dono.';
+  if (/at least|password/i.test(m)) return 'A senha precisa ter pelo menos 6 caracteres.';
+  if (/rate|seconds/i.test(m)) return 'Muitas tentativas — espere um minuto.';
+  return m || 'Não foi possível entrar.';
+};
+const creds = () => ({ email: $('#sync-email').value.trim(), password: $('#sync-pass').value });
+$('#login-form').onsubmit = async (e) => {
+  e.preventDefault();
+  if (!cloud) return;
+  authBusy = true; authError = ''; authInfo = ''; renderSync();
+  const { error } = await cloud.auth.signInWithPassword(creds());
   authBusy = false;
-  if (error) authError = /signups? not allowed|not allowed/i.test(error.message) ? 'Este e-mail não tem acesso a este painel.' : /rate|seconds/i.test(error.message) ? 'Espere 1 minuto para pedir outro e-mail.' : error.message;
-  else { otpEmail = email; otpSent = true; setTimeout(() => $('#sync-code').focus()); }
+  if (error) authError = authMsg(error); else $('#sync-pass').value = '';
   renderSync();
 };
-$('#sync-verify').onclick = async () => {
-  const token = $('#sync-code').value.replace(/\D/g, '');
-  if (token.length < 6) { authError = 'Digite o código de 6 dígitos do e-mail.'; renderSync(); return; }
-  authBusy = true; authError = ''; renderSync();
-  const { error } = await cloud.auth.verifyOtp({ email: otpEmail, token, type: 'email' });
+$('#sync-signup').onclick = async () => {
+  const c = creds();
+  if (!cloud || !c.email || c.password.length < 6) { authError = 'Preencha o e-mail e uma senha de pelo menos 6 caracteres.'; renderSync(); return; }
+  authBusy = true; authError = ''; authInfo = ''; renderSync();
+  const { data, error } = await cloud.auth.signUp({ ...c, options: { emailRedirectTo: location.origin + location.pathname } });
   authBusy = false;
-  if (error) authError = 'Código inválido ou expirado.';
+  if (error) authError = authMsg(error);
+  else if (!data.session) authInfo = 'Conta criada! Abra o e-mail de confirmação do Supabase, toque no link e depois entre aqui.';
   renderSync();
 };
-$('#sync-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#sync-verify').click(); });
-$('#sync-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#sync-send').click(); });
-$('#sync-other').onclick = () => { otpSent = false; authError = ''; renderSync(); };
 $('#sync-now').onclick = syncNow;
 $('#sync-disconnect').onclick = async () => { await cloud.auth.signOut(); };   // os dados continuam neste navegador
 
@@ -4910,7 +4917,7 @@ if (cloud) {
     session = s;
     // fora do callback: chamar o Supabase aqui dentro pode travar o cliente
     setTimeout(() => {
-      if (s && s.user.id !== was) { otpSent = false; $('#sync-dialog').open && $('#sync-dialog').close(); subscribeRealtime(); syncNow(); }
+      if (s && s.user.id !== was) { authInfo = ''; $('#sync-dialog').open && $('#sync-dialog').close(); subscribeRealtime(); syncNow(); }
       if (!s) { if (channel) cloud.removeChannel(channel); channel = null; realtimeOn = false; syncStatus = 'off'; }
       renderSync();
     });
