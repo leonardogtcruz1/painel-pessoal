@@ -221,7 +221,12 @@
           </button>
         </div>
       </div>
-      <div id="mr-stats" class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5"></div>
+      <div id="mr-stats" class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6"></div>
+      <div id="mr-rate-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
+        <p class="text-sm font-semibold">Avaliação das metas do mês</p>
+        <p class="text-xs text-zinc-500">De 1 a 5: quanto você avançou em cada uma — vale mesmo para as que não foram concluídas.</p>
+        <ul id="mr-rate" class="mt-3 space-y-2"></ul>
+      </div>
       <div id="mr-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
       <div class="mt-5 flex justify-end">
         <button id="mr-done" class="btn-primary">Concluir reflexão do mês</button>
@@ -299,6 +304,39 @@
         </div>
       </form>
       <div id="metric-list" class="mt-4 grid gap-4 sm:grid-cols-2"></div>
+    </section>
+
+    <!-- ============ PROJETOS ============ -->
+    <section class="card">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-sm font-semibold">Projetos</h2>
+          <p class="text-xs text-zinc-500">Coisas grandes, divididas em marcos · registre cada avanço</p>
+        </div>
+        <button id="project-new" class="btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800">+ Novo projeto</button>
+      </div>
+      <form id="project-form" class="mt-4 hidden space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="sm:col-span-2">
+            <label for="pf-name" class="eyebrow">Projeto</label>
+            <input id="pf-name" class="field mt-1.5" maxlength="60" autocomplete="off" placeholder="Terminar o curso de Python" required />
+          </div>
+          <div>
+            <label for="pf-due" class="eyebrow">Prazo (opcional)</label>
+            <input id="pf-due" class="field mt-1.5" type="date" />
+          </div>
+        </div>
+        <div>
+          <label for="pf-miles" class="eyebrow">Marcos · um por linha</label>
+          <textarea id="pf-miles" rows="4" class="field mt-1.5 resize-y" placeholder="Módulo 1 — fundamentos&#10;Módulo 2 — funções&#10;Projeto final"></textarea>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" id="pf-cancel" class="btn-ghost">Cancelar</button>
+          <button type="submit" class="btn-primary">Criar projeto</button>
+        </div>
+      </form>
+      <div id="project-list" class="mt-4 grid gap-4 sm:grid-cols-2"></div>
+      <button id="projects-closed" class="btn-ghost -mx-2.5 mt-2 hidden text-xs"></button>
     </section>
 
     <!-- ============ GRID PRINCIPAL ============ -->
@@ -526,6 +564,23 @@
           </div>
         </section>
 
+        <!-- Check-in do dia: perguntas configuráveis + tags -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold">Check-in do dia</h2>
+            <div class="flex items-center gap-1">
+              <button id="tags-open" class="btn-ghost text-xs">Análise por tag</button>
+              <button id="questions-manage" class="btn-ghost h-7 w-7 p-0" aria-label="Configurar perguntas" title="Configurar perguntas"></button>
+            </div>
+          </div>
+          <div id="checkin" class="mt-4 space-y-4"></div>
+          <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <p class="eyebrow">Tags do dia</p>
+            <div id="day-tags" class="mt-2 flex flex-wrap gap-1.5"></div>
+            <p class="mt-2 text-[11px] leading-snug text-zinc-500">#tags escritas no foco, na reflexão ou nas respostas também contam. Os insights comparam dias com e sem cada tag.</p>
+          </div>
+        </section>
+
       </div>
     </div>
 
@@ -740,6 +795,20 @@
     <div id="journal-list" class="max-h-[60vh] space-y-6 overflow-y-auto px-5 py-5"></div>
   </dialog>
 
+  <!-- Análise por tag -->
+  <dialog id="tags-dialog" class="m-auto max-h-[85vh] w-[min(640px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+    <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+      <div class="flex items-baseline gap-2">
+        <h2 class="text-base font-semibold">Análise por tag</h2>
+        <span class="text-xs text-zinc-500">últimos 90 dias</span>
+      </div>
+      <button class="btn-ghost h-7 w-7 p-0" data-close aria-label="Fechar">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="tags-body" class="max-h-[70vh] overflow-y-auto px-5 py-4"></div>
+  </dialog>
+
   <!-- Todos os tópicos aprendidos -->
   <dialog id="topics-dialog" class="m-auto max-h-[85vh] w-[min(640px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
     <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
@@ -828,6 +897,11 @@ function freshState() {
     metrics: [], // métricas de resultado: { id, name, unit, start, startKey, target, deadline, entries: { AAAA-MM-DD: valor } }
     priorities: [], // até 3 pontos de melhoria escolhidos nas reflexões: { id, text, src }
     subjects: [],   // matérias: { id, name, goalH } — goalH = meta semanal em horas (opcional)
+    questions: [    // perguntas do check-in diário: { id, text, type: 'scale' (1–5) | 'number' | 'text', unit }
+      { id: 'q-humor', text: 'Humor', type: 'scale' },
+      { id: 'q-foco', text: 'Foco', type: 'scale' },
+    ],
+    projects: [],   // { id, name, status: 'active'|'paused'|'done', created, due, milestones: [{ id, text, addedK, doneK }], log: [{ id, k, min, note }] }
     topics: [],     // tópicos aprendidos (revisão espaçada): { id, title, subjectId, grade, created, stage, due, mastered, reviews: [{ k, ok }] }
     settings: { theme: null, studyGoalH: 10 },
   };
@@ -856,7 +930,7 @@ let S = loadState();
  */
 const SYNCED = ['days', 'weeks', 'months'];
 /** Listas sincronizadas inteiras (vale a versão editada por último), cada uma com carimbo `<nome>U`. */
-const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics'];
+const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics', 'questions', 'projects'];
 const sigs = new Map();
 const sigOf = (rec) => { const { u, ...rest } = rec; return JSON.stringify(rest); };
 const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH });
@@ -895,7 +969,7 @@ function save() {
  * Registro de um dia. `done` = hábitos completos; `qty`/`tgt` = quantidade feita e a meta
  * daquele dia para hábitos com quantidade (a meta fica gravada para o histórico não mudar).
  */
-const blankDay = () => ({ done: [], qty: {}, tgt: {}, total: 0, oneThing: '', oneDone: false, sleep: null, energy: 0,
+const blankDay = () => ({ done: [], wk: [], qty: {}, tgt: {}, answers: {}, tags: [], total: 0, oneThing: '', oneDone: false, sleep: null, energy: 0,
                           studyMin: 0, sessions: 0, topic: '', win: '', improve: '' });
 /** Registro de um dia (cria se não existir). */
 function day(k = todayKey()) {
@@ -918,13 +992,26 @@ function wday() {
   return d;
 }
 
-/* Frequência dos hábitos: `t.days` = dias da semana (0 = dom … 6 = sáb); ausente = todo dia. */
+/*
+ * Frequência dos hábitos: `t.days` = dias da semana (0 = dom … 6 = sáb); ausente = todo dia.
+ * `t.weekly` = N vezes por semana, em qualquer dia: fica fora do % diário e conta na semana
+ * (as marcações ficam em `rec.wk`).
+ */
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
-const isDaily = (t) => !t.days || t.days.length === 7;
-const scheduledOn = (t, date) => isDaily(t) || t.days.includes(date.getDay());
+const isWeekly = (t) => t.weekly > 0;
+const isDaily = (t) => !isWeekly(t) && (!t.days || t.days.length === 7);
+const scheduledOn = (t, date) => !isWeekly(t) && (isDaily(t) || t.days.includes(date.getDay()));
 const tasksFor = (date) => S.tasks.filter((t) => scheduledOn(t, date));
+const weeklyTasks = () => S.tasks.filter(isWeekly);
+/** Quantas vezes um hábito semanal foi feito na semana que começa em `ws`. */
+function weeklyCount(t, ws) {
+  let n = 0;
+  for (let i = 0; i < 7; i++) if (peek(keyOf(addDays(ws, i)))?.wk?.includes(t.id)) n++;
+  return n;
+}
 function schedLabel(t) {
+  if (isWeekly(t)) return `${t.weekly}× por semana`;
   if (isDaily(t)) return '';
   const d = [...t.days].sort().join();
   if (d === '1,2,3,4,5') return 'seg–sex';
@@ -936,7 +1023,14 @@ function schedLabel(t) {
 function syncDay(k = todayKey()) {
   const d = day(k), list = tasksFor(parseKey(k));
   const ids = new Set(list.map((t) => t.id));
-  d.qty ||= {}; d.tgt ||= {};
+  d.qty ||= {}; d.tgt ||= {}; d.wk ||= [];
+  // Hábito que mudou entre "dias fixos" e "N por semana" leva a marcação do dia junto
+  for (const t of S.tasks) {
+    if (isWeekly(t) && d.done.includes(t.id)) { d.done = d.done.filter((x) => x !== t.id); if (!d.wk.includes(t.id)) d.wk.push(t.id); }
+    if (!isWeekly(t) && d.wk.includes(t.id)) { d.wk = d.wk.filter((x) => x !== t.id); if (ids.has(t.id) && !d.done.includes(t.id)) d.done.push(t.id); }
+  }
+  const wkIds = new Set(weeklyTasks().map((t) => t.id));
+  d.wk = d.wk.filter((id) => wkIds.has(id));
   d.done = d.done.filter((id) => ids.has(id));
   for (const id of Object.keys(d.qty)) if (!ids.has(id)) { delete d.qty[id]; delete d.tgt[id]; }
   for (const t of list) {
@@ -979,7 +1073,7 @@ function dayScore(d) {
 /** Quanto de um hábito foi feito num registro de dia (0–1). */
 function habitDone(rec, id) {
   if (!rec) return 0;
-  if (rec.done.includes(id)) return 1;
+  if (rec.done.includes(id) || rec.wk?.includes(id)) return 1;
   const v = rec.qty?.[id], t = rec.tgt?.[id];
   return v && t ? Math.min(1, v / t) : 0;
 }
@@ -1350,7 +1444,8 @@ function emptyRow(text) {
  */
 let taskDraft = null;
 function scheduleEditor(t) {
-  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '' };
+  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '',
+                                              weeklyMode: isWeekly(t), weekly: t.weekly || 3 };
   const dr = taskDraft;
   const wrapLi = document.createElement('li');
   wrapLi.className = 'mb-3 ml-8 space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800';
@@ -1391,7 +1486,24 @@ function scheduleEditor(t) {
     chip('todo dia', isDaily(t), () => setTaskDays(t.id, [0, 1, 2, 3, 4, 5, 6])),
     chip('seg–sex', schedLabel(t) === 'seg–sex', () => setTaskDays(t.id, [1, 2, 3, 4, 5])));
   const dBox = document.createElement('div');
-  dBox.append(sectionLabel('Dias'), dRow);
+  const fRow = document.createElement('div');
+  fRow.className = 'mt-1.5 flex flex-wrap items-center gap-1.5';
+  fRow.append(chip('Dias fixos', !dr.weeklyMode, () => { dr.weeklyMode = false; renderTasks(); }),
+              chip('X vezes por semana', dr.weeklyMode, () => { dr.weeklyMode = true; renderTasks(); }));
+  dBox.append(sectionLabel('Frequência', dr.weeklyMode
+    ? 'Faça em qualquer dia; conta na semana e não entra no % diário. Bom para treino e coisas flexíveis.'
+    : 'Aparece nos dias escolhidos e entra no % de cada dia.'), fRow);
+  if (dr.weeklyMode) {
+    const wRow = document.createElement('div');
+    wRow.className = 'mt-2 flex items-center gap-1.5';
+    for (let n = 1; n <= 7; n++) wRow.append(chip(String(n), dr.weekly === n, () => { dr.weekly = n; renderTasks(); }));
+    const l = document.createElement('span'); l.className = 'ml-1 text-xs text-zinc-500'; l.textContent = 'vezes por semana';
+    wRow.append(l);
+    dBox.append(wRow);
+  } else {
+    dRow.className = 'mt-2 flex flex-wrap items-center gap-1.5';
+    dBox.append(dRow);
+  }
 
   // 2. Como medir: feito/não feito ou quantidade
   const qBox = document.createElement('div');
@@ -1449,13 +1561,15 @@ function scheduleEditor(t) {
   saveBtn.type = 'button'; saveBtn.className = 'btn-primary !py-1.5 text-xs'; saveBtn.textContent = 'Salvar';
   saveBtn.onclick = () => {
     const target = Number(dr.target);
-    if (dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 20).'; return; }
+    if (!dr.weeklyMode && dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 20).'; return; }
     taskDraft = null; editingTask = null;
-    setTaskConfig(t.id, { target: dr.qty ? target : null, unit: dr.qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null });
+    const qty = !dr.weeklyMode && dr.qty;
+    setTaskConfig(t.id, { target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null,
+                          weekly: dr.weeklyMode ? dr.weekly : null, ...(dr.weeklyMode ? { days: null } : {}) });
   };
   act.append(err, cancel, saveBtn);
 
-  wrapLi.append(dBox, qBox, mBox, act);
+  wrapLi.append(...(dr.weeklyMode ? [dBox, mBox, act] : [dBox, qBox, mBox, act]));
   return wrapLi;
 }
 
@@ -1465,9 +1579,9 @@ function renderTasks() {
   $('#tasks-title').textContent = isToday() ? 'Hábitos de hoje' : `Hábitos · ${fmtDay.format(now).replace(/\./g, '')}`;
   const ul = $('#task-list');
   ul.replaceChildren();
-  const today = tasksFor(now), off = S.tasks.filter((t) => !scheduledOn(t, now));
+  const today = tasksFor(now), off = S.tasks.filter((t) => !isWeekly(t) && !scheduledOn(t, now)), weekly = weeklyTasks();
   if (!S.tasks.length) ul.append(emptyRow('Nenhum hábito ainda. Adicione o primeiro abaixo.'));
-  else if (!today.length) ul.append(emptyRow(`Nenhum hábito previsto para ${isToday() ? 'hoje' : 'este dia'} — dia livre.`));
+  else if (!today.length && !weekly.length) ul.append(emptyRow(`Nenhum hábito previsto para ${isToday() ? 'hoje' : 'este dia'} — dia livre.`));
 
   const metricName = (t) => S.metrics.find((m) => m.id === t.metricId)?.name;
   const row = (t, isOff) => {
@@ -1480,6 +1594,24 @@ function renderTasks() {
     if (editingTask === t.id) ul.append(scheduleEditor(t));
   };
   today.forEach((t) => row(t, false));
+
+  // Hábitos "N por semana": marca no dia em que fizer; a meta é da semana
+  if (weekly.length) {
+    const h = document.createElement('li');
+    h.className = 'eyebrow pb-1 pt-3';
+    h.textContent = 'Na semana';
+    ul.append(h);
+    const ws = weekStart(now);
+    for (const t of weekly) {
+      const n = weeklyCount(t, ws), hit = n >= t.weekly;
+      ul.append(checkRow(t.title, (d.wk || []).includes(t.id), () => toggleWeekly(t.id), () => removeTask(t.id), undefined, {
+        badge: `${n}/${t.weekly} na semana${hit ? ' ✓' : ''}${S.metrics.find((m) => m.id === t.metricId) ? ` · → ${S.metrics.find((m) => m.id === t.metricId).name}` : ''}`,
+        editing: editingTask === t.id,
+        onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
+      }));
+      if (editingTask === t.id) ul.append(scheduleEditor(t));
+    }
+  }
 
   if (off.length) {
     const li = document.createElement('li');
@@ -1775,6 +1907,21 @@ const taskAdherence = (t, fromK, toK) => adherence([t], fromK, toK);
 function adherence(tasks, fromK, toK) {
   if (!tasks.length) return null;
   const vals = [], tk = todayKey();
+  if (toK > tk) toK = tk;
+  // Hábitos semanais: vezes feitas ÷ meta proporcional aos dias da semana dentro do período
+  for (const t of tasks.filter(isWeekly)) {
+    for (let ws = weekStart(parseKey(fromK)); keyOf(ws) <= toK; ws = addDays(ws, 7)) {
+      let n = 0, days = 0;
+      for (let i = 0; i < 7; i++) {
+        const k = keyOf(addDays(ws, i));
+        if (k < fromK || k > toK || k < S.startDate) continue;
+        days++;
+        if (peek(k)?.wk?.includes(t.id)) n++;
+      }
+      if (days) vals.push(Math.min(1, n / Math.max(1, (t.weekly * days) / 7)));
+    }
+  }
+  tasks = tasks.filter((t) => !isWeekly(t));
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
     const k = keyOf(d);
     if (k < S.startDate) continue;
@@ -2045,13 +2192,20 @@ function computeInsights() {
   const energy = (x) => (x.r.energy > 0 ? x.r.energy : null);
 
   for (const t of S.tasks) {
-    const sched = rec.filter((x) => scheduledOn(t, x.date) && x.r.total);
+    const sched = rec.filter((x) => (isWeekly(t) || scheduledOn(t, x.date)) && (x.r.total || isWeekly(t)));
     const did = (x) => habitDone(x.r, t.id) >= 1;
     const e = split(sched, did, energy);
     if (e && Math.abs(e.a - e.b) >= 0.5) {
       out.push({ score: Math.abs(e.a - e.b) / 4, n: e.n, text: e.a > e.b
         ? `Nos dias com “${t.title}”, sua energia é ${fmtNum(+e.a.toFixed(1))}/5 contra ${fmtNum(+e.b.toFixed(1))}/5 nos outros.`
         : `Nos dias com “${t.title}”, sua energia cai: ${fmtNum(+e.a.toFixed(1))}/5 contra ${fmtNum(+e.b.toFixed(1))}/5. Vale mudar o horário?` });
+    }
+    for (const q of scaleQs()) {
+      const r = split(sched, did, (x) => x.r.answers?.[q.id] ?? null);
+      if (r && Math.abs(r.a - r.b) >= 0.5) {
+        out.push({ score: Math.abs(r.a - r.b) / 4, n: r.n,
+          text: `Nos dias com “${t.title}” → ${q.text} ${r.a > r.b ? 'sobe' : 'cai'}: ${fmtNum(+r.a.toFixed(1))}/5 contra ${fmtNum(+r.b.toFixed(1))}/5 nos outros.` });
+      }
     }
     const s = split(sched, did, (x) => x.r.studyMin || 0);
     if (s && Math.abs(s.a - s.b) >= 15) {
@@ -2066,6 +2220,23 @@ function computeInsights() {
     out.push({ score: Math.abs(sl.a - sl.b) / 4, n: sl.n, text: sl.a > sl.b
       ? `Com 7,5h+ de sono sua energia é ${fmtNum(+sl.a.toFixed(1))}/5; com menos, ${fmtNum(+sl.b.toFixed(1))}/5.`
       : `Curioso: dormir 7,5h+ não melhorou sua energia (${fmtNum(+sl.a.toFixed(1))} vs ${fmtNum(+sl.b.toFixed(1))}).` });
+  }
+
+  for (const q of scaleQs()) {
+    const r = split(rec, (x) => x.r.sleep >= 7.5, (x) => (x.r.sleep == null ? null : x.r.answers?.[q.id] ?? null));
+    if (r && Math.abs(r.a - r.b) >= 0.5) {
+      out.push({ score: Math.abs(r.a - r.b) / 4, n: r.n, text: `Com 7,5h+ de sono → ${q.text} ${fmtNum(+r.a.toFixed(1))}/5; com menos, ${fmtNum(+r.b.toFixed(1))}/5.` });
+    }
+  }
+
+  // Tags: o efeito mais forte de cada uma (no dia ou no dia seguinte)
+  for (const t of tagAnalysis(60)) {
+    const cands = [...t.same.filter((o) => o.ok).map((o) => ({ o, next: false })), ...t.next.filter((o) => o.ok).map((o) => ({ o, next: true }))];
+    if (!cands.length) continue;
+    const { o, next } = cands.reduce((a, b) => (b.o.effect > a.o.effect ? b : a));
+    const up = o.a > o.b;
+    out.push({ score: Math.min(1, o.effect), n: t.days,
+      text: `${next ? `No dia seguinte a #${t.tag}` : `Nos dias com #${t.tag}`} → ${o.name} ${up ? 'sobe' : 'cai'}: ${o.fmt(o.a)} contra ${o.fmt(o.b)} ${next ? 'nos demais' : 'nos outros'}.` });
   }
 
   const one = split(rec.filter((x) => x.r.oneThing?.trim()), (x) => x.r.oneDone, (x) => x.p);
@@ -2149,7 +2320,7 @@ function periodStats(fromK, toK) {
   if (toK > tk) toK = tk;
   if (fromK < S.startDate) fromK = S.startDate;
   const res = { fromK, toK, days: 0, habitAvg: null, perfect: 0, zero: 0, study: 0, sleepAvg: null, energyAvg: null, habits: [], metrics: [],
-                learned: 0, retention: { ok: 0, n: 0, rate: null }, bySubject: {} };
+                learned: 0, retention: { ok: 0, n: 0, rate: null }, bySubject: {}, projects: [] };
   if (fromK > toK) return res;
   const ps = [], sleeps = [], energies = [];
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
@@ -2168,6 +2339,8 @@ function periodStats(fromK, toK) {
   res.learned = S.topics.filter((t) => t.created >= fromK && t.created <= toK).length;
   res.retention = retention(fromK, toK);
   res.bySubject = subjectMinutes(fromK, toK);
+  res.projects = S.projects.filter((p) => p.created <= toK && (p.status !== 'done' || (p.doneK || '9999') >= fromK)).map((p) => ({
+    p, min: projMin(p, fromK, toK), milestones: (p.milestones || []).filter((m) => m.doneK && m.doneK >= fromK && m.doneK <= toK) }));
   const dayBefore = keyOf(addDays(parseKey(fromK), -1));
   for (const m of S.metrics) {
     const before = metricAt(m, dayBefore), after = metricAt(m, toK);
@@ -2181,16 +2354,31 @@ function periodStats(fromK, toK) {
 function reflectionHints(cur, prev, goals, studyGoalMin, weeks = 1) {
   const H = { wins: [], sins: [], better: [], improve: [] };
   const q = (t) => `“${t}”`;
-  for (const g of goals) (g.done ? H.wins : H.sins).push(`${g.done ? 'Meta cumprida' : 'Meta não cumprida'}: ${q(g.title)}`);
+  for (const g of goals) {
+    (g.done ? H.wins : H.sins).push(`${g.done ? 'Meta cumprida' : 'Meta não cumprida'}: ${q(g.title)}`);
+    if (g.rating >= 4 && !g.done) H.wins.push(`Avancei bem em ${q(g.title)} (nota ${g.rating}/5)`);
+    if (g.rating && g.rating <= 2) { H.sins.push(`${q(g.title)}: nota ${g.rating}/5`); H.improve.push(`Plano concreto para ${q(g.title)}`); }
+  }
+  // Projetos
+  for (const x of cur.projects || []) {
+    for (const m of x.milestones) H.wins.push(`Marco concluído: ${q(m.text)} (${x.p.name})`);
+    if (x.p.status === 'active' && !x.milestones.length && !x.min) {
+      H.sins.push(`Projeto ${q(x.p.name)} parado no período`);
+      H.improve.push(`Retomar ${q(x.p.name)}: um avanço por semana`);
+    }
+    const pv = (prev.projects || []).find((y) => y.p.id === x.p.id);
+    if (pv && x.min >= 60 && x.min >= pv.min * 1.25) H.better.push(`Mais tempo em ${q(x.p.name)}: ${fmtMin(pv.min)} → ${fmtMin(x.min)}`);
+  }
   for (const x of cur.metrics) {
     if (x.before == null || x.before === x.after) continue;
     const txt = `${x.m.name}: ${fmtNum(x.before)} → ${fmtVal(x.m, x.after)}`;
     (x.st.good(x.after - x.before) ? H.wins : H.sins).push(x.st.good(x.after - x.before) ? txt : `${txt} (direção contrária da meta)`);
   }
   for (const x of cur.metrics) if (!x.logged) H.sins.push(`Não registrei ${q(x.m.name)} no período`);
+  const hLabel = (t, a) => (isWeekly(t) ? `${fmtPct(a)} da meta de ${t.weekly}×/semana` : `${fmtPct(a)} dos dias`);
   for (const { t, a } of cur.habits) {
-    if (a >= 0.9) H.wins.push(`${q(t.title)} em ${fmtPct(a)} dos dias`);
-    else if (a < 0.5) H.sins.push(`${q(t.title)} em só ${fmtPct(a)} dos dias`);
+    if (a >= 0.9) H.wins.push(`${q(t.title)} em ${hLabel(t, a)}`);
+    else if (a < 0.5) H.sins.push(`${q(t.title)} em só ${hLabel(t, a)}`);
   }
   if (cur.perfect) H.wins.push(`${cur.perfect} ${cur.perfect === 1 ? 'dia' : 'dias'} com 100% dos hábitos`);
   if (cur.zero) H.sins.push(`${cur.zero} ${cur.zero === 1 ? 'dia zerado' : 'dias zerados'} (0% dos hábitos)`);
@@ -2225,7 +2413,7 @@ function reflectionHints(cur, prev, goals, studyGoalMin, weeks = 1) {
   }
   for (const { t, a } of cur.habits) {
     const b = prev.habits.find((x) => x.t.id === t.id)?.a;
-    if (b != null && a - b >= 0.15) H.better.push(`${q(t.title)}: ${fmtPct(b)} → ${fmtPct(a)} dos dias`);
+    if (b != null && a - b >= 0.15) H.better.push(`${q(t.title)}: ${fmtPct(b)} → ${hLabel(t, a)}`);
   }
   if (prev.study > 0 && cur.study >= prev.study * 1.15) H.better.push(`Estudo: ${fmtMin(prev.study)} → ${fmtMin(cur.study)}`);
   if (prev.sleepAvg != null && cur.sleepAvg != null && cur.sleepAvg - prev.sleepAvg >= 0.25) H.better.push(`Sono médio: ${fmtSleep(prev.sleepAvg)} → ${fmtSleep(cur.sleepAvg)}`);
@@ -2235,7 +2423,7 @@ function reflectionHints(cur, prev, goals, studyGoalMin, weeks = 1) {
   }
 
   const weak = [...cur.habits].sort((a, b) => a.a - b.a).filter((x) => x.a < 0.8).slice(0, 2);
-  for (const { t } of weak) H.improve.push(`Fazer ${q(t.title)} em pelo menos 80% dos dias`);
+  for (const { t } of weak) H.improve.push(isWeekly(t) ? `Bater ${t.weekly}× por semana de ${q(t.title)}` : `Fazer ${q(t.title)} em pelo menos 80% dos dias`);
   if (cur.zero) H.improve.push('Não zerar nenhum dia: ao menos 1 hábito, mesmo no dia ruim');
   if (cur.sleepAvg != null && cur.sleepAvg < 7) H.improve.push('Dormir 7h ou mais');
   for (const x of cur.metrics) {
@@ -2438,7 +2626,37 @@ function renderMonthReview() {
     stat('Metas semanais', ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—', ms.goalsTotal ? '' : 'sem metas'),
     stat('Metas do mês', ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : '—', ms.mTotal ? '' : 'sem metas'),
     stat('Estudo', fmtMin(cur.study), prev.study ? `antes: ${fmtMin(prev.study)}` : ''),
-    stat('Sono médio', cur.sleepAvg == null ? '—' : fmtSleep(cur.sleepAvg), prev.sleepAvg == null ? '' : `antes: ${fmtSleep(prev.sleepAvg)}`));
+    stat('Sono médio', cur.sleepAvg == null ? '—' : fmtSleep(cur.sleepAvg), prev.sleepAvg == null ? '' : `antes: ${fmtSleep(prev.sleepAvg)}`),
+    stat('Nota das metas', goalsRatingAvg(S.months[mk]?.goals || []) == null ? '—' : `${fmtNum(+goalsRatingAvg(S.months[mk].goals).toFixed(1))}/5`,
+      (S.months[mk]?.goals || []).length ? `${(S.months[mk].goals).filter((g) => g.rating).length}/${S.months[mk].goals.length} avaliadas` : 'sem metas do mês'));
+
+  // Avaliação 1–5 de cada meta do mês
+  const mg = S.months[mk]?.goals || [];
+  $('#mr-rate-wrap').classList.toggle('hidden', !mg.length);
+  const ru = $('#mr-rate');
+  ru.replaceChildren();
+  for (const g of mg) {
+    const li = document.createElement('li');
+    li.className = 'flex flex-wrap items-center justify-between gap-2';
+    const t = document.createElement('span');
+    t.className = 'min-w-0 flex-1 text-sm';
+    t.textContent = `${g.done ? '✓ ' : ''}${g.title}`;
+    const btns = document.createElement('div');
+    btns.className = 'flex gap-1';
+    for (let i = 1; i <= 5; i++) {
+      const b = document.createElement('button');
+      b.className = 'h-7 w-7 rounded-md border text-xs font-medium tabular-nums transition ' + (g.rating === i
+        ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+        : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-700');
+      b.textContent = i;
+      b.setAttribute('aria-label', `Nota ${i} para ${g.title}`);
+      b.setAttribute('aria-pressed', String(g.rating === i));
+      b.onclick = () => setGoalRating(mk, g.id, i);
+      btns.append(b);
+    }
+    li.append(t, btns);
+    ru.append(li);
+  }
 
   const goals = [...(S.months[mk]?.goals || [])];
   for (const w of ms.weeks) if (w.start.getMonth() === m) goals.push(...(S.weeks[w.wk]?.goals || []));
@@ -2462,6 +2680,540 @@ function setStudyTotal(min) {
   commit(renderStudy, renderKPIs, renderMonth, renderReview, renderInsights, renderSubjects);
 }
 
+// ---------- Check-in do dia: perguntas + tags ----------
+const TAG_RE = /#([\p{L}\p{N}_-]{2,30})/gu;
+const normTag = (t) => t.replace(/^#/, '').trim().toLowerCase();
+/** Tags de um dia: as marcadas no check-in + #tags escritas nos textos do dia. */
+function dayTags(rec) {
+  if (!rec) return [];
+  const out = new Set((rec.tags || []).map(normTag));
+  const texts = [rec.oneThing, rec.win, rec.improve, ...Object.values(rec.answers || {}).filter((v) => typeof v === 'string')];
+  for (const t of texts) for (const m of (t || '').matchAll(TAG_RE)) out.add(m[1].toLowerCase());
+  return [...out];
+}
+/** Tags mais usadas nos últimos `n` dias (para sugerir com um toque). */
+function recentTags(n = 60) {
+  const cnt = {};
+  for (let i = 0; i <= n; i++) for (const t of dayTags(peek(keyOf(addDays(new Date(), -i))))) cnt[t] = (cnt[t] || 0) + 1;
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([t]) => t);
+}
+const scaleQs = () => S.questions.filter((q) => q.type === 'scale');
+
+let managingQuestions = false, questionDrafts = null;
+function renderCheckin() {
+  $('#questions-manage').innerHTML = ICON_CAL;
+  const wrap = $('#checkin');
+  wrap.replaceChildren();
+  if (managingQuestions) { wrap.append(questionManager()); }
+  else {
+    const d = rday();
+    if (!S.questions.length) {
+      const p = document.createElement('p'); p.className = 'text-sm text-zinc-500';
+      p.textContent = 'Nenhuma pergunta. Use ⚙ para criar (ex.: Humor, Foco, Ansiedade, Dor, Café).';
+      wrap.append(p);
+    }
+    for (const q of S.questions) {
+      const row = document.createElement('div');
+      const v = d.answers?.[q.id];
+      const l = document.createElement('p');
+      l.className = 'eyebrow';
+      l.textContent = q.text + (q.type === 'number' && q.unit ? ` (${q.unit})` : '');
+      row.append(l);
+      if (q.type === 'scale') {
+        const g = document.createElement('div');
+        g.className = 'mt-1.5 flex gap-1';
+        g.setAttribute('role', 'radiogroup');
+        g.setAttribute('aria-label', q.text);
+        for (let i = 1; i <= 5; i++) {
+          const b = document.createElement('button');
+          b.setAttribute('role', 'radio');
+          b.setAttribute('aria-checked', String(v === i));
+          b.className = 'h-8 flex-1 rounded-md border text-sm font-medium tabular-nums transition ' + (v === i
+            ? 'border-emerald-500 bg-emerald-500 text-white'
+            : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600');
+          b.textContent = i;
+          b.onclick = () => setAnswer(q.id, v === i ? null : i);
+          g.append(b);
+        }
+        row.append(g);
+      } else {
+        const i = document.createElement(q.type === 'text' ? 'textarea' : 'input');
+        if (q.type === 'number') { i.type = 'number'; i.step = 'any'; i.inputMode = 'decimal'; }
+        else i.rows = 2;
+        i.className = 'field mt-1.5 resize-none';
+        i.value = v ?? '';
+        i.placeholder = q.type === 'text' ? 'Escreva… (#tags valem)' : '0';
+        i.setAttribute('aria-label', q.text);
+        if (q.type === 'number') i.onchange = () => setAnswer(q.id, i.value === '' ? null : Number(i.value), false);
+        else i.oninput = () => { setAnswer(q.id, i.value, true); };
+        if (q.type === 'text') i.onblur = () => renderDayTags();
+        row.append(i);
+      }
+      wrap.append(row);
+    }
+  }
+  renderDayTags();
+}
+
+function renderDayTags() {
+  const d = rday(), box = $('#day-tags');
+  box.replaceChildren();
+  const explicit = new Set((d.tags || []).map(normTag)), all = dayTags(d);
+  for (const t of all) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400';
+    b.textContent = `#${t}` + (explicit.has(t) ? ' ×' : '');
+    b.title = explicit.has(t) ? 'Remover tag' : 'Vem de um texto do dia';
+    if (explicit.has(t)) b.onclick = () => toggleTag(t);
+    else b.disabled = true;
+    box.append(b);
+  }
+  for (const t of recentTags().filter((x) => !all.includes(x)).slice(0, 8)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rounded-md border border-dashed border-zinc-300 px-2 py-1 text-xs text-zinc-500 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-zinc-700';
+    b.textContent = `+ #${t}`;
+    b.onclick = () => toggleTag(t);
+    box.append(b);
+  }
+  const f = document.createElement('form');
+  f.className = 'inline-flex';
+  const i = document.createElement('input');
+  i.className = 'w-28 rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-emerald-500 dark:border-zinc-700';
+  i.placeholder = '#nova tag'; i.maxLength = 30;
+  f.onsubmit = (e) => { e.preventDefault(); const t = normTag(i.value).replace(/\s+/g, '-'); if (t) toggleTag(t); };
+  f.append(i);
+  box.append(f);
+}
+
+/** Editor das perguntas (rascunho + Salvar). */
+function questionManager() {
+  questionDrafts ||= S.questions.map((q) => ({ ...q }));
+  const box = document.createElement('div');
+  box.className = 'space-y-2';
+  const small = 'rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900';
+  for (const q of questionDrafts) {
+    const row = document.createElement('div');
+    row.className = 'flex flex-wrap items-center gap-1.5';
+    const n = document.createElement('input');
+    n.className = small + ' min-w-0 flex-1'; n.value = q.text; n.placeholder = 'Pergunta (ex.: Humor)'; n.maxLength = 40;
+    n.oninput = () => { q.text = n.value; };
+    const t = document.createElement('select');
+    t.className = small;
+    for (const [v, l] of [['scale', 'nota 1–5'], ['number', 'número'], ['text', 'texto']]) t.append(new Option(l, v, false, q.type === v));
+    t.onchange = () => { q.type = t.value; renderCheckin(); };
+    row.append(n, t);
+    if (q.type === 'number') {
+      const u = document.createElement('input');
+      u.className = small + ' w-20'; u.value = q.unit || ''; u.placeholder = 'unidade'; u.maxLength = 10;
+      u.oninput = () => { q.unit = u.value; };
+      row.append(u);
+    }
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = 'rounded-md p-1 text-zinc-400 hover:text-rose-500';
+    rm.innerHTML = ICON_X; rm.setAttribute('aria-label', 'Apagar pergunta');
+    rm.onclick = () => { questionDrafts = questionDrafts.filter((x) => x !== q); renderCheckin(); };
+    row.append(rm);
+    box.append(row);
+  }
+  const act = document.createElement('div');
+  act.className = 'flex items-center justify-between pt-1';
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'btn-ghost -ml-2.5 text-xs'; add.textContent = '+ Pergunta';
+  add.onclick = () => { questionDrafts.push({ id: uid(), text: '', type: 'scale' }); renderCheckin(); };
+  const right = document.createElement('div'); right.className = 'flex gap-2';
+  const cancel = document.createElement('button');
+  cancel.type = 'button'; cancel.className = 'btn-ghost text-xs'; cancel.textContent = 'Fechar';
+  cancel.onclick = () => { questionDrafts = null; managingQuestions = false; renderCheckin(); };
+  const save_ = document.createElement('button');
+  save_.type = 'button'; save_.className = 'btn-primary !py-1 text-xs'; save_.textContent = 'Salvar';
+  save_.onclick = () => {
+    S.questions = questionDrafts.filter((q) => q.text.trim()).map((q) => ({ id: q.id, text: q.text.trim(), type: q.type, ...(q.type === 'number' && q.unit?.trim() ? { unit: q.unit.trim() } : {}) }));
+    questionDrafts = null; managingQuestions = false;
+    commit(renderCheckin, renderInsights);
+  };
+  right.append(cancel, save_);
+  act.append(add, right);
+  const note = document.createElement('p');
+  note.className = 'text-[11px] text-zinc-500';
+  note.textContent = 'Perguntas de nota 1–5 entram nos insights (ex.: “nos dias com Treino, seu Humor é 4,1 contra 3,2”). Apagar uma pergunta não apaga as respostas antigas.';
+  box.append(act, note);
+  return box;
+}
+
+function setAnswer(qid, v, quiet = false) {
+  const d = wday();
+  d.answers ||= {};
+  if (v == null || v === '') delete d.answers[qid]; else d.answers[qid] = v;
+  if (quiet) { save(); return; }
+  commit(renderCheckin, renderInsights);
+}
+function toggleTag(t) {
+  const d = wday();
+  d.tags ||= [];
+  d.tags = d.tags.map(normTag).includes(t) ? d.tags.filter((x) => normTag(x) !== t) : [...d.tags, t];
+  commit(renderDayTags, renderInsights);
+}
+
+/** Comparação de dias com vs. sem cada tag (no dia e no dia seguinte). */
+function tagAnalysis(days = 90) {
+  const rows = [], now = new Date();
+  for (let i = 1; i <= days; i++) {
+    const date = addDays(now, -i), k = keyOf(date);
+    if (k < S.startDate) break;
+    const r = peek(k);
+    if (!r) continue;
+    const next = peek(keyOf(addDays(date, 1)));
+    rows.push({ k, r, tags: dayTags(r), p: completion(k), next, pNext: next ? completion(keyOf(addDays(date, 1))) : null });
+  }
+  const outcomes = [
+    { name: 'Hábitos', get: (x) => x.p, fmt: (v) => fmtPct(v), min: 0.1, scale: 1 },
+    { name: 'Energia', get: (x) => (x.r.energy > 0 ? x.r.energy : null), fmt: (v) => `${fmtNum(+v.toFixed(1))}/5`, min: 0.5, scale: 4 },
+    ...scaleQs().map((q) => ({ name: q.text, get: (x) => x.r.answers?.[q.id] ?? null, fmt: (v) => `${fmtNum(+v.toFixed(1))}/5`, min: 0.5, scale: 4 })),
+    { name: 'Estudo', get: (x) => x.r.studyMin || 0, fmt: (v) => fmtMin(Math.round(v)), min: 15, scale: 60 },
+    { name: 'Sono', get: (x) => x.r.sleep ?? null, fmt: (v) => fmtSleep(v), min: 0.5, scale: 3 },
+  ];
+  const nextOutcomes = [
+    { name: 'Hábitos', get: (x) => x.pNext, fmt: (v) => fmtPct(v), min: 0.1, scale: 1 },
+    { name: 'Energia', get: (x) => (x.next?.energy > 0 ? x.next.energy : null), fmt: (v) => `${fmtNum(+v.toFixed(1))}/5`, min: 0.5, scale: 4 },
+    ...scaleQs().map((q) => ({ name: q.text, get: (x) => x.next?.answers?.[q.id] ?? null, fmt: (v) => `${fmtNum(+v.toFixed(1))}/5`, min: 0.5, scale: 4 })),
+    { name: 'Sono', get: (x) => x.next?.sleep ?? null, fmt: (v) => fmtSleep(v), min: 0.5, scale: 3 },
+  ];
+  const all = [...new Set(rows.flatMap((x) => x.tags))];
+  const res = [];
+  for (const tag of all) {
+    const has = rows.filter((x) => x.tags.includes(tag)), not = rows.filter((x) => !x.tags.includes(tag));
+    const cmp = (list) => list.map((o) => {
+      const a = has.map(o.get).filter((v) => v != null), b = not.map(o.get).filter((v) => v != null);
+      if (a.length < 3 || b.length < 3) return { ...o, a: a.length ? avg(a) : null, b: b.length ? avg(b) : null, n: a.length, ok: false };
+      const A = avg(a), B = avg(b);
+      return { ...o, a: A, b: B, n: a.length, ok: Math.abs(A - B) >= o.min, effect: Math.abs(A - B) / o.scale };
+    });
+    res.push({ tag, days: has.length, same: cmp(outcomes), next: cmp(nextOutcomes) });
+  }
+  return res.sort((a, b) => b.days - a.days);
+}
+
+function renderTagsDialog() {
+  const body = $('#tags-body');
+  body.replaceChildren();
+  const list = tagAnalysis();
+  if (!list.length) {
+    const p = document.createElement('p'); p.className = 'py-8 text-center text-sm text-zinc-500';
+    p.textContent = 'Nenhuma tag ainda. Marque tags no check-in (ex.: #academia, #festa, #café) ou escreva #tag nos textos do dia.';
+    body.append(p);
+    return;
+  }
+  for (const t of list) {
+    const sec = document.createElement('section');
+    sec.className = 'border-b border-zinc-100 py-4 first:pt-0 last:border-0 dark:border-zinc-800';
+    const h = document.createElement('p');
+    h.className = 'text-sm font-semibold';
+    h.textContent = `#${t.tag} `;
+    const c = document.createElement('span'); c.className = 'font-normal text-zinc-500'; c.textContent = `· ${t.days} ${t.days === 1 ? 'dia' : 'dias'}`;
+    h.append(c);
+    sec.append(h);
+    const table = document.createElement('div');
+    table.className = 'mt-2 grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 text-xs tabular-nums';
+    const cell = (txt, cls = '') => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; return s; };
+    table.append(cell('', ''), cell('com a tag', 'text-right text-zinc-500'), cell('sem', 'text-right text-zinc-500'));
+    const addRows = (items, prefix) => {
+      for (const o of items) {
+        if (o.a == null && o.b == null) continue;
+        const strong = o.ok;
+        table.append(cell(prefix + o.name, 'text-zinc-600 dark:text-zinc-400'),
+          cell(o.a == null ? '—' : o.fmt(o.a), 'text-right ' + (strong ? 'font-semibold text-zinc-900 dark:text-zinc-100' : '')),
+          cell(o.b == null ? '—' : o.fmt(o.b), 'text-right text-zinc-500'));
+      }
+    };
+    addRows(t.same, '');
+    addRows(t.next, 'Dia seguinte · ');
+    sec.append(table);
+    if (t.days < 3) { const n = document.createElement('p'); n.className = 'mt-1.5 text-[11px] text-zinc-500'; n.textContent = 'Poucos dias ainda — comparações a partir de 3 dias com a tag.'; sec.append(n); }
+    body.append(sec);
+  }
+}
+
+// ---------- Avaliação das metas do mês (1–5) ----------
+function setGoalRating(mk, id, r) {
+  const g = monthRec(mk).goals.find((x) => x.id === id);
+  if (!g) return;
+  g.rating = g.rating === r ? null : r;
+  commit(renderMonthReview, renderMonth);
+}
+const goalsRatingAvg = (goals) => { const r = goals.map((g) => g.rating).filter(Boolean); return r.length ? avg(r) : null; };
+
+// ---------- Projetos ----------
+let projectEditing = null, projectDraft = null, projectLogOpen = null, showClosedProjects = false;
+const projMin = (p, fromK = '0000', toK = '9999') => (p.log || []).filter((l) => l.k >= fromK && l.k <= toK).reduce((a, l) => a + (l.min || 0), 0);
+function projectStats(p) {
+  const ms = p.milestones || [], done = ms.filter((m) => m.doneK).length;
+  const acts = [...(p.log || []).map((l) => l.k), ...ms.filter((m) => m.doneK).map((m) => m.doneK)].sort();
+  const last = acts[acts.length - 1] || p.created;
+  const tk = todayKey(), ws = keyOf(weekStart(new Date()));
+  const res = { total: ms.length, done, pct: ms.length ? done / ms.length : 0, last, idle: daysBetween(last, tk),
+                minAll: projMin(p), minWeek: projMin(p, ws, tk), next: ms.find((m) => !m.doneK) };
+  if (p.due && p.due > tk && done < ms.length) {
+    const weeks = daysBetween(tk, p.due) / 7;
+    res.perWeek = (ms.length - done) / weeks;
+    // ritmo real: marcos concluídos por semana desde a criação
+    const age = daysBetween(p.created, tk) / 7;
+    if (age >= 1) { res.pace = done / age; res.onTrack = res.pace >= res.perWeek; }   // ritmo só depois de 1 semana
+  }
+  return res;
+}
+
+/** Gráfico de progresso (burn-up): marcos concluídos acumulados × total de marcos, até o prazo. */
+function projectBurnup(p) {
+  const tk = todayKey(), start = p.created, end = p.due && p.due > tk ? p.due : tk;
+  const span = Math.max(1, daysBetween(start, end));
+  const ms = p.milestones || [];
+  const X = (k) => (daysBetween(start, k) / span) * 100;
+  const total = Math.max(1, ms.length);
+  const Y = (v) => 36 - (v / total) * 32;
+  const svg = svgEl('svg', { viewBox: '0 0 100 40', preserveAspectRatio: 'none', class: 'mt-3 block h-10 w-full', 'aria-hidden': 'true' });
+  const step = (events) => {   // events: [k, delta]
+    let v = 0, d = `M0,${Y(0)}`;
+    for (const [k, dv] of events.sort((a, b) => (a[0] < b[0] ? -1 : 1))) { const x = X(k < start ? start : k); d += `L${x},${Y(v)}`; v += dv; d += `L${x},${Y(v)}`; }
+    return d + `L${X(tk)},${Y(v)}`;
+  };
+  // escopo (quantos marcos existiam em cada momento)
+  svg.append(svgEl('path', { d: step(ms.map((m) => [m.addedK || start, 1])), fill: 'none', stroke: 'var(--c-axis)', 'stroke-width': 1,
+    'stroke-dasharray': '3 3', 'vector-effect': 'non-scaling-stroke', opacity: 0.7 }));
+  if (p.due) svg.append(svgEl('line', { x1: 0, y1: Y(0), x2: X(p.due), y2: Y(ms.length), stroke: 'var(--c-axis)', 'stroke-width': 1, opacity: 0.35, 'vector-effect': 'non-scaling-stroke' }));
+  svg.append(svgEl('path', { d: step(ms.filter((m) => m.doneK).map((m) => [m.doneK, 1])), fill: 'none', stroke: 'var(--c-habit)', 'stroke-width': 2,
+    'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }));
+  return svg;
+}
+
+function renderProjects() {
+  const wrap = $('#project-list');
+  wrap.replaceChildren();
+  const open_ = S.projects.filter((p) => p.status !== 'done'), closed = S.projects.filter((p) => p.status === 'done');
+  const shown = showClosedProjects ? S.projects : open_;
+  const cb = $('#projects-closed');
+  cb.classList.toggle('hidden', !closed.length);
+  cb.textContent = showClosedProjects ? 'Esconder concluídos' : `Ver ${closed.length} ${closed.length === 1 ? 'concluído' : 'concluídos'}`;
+  if (!shown.length) {
+    const p = document.createElement('div');
+    p.className = 'rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500 sm:col-span-2 dark:border-zinc-800';
+    p.textContent = 'Nenhum projeto ativo. Divida algo grande em 3–10 marcos (ex.: módulos de um curso, capítulos, etapas de um app).';
+    wrap.append(p);
+    return;
+  }
+  const tk = todayKey(), selLabel = isToday() ? 'hoje' : fmtShort.format(parseKey(selKey)).replace('.', '');
+  for (const p of shown) {
+    const st = projectStats(p);
+    const card = document.createElement('div');
+    card.className = 'rounded-xl border border-zinc-200 p-4 dark:border-zinc-800' + (p.status === 'done' ? ' opacity-70' : '');
+    const head = document.createElement('div');
+    head.className = 'flex items-start justify-between gap-2';
+    const nm = document.createElement('div');
+    nm.className = 'min-w-0';
+    const n = document.createElement('p'); n.className = 'text-sm font-medium'; n.textContent = p.name;
+    const sub = document.createElement('p'); sub.className = 'text-xs text-zinc-500';
+    sub.textContent = [p.status === 'paused' ? 'pausado' : p.status === 'done' ? 'concluído ✓' : '',
+      p.due ? `prazo ${fmtShort.format(parseKey(p.due)).replace('.', '')}` : ''].filter(Boolean).join(' · ');
+    nm.append(n, sub);
+    const gear = document.createElement('button');
+    gear.className = 'btn-ghost -mr-1.5 -mt-1 h-7 w-7 p-0';
+    gear.innerHTML = ICON_CAL; gear.setAttribute('aria-label', `Configurar ${p.name}`);
+    gear.onclick = () => { projectEditing = projectEditing === p.id ? null : p.id; projectDraft = null; renderProjects(); };
+    head.append(nm, gear);
+    card.append(head);
+
+    const big = document.createElement('div');
+    big.className = 'mt-2 flex items-baseline gap-2';
+    const pc = document.createElement('span'); pc.className = 'text-2xl font-semibold tabular-nums tracking-tight'; pc.textContent = fmtPct(st.pct);
+    const mc = document.createElement('span'); mc.className = 'text-xs text-zinc-500'; mc.textContent = `${st.done}/${st.total} marcos`;
+    big.append(pc, mc);
+    card.append(big, projectBurnup(p));
+
+    const info = document.createElement('p');
+    info.className = 'mt-1.5 text-xs text-zinc-500';
+    info.textContent = `${fmtMin(st.minAll)} no total · ${fmtMin(st.minWeek)} esta semana`;
+    card.append(info);
+    if (st.perWeek != null) {
+      const pace = document.createElement('p');
+      pace.className = 'mt-0.5 text-xs ' + (st.pace == null ? 'text-zinc-500' : st.onTrack ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400');
+      pace.textContent = `Precisa de ${fmtNum(+st.perWeek.toFixed(1))} marco/sem até o prazo` + (st.pace == null ? '' : ` · seu ritmo: ${fmtNum(+st.pace.toFixed(1))}/sem`);
+      card.append(pace);
+    }
+    if (p.status === 'active' && st.idle >= 7) {
+      const idle = document.createElement('p');
+      idle.className = 'mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400';
+      idle.textContent = `Parado há ${st.idle} dias — um avanço pequeno hoje já destrava.`;
+      card.append(idle);
+    }
+
+    if (st.next && p.status !== 'done') {
+      const nx = document.createElement('div');
+      nx.className = 'mt-3 flex items-center gap-2 rounded-lg bg-zinc-50 px-2.5 py-2 dark:bg-zinc-800/40';
+      const ck = document.createElement('button');
+      paintCheck(ck, false);
+      ck.setAttribute('aria-label', `Concluir marco ${st.next.text}`);
+      ck.onclick = () => toggleMilestone(p.id, st.next.id);
+      const t = document.createElement('span'); t.className = 'min-w-0 flex-1 text-sm';
+      t.innerHTML = '<span class="text-xs text-zinc-500">Próximo marco: </span>';
+      t.append(document.createTextNode(st.next.text));
+      nx.append(ck, t);
+      card.append(nx);
+    } else if (!st.total) {
+      const nx = document.createElement('p'); nx.className = 'mt-3 text-xs text-zinc-500'; nx.textContent = 'Sem marcos — adicione no ⚙.';
+      card.append(nx);
+    } else if (p.status !== 'done') {
+      const b = document.createElement('button');
+      b.className = 'btn-primary mt-3 w-full !py-1.5 text-xs';
+      b.textContent = 'Todos os marcos feitos 🎉 Marcar projeto como concluído';
+      b.onclick = () => updateProject(p.id, { status: 'done', doneK: todayKey() });
+      card.append(b);
+    }
+
+    // Registrar avanço
+    if (p.status !== 'done') {
+      if (projectLogOpen === p.id) {
+        const f = document.createElement('form');
+        f.className = 'mt-3 flex flex-wrap items-center gap-2';
+        const mi = document.createElement('input');
+        mi.type = 'number'; mi.min = '0'; mi.step = '5'; mi.inputMode = 'numeric'; mi.placeholder = 'min';
+        mi.className = 'w-16 rounded-md border border-zinc-200 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700';
+        const no = document.createElement('input');
+        no.className = 'field !py-1.5 min-w-0 flex-1'; no.maxLength = 140; no.placeholder = 'O que avançou?';
+        const b = document.createElement('button'); b.type = 'submit'; b.className = 'btn-primary !py-1.5 text-xs'; b.textContent = `Salvar (${selLabel})`;
+        f.onsubmit = (e) => { e.preventDefault(); if (!mi.value && !no.value.trim()) return; logProject(p.id, Number(mi.value) || 0, no.value.trim()); };
+        f.append(mi, no, b);
+        card.append(f);
+        setTimeout(() => mi.focus());
+      } else {
+        const b = document.createElement('button');
+        b.className = 'btn-ghost -ml-2.5 mt-2 text-xs';
+        b.textContent = '+ Registrar avanço';
+        b.onclick = () => { projectLogOpen = p.id; renderProjects(); };
+        card.append(b);
+      }
+      const lastLog = [...(p.log || [])].sort((a, b) => (a.k < b.k ? 1 : -1))[0];
+      if (lastLog) {
+        const l = document.createElement('p'); l.className = 'mt-1 text-[11px] text-zinc-500';
+        l.textContent = `Último: ${fmtShort.format(parseKey(lastLog.k)).replace('.', '')}${lastLog.min ? ` · ${fmtMin(lastLog.min)}` : ''}${lastLog.note ? ` · ${lastLog.note}` : ''}`;
+        card.append(l);
+      }
+    }
+    if (projectEditing === p.id) card.append(projectEditor(p));
+    wrap.append(card);
+  }
+}
+
+function projectEditor(p) {
+  projectDraft ||= { name: p.name, due: p.due || '', status: p.status };
+  const dr = projectDraft;
+  const box = document.createElement('div');
+  box.className = 'mt-4 space-y-3 border-t border-zinc-100 pt-4 dark:border-zinc-800';
+  const small = 'rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900';
+  const grid = document.createElement('div');
+  grid.className = 'grid grid-cols-2 gap-2 text-xs text-zinc-500';
+  const mk = (label, el) => { const l = document.createElement('label'); l.className = 'block'; el.className = small + ' mt-1 w-full'; l.append(label, el); return l; };
+  const n = document.createElement('input'); n.value = dr.name; n.maxLength = 60; n.oninput = () => { dr.name = n.value; };
+  const d = document.createElement('input'); d.type = 'date'; d.value = dr.due; d.oninput = () => { dr.due = d.value; };
+  const s_ = document.createElement('select');
+  for (const [v, l] of [['active', 'Ativo'], ['paused', 'Pausado'], ['done', 'Concluído']]) s_.append(new Option(l, v, false, dr.status === v));
+  s_.onchange = () => { dr.status = s_.value; };
+  grid.append(mk('Nome', n), mk('Prazo', d), mk('Status', s_));
+  const act = document.createElement('div');
+  act.className = 'flex items-end justify-end gap-2';
+  const save_ = document.createElement('button'); save_.type = 'button'; save_.className = 'btn-primary !py-1 text-xs'; save_.textContent = 'Salvar';
+  save_.onclick = () => { if (!dr.name.trim()) return; projectDraft = null; updateProject(p.id, { name: dr.name.trim(), due: dr.due || null, status: dr.status }); };
+  act.append(save_);
+  grid.append(act);
+  box.append(grid);
+
+  // Marcos
+  const h = document.createElement('p'); h.className = 'eyebrow'; h.textContent = 'Marcos';
+  const ul = document.createElement('ul'); ul.className = 'space-y-0.5';
+  for (const m of p.milestones || []) {
+    const li = document.createElement('li');
+    li.className = 'group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+    const ck = document.createElement('button');
+    paintCheck(ck, !!m.doneK);
+    ck.onclick = () => toggleMilestone(p.id, m.id);
+    const t = document.createElement('span');
+    t.className = 'min-w-0 flex-1 text-sm ' + (m.doneK ? 'text-zinc-400 line-through' : '');
+    t.textContent = m.text;
+    const when = document.createElement('span'); when.className = 'text-[11px] text-zinc-500';
+    when.textContent = m.doneK ? fmtShort.format(parseKey(m.doneK)).replace('.', '') : '';
+    const rm = document.createElement('button'); rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', 'Apagar marco');
+    rm.onclick = () => removeMilestone(p.id, m.id);
+    li.append(ck, t, when, rm);
+    ul.append(li);
+  }
+  const f = document.createElement('form');
+  f.className = 'flex gap-2';
+  const i = document.createElement('input'); i.className = 'field !py-1.5'; i.placeholder = 'Novo marco…'; i.maxLength = 100;
+  const b = document.createElement('button'); b.type = 'submit'; b.className = 'btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800'; b.textContent = 'Adicionar';
+  f.onsubmit = (e) => { e.preventDefault(); addMilestone(p.id, i.value); };
+  f.append(i, b);
+  box.append(h, ul, f);
+
+  // Registros de avanço
+  const logs = [...(p.log || [])].sort((a, b) => (a.k < b.k ? 1 : -1));
+  if (logs.length) {
+    const lh = document.createElement('p'); lh.className = 'eyebrow'; lh.textContent = 'Avanços';
+    const lu = document.createElement('ul'); lu.className = 'max-h-40 space-y-0.5 overflow-y-auto';
+    for (const l of logs) {
+      const li = document.createElement('li');
+      li.className = 'group flex items-center justify-between gap-2 rounded-md px-1 py-0.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+      const t = document.createElement('span');
+      t.textContent = `${fmtDay.format(parseKey(l.k)).replace(/\./g, '')}${l.min ? ` · ${fmtMin(l.min)}` : ''}${l.note ? ` · ${l.note}` : ''}`;
+      const rm = document.createElement('button'); rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', 'Apagar avanço');
+      rm.onclick = () => removeProjectLog(p.id, l.id);
+      li.append(t, rm);
+      lu.append(li);
+    }
+    box.append(lh, lu);
+  }
+  const del = document.createElement('button');
+  del.className = 'btn-ghost -ml-2.5 text-xs text-rose-500';
+  del.textContent = 'Apagar projeto';
+  del.onclick = () => {
+    if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Confirmar? (apaga marcos e avanços)'; setTimeout(() => { delete del.dataset.armed; del.textContent = 'Apagar projeto'; }, 3000); return; }
+    removeProject(p.id);
+  };
+  box.append(del);
+  return box;
+}
+
+const findProject = (id) => S.projects.find((p) => p.id === id);
+function addProject(name, due, milestonesText) {
+  const k = todayKey();
+  const milestones = milestonesText.split('\n').map((x) => x.trim()).filter(Boolean).map((text) => ({ id: uid(), text, addedK: k, doneK: null }));
+  S.projects.push({ id: uid(), name, status: 'active', created: k, due: due || null, milestones, log: [] });
+  commit(renderProjects);
+}
+function updateProject(id, patch) { const p = findProject(id); if (!p) return; Object.assign(p, patch); projectEditing = null; commit(renderProjects); }
+function toggleMilestone(pid, mid) {
+  const m = findProject(pid)?.milestones.find((x) => x.id === mid);
+  if (!m) return;
+  m.doneK = m.doneK ? null : selKey;
+  commit(renderProjects);
+}
+function addMilestone(pid, text) {
+  text = text.trim();
+  const p = findProject(pid);
+  if (!p || !text) return;
+  p.milestones.push({ id: uid(), text, addedK: todayKey(), doneK: null });
+  commit(renderProjects);
+}
+function removeMilestone(pid, mid) { const p = findProject(pid); if (!p) return; p.milestones = p.milestones.filter((x) => x.id !== mid); commit(renderProjects); }
+function logProject(pid, min, note) {
+  const p = findProject(pid);
+  if (!p) return;
+  p.log = [...(p.log || []), { id: uid(), k: selKey, min: Math.max(0, Math.round(min)), note }];
+  projectLogOpen = null;
+  commit(renderProjects);
+}
+function removeProjectLog(pid, lid) { const p = findProject(pid); if (!p) return; p.log = p.log.filter((x) => x.id !== lid); commit(renderProjects); }
+function removeProject(pid) { S.projects = S.projects.filter((p) => p.id !== pid); projectEditing = null; commit(renderProjects); }
+
 // ---------- Dia em edição ----------
 function renderDayNav() {
   const tk = todayKey(), minK = keyOf(addDays(new Date(), -MAX_BACK));
@@ -2479,6 +3231,7 @@ function setSelDay(k) {
   selKey = k;
   editingTask = null;
   renderDayNav(); renderOne(); renderTasks(); renderSleep(); renderStudy(); renderReflection(); renderMetrics(); renderSubjects();
+  renderCheckin(); renderProjects();
 }
 
 // ---------- Matérias ----------
@@ -2877,7 +3630,7 @@ function renderMonthGoals() {
   ul.replaceChildren();
   if (!goals.length) ul.append(emptyRow('1 a 3 metas grandes — o que faria este mês valer a pena?'));
   for (const g of goals) {
-    ul.append(checkRow(g.title, g.done, () => toggleMonthGoal(g.id), () => removeMonthGoal(g.id), 'month'));
+    ul.append(checkRow(g.title, g.done, () => toggleMonthGoal(g.id), () => removeMonthGoal(g.id), 'month', { badge: g.rating ? `nota ${g.rating}/5` : '' }));
   }
   $('#mgoal-count').textContent = goals.length ? `${goals.filter((g) => g.done).length}/${goals.length}` : '';
 }
@@ -3105,6 +3858,8 @@ function renderJournal() {
     line(d.oneDone ? 'One Thing ✓' : 'One Thing', d.oneThing, 'text-xs');
     line('Vitória:', d.win);
     line('Melhorar:', d.improve);
+    const tg = dayTags(d);
+    if (tg.length) line('Tags:', tg.map((t) => '#' + t).join(' '), 'text-xs');
     art.append(when, body);
     wrap.append(art);
   }
@@ -3520,7 +4275,8 @@ function renderMonthCards(ys) {
     const lines = x.status === 'future' ? ['ainda não chegou']
       : x.status === 'before' ? ['antes do 1º uso']
       : [[x.habitAvg == null ? null : `hábitos ${fmtPct(x.habitAvg)}`, ms.study ? `estudo ${fmtMin(ms.study)}` : null],
-         [ms.goalsTotal ? `metas semanais ${ms.goalsDone}/${ms.goalsTotal}` : null, ms.mTotal ? `do mês ${ms.mDone}/${ms.mTotal}` : null]]
+         [ms.goalsTotal ? `metas semanais ${ms.goalsDone}/${ms.goalsTotal}` : null, ms.mTotal ? `do mês ${ms.mDone}/${ms.mTotal}` : null],
+         [goalsRatingAvg(S.months[monthKey(ys.y, x.m)]?.goals || []) != null ? `nota das metas ${fmtNum(+goalsRatingAvg(S.months[monthKey(ys.y, x.m)].goals).toFixed(1))}/5` : null]]
           .map((l) => l.filter(Boolean).join(' · ')).filter(Boolean);
     for (const t of lines.length ? lines : ['sem registros']) {
       const p = document.createElement('p');
@@ -3572,6 +4328,12 @@ function toggleTask(id) {
   }
   commit(renderTasks, renderProgress);
 }
+function toggleWeekly(id) {
+  const d = wday();
+  d.wk ||= [];
+  d.wk = d.wk.includes(id) ? d.wk.filter((x) => x !== id) : [...d.wk, id];
+  commit(renderTasks, renderProgress);
+}
 function setQty(id, v) {
   const d = wday();
   d.qty ||= {};
@@ -3604,7 +4366,17 @@ function setTaskDays(id, days) {
 function setTaskConfig(id, patch) {
   const t = S.tasks.find((x) => x.id === id);
   if (!t) return;
+  const wasWeekly = isWeekly(t);
   for (const [k, v] of Object.entries(patch)) { if (v == null) delete t[k]; else t[k] = v; }
+  // Mudou entre "dias fixos" e "N por semana": leva o histórico junto (senão a aderência some)
+  if (wasWeekly !== isWeekly(t)) {
+    for (const d of Object.values(S.days)) {
+      const from = isWeekly(t) ? 'done' : 'wk', to = isWeekly(t) ? 'wk' : 'done';
+      if (!d[from]?.includes(id)) continue;
+      d[from] = d[from].filter((x) => x !== id);
+      d[to] = [...new Set([...(d[to] || []), id])];
+    }
+  }
   resync();
   commit(renderTasks, renderProgress);
 }
@@ -3811,7 +4583,7 @@ $('#reset-day').onclick = (e) => {
   btn.textContent = 'Zerar dia';
   btn.classList.remove('text-rose-500');
   const d = wday();
-  d.done = []; d.qty = {};
+  d.done = []; d.qty = {}; d.wk = [];
   syncDay(selKey);
   commit(renderTasks, renderProgress);
 };
@@ -3835,6 +4607,25 @@ $('#topics-open').onclick = () => { $('#topics-search').value = ''; topicsFilter
 $('#topics-search').addEventListener('input', renderTopicsDialog);
 $('#topics-filter').onchange = (e) => { topicsFilter = e.target.value; renderTopicsDialog(); };
 $('#subjects-manage').onclick = () => { managingSubjects = !managingSubjects; subjectDrafts = null; renderSubjects(); };
+// Check-in
+$('#questions-manage').onclick = () => { managingQuestions = !managingQuestions; questionDrafts = null; renderCheckin(); };
+$('#tags-open').onclick = () => { renderTagsDialog(); $('#tags-dialog').showModal(); };
+['#one-input', '#win', '#improve'].forEach((id) => $(id).addEventListener('change', renderDayTags));
+
+// Projetos
+const projectForm = $('#project-form');
+$('#project-new').onclick = () => { projectForm.classList.toggle('hidden'); if (!projectForm.classList.contains('hidden')) $('#pf-name').focus(); };
+$('#pf-cancel').onclick = () => { projectForm.reset(); projectForm.classList.add('hidden'); };
+projectForm.onsubmit = (e) => {
+  e.preventDefault();
+  const name = $('#pf-name').value.trim();
+  if (!name) return;
+  addProject(name, $('#pf-due').value, $('#pf-miles').value);
+  projectForm.reset();
+  projectForm.classList.add('hidden');
+};
+$('#projects-closed').onclick = () => { showClosedProjects = !showClosedProjects; renderProjects(); };
+
 $('#study-fix').onsubmit = (e) => { e.preventDefault(); setStudyTotal(Number($('#study-total').value)); $('#study-total').blur(); };
 
 // Reflexão do mês
@@ -4089,6 +4880,7 @@ function renderAll(openReflection = true) {
   renderDayNav();
   renderSleep(); renderStudy(); renderReflection(); renderMonth(); renderReview(); renderSync();
   renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview(); renderSubjects(); renderLearning();
+  renderCheckin(); renderProjects();
   renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
