@@ -1393,13 +1393,25 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     check.onclick = onToggle;
   }
 
+  // Nome em cima (tem prioridade de espaço); vínculos e frequência numa linha menor embaixo
+  const textCol = document.createElement('span');
+  textCol.className = 'flex min-w-0 flex-1 flex-col';
   const label = document.createElement('span');
   label.textContent = title;
-  label.className = 'min-w-0 flex-1 select-none truncate text-sm transition ' +
+  label.title = title;
+  label.className = 'select-none break-words text-sm transition ' +
     (opts.off ? 'text-zinc-400 dark:text-zinc-500'
       : 'cursor-pointer ' + (on ? 'text-zinc-400 line-through decoration-zinc-400/50 dark:text-zinc-500' : ''));
   if (!opts.off) label.onclick = onToggle;
-  li.append(check, label);
+  textCol.append(label);
+  if (opts.badge) {
+    const b = document.createElement('span');
+    b.className = 'truncate text-[11px] text-zinc-500';
+    b.textContent = opts.badge;
+    b.title = opts.badge;
+    textCol.append(b);
+  }
+  li.append(check, textCol);
 
   if (opts.qty && !opts.off) {
     const q = opts.qty, box = document.createElement('span');
@@ -1413,17 +1425,18 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     inp.onchange = () => q.onSet(inp.value === '' ? 0 : Number(inp.value));
     inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); };
     const of = document.createElement('span');
-    of.textContent = `/ ${q.target}${q.unit ? ' ' + q.unit : ''}`;
+    of.textContent = `/ ${fmtNum(q.target)}${q.unit ? ' ' + q.unit : ''}`;
     box.append(inp, of);
+    if (q.value > q.target) {
+      const ex = document.createElement('span');
+      ex.className = 'font-medium text-emerald-600 dark:text-emerald-400';
+      ex.textContent = `+${fmtNum(+(q.value - q.target).toFixed(2))}`;
+      ex.title = 'Além da meta';
+      box.append(ex);
+    }
     li.append(box);
   }
 
-  if (opts.badge) {
-    const b = document.createElement('span');
-    b.className = 'shrink-0 text-[11px] text-zinc-500';
-    b.textContent = opts.badge;
-    li.append(b);
-  }
   if (opts.onEdit) {
     const ed = document.createElement('button');
     ed.className = ROW_BTN + (opts.editing ? ' !opacity-100 text-zinc-700 dark:text-zinc-200' : '');
@@ -1575,7 +1588,7 @@ function scheduleEditor(t) {
   const projs = S.projects.filter((p) => p.status !== 'done' || p.id === dr.projectId);
   const pBox = document.createElement('div');
   pBox.append(sectionLabel('Projeto que este hábito move',
-    projs.length ? 'Cada dia feito conta como avanço do projeto. Se o hábito for medido em "min", os minutos entram no tempo do projeto.'
+    projs.length ? 'Cada dia feito conta como avanço do projeto. Se o hábito for medido em min ou horas, o tempo entra no projeto (1 hora = 60 min).'
       : 'Crie um projeto no card "Projetos" para ligar este hábito a ele.'));
   const psel = document.createElement('select');
   psel.className = small + ' mt-1.5 w-full max-w-xs';
@@ -1586,7 +1599,7 @@ function scheduleEditor(t) {
   psel.disabled = !projs.length;
   psel.onchange = () => { dr.projectId = psel.value; renderTasks(); };
   pBox.append(psel);
-  const minUnit = !dr.weeklyMode && dr.qty && /^min/i.test(dr.unit.trim());
+  const minUnit = !dr.weeklyMode && dr.qty && minPerUnit(dr.unit) > 0;
   if (dr.projectId && !minUnit) {
     const r = document.createElement('label');
     r.className = 'mt-2 flex items-center gap-1.5 text-xs text-zinc-500';
@@ -1923,8 +1936,11 @@ function metricSeries(m) {
   return withHabitIncrements(m, out);
 }
 /** Quanto um hábito soma num dia: a quantidade feita (hábito de quantidade) ou 1 por vez. */
-function habitAmount(t, d) {
-  if (t.target) return d.qty?.[t.id] || 0;
+function habitAmount(t, d, m) {
+  if (t.target) {
+    const q = d.qty?.[t.id] || 0, a = minPerUnit(t.unit), b = minPerUnit(m?.unit);
+    return a && b ? (q * a) / b : q;   // hábito em horas → métrica em min (e vice-versa)
+  }
   return (d.done || []).includes(t.id) || (d.wk || []).includes(t.id) ? 1 : 0;
 }
 /** Incremento automático por dia dos hábitos com "Somar na métrica". */
@@ -1933,7 +1949,7 @@ function metricIncrements(m) {
   const inc = {};
   if (!linked.length) return inc;
   for (const [k, d] of Object.entries(S.days)) {
-    const v = linked.reduce((a, t) => a + habitAmount(t, d), 0);
+    const v = linked.reduce((a, t) => a + habitAmount(t, d, m), 0);
     if (v) inc[k] = v;
   }
   return inc;
@@ -3043,20 +3059,27 @@ const goalsRatingAvg = (goals) => { const r = goals.map((g) => g.rating).filter(
 // ---------- Projetos ----------
 let projectEditing = null, projectDraft = null, projectLogOpen = null, showClosedProjects = false, projectOpen = null;
 const projMin = (p, fromK = '0000', toK = '9999') => (p.log || []).filter((l) => l.k >= fromK && l.k <= toK).reduce((a, l) => a + (l.min || 0), 0);
-/** Hábitos ligados ao projeto: dias em que foram feitos e minutos (se o hábito é medido em min). */
+/** Minutos por unidade do hábito: min → 1, hora → 60; outras unidades não viram tempo. */
+function minPerUnit(unit) {
+  const u = (unit || '').trim().toLowerCase();
+  if (/^min/.test(u)) return 1;
+  if (/^(h|hr|hrs|hora|horas)\.?$/.test(u)) return 60;
+  return 0;
+}
+/** Hábitos ligados ao projeto: dias em que foram feitos e minutos (se o hábito é medido em min ou horas). */
 function projHabits(p, fromK = '0000', toK = '9999') {
   const linked = S.tasks.filter((t) => t.projectId === p.id);
   const res = { n: 0, min: 0, keys: [] };
   if (!linked.length) return res;
-  const inMin = (t) => /^min/i.test((t.unit || '').trim());
   for (const [k, d] of Object.entries(S.days)) {
     if (k < fromK || k > toK) continue;
     let hit = false;
     for (const t of linked) {
       const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
       const q = t.target ? d.qty?.[t.id] || 0 : 0;
-      if (done) { res.n++; hit = true; if (!inMin(t) && t.projectMin) res.min += t.projectMin; }
-      if (inMin(t) && q > 0) { res.min += q; hit = true; }
+      const f = t.target ? minPerUnit(t.unit) : 0;
+      if (done) { res.n++; hit = true; if (!f && t.projectMin) res.min += t.projectMin; }
+      if (f && q > 0) { res.min += Math.round(q * f); hit = true; }
     }
     if (hit) res.keys.push(k);
   }
@@ -3087,13 +3110,13 @@ function projectDaily(p) {
   for (const l of p.log || []) { const d = at(l.k); d.min += l.min || 0; d.log++; }
   for (const m of p.milestones || []) if (m.doneK) at(m.doneK).ms++;
   const linked = S.tasks.filter((t) => t.projectId === p.id);
-  const inMin = (t) => /^min/i.test((t.unit || '').trim());
   if (linked.length) for (const [k, d] of Object.entries(S.days)) {
     for (const t of linked) {
       const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
       const q = t.target ? d.qty?.[t.id] || 0 : 0;
-      if (done) { at(k).hab++; if (!inMin(t) && t.projectMin) at(k).min += t.projectMin; }
-      if (inMin(t) && q > 0) at(k).min += q;
+      const f = t.target ? minPerUnit(t.unit) : 0;
+      if (done) { at(k).hab++; if (!f && t.projectMin) at(k).min += t.projectMin; }
+      if (f && q > 0) at(k).min += Math.round(q * f);
     }
   }
   return out;
