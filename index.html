@@ -5020,23 +5020,47 @@ function renderMonthDetail() {
       `${t.title} — ${t.once >= tk && !wentPending(t) ? (peek(t.once)?.done?.includes(t.id) ? 'feita' : 'hoje') : !wentPending(t) ? 'feita no dia' : t.lateK ? `concluída ${daysBetween(t.once, t.lateK)} d depois` : t.dropK ? 'descartada' : 'pendente'}`]), ''));
   }
 
+  // Bloco com título e partes rotuladas; parte com lista (array) vira tópicos
+  const entryCard = (title, parts) => {
+    const card = el('div', 'rounded-lg border border-zinc-100 px-3 py-2.5 dark:border-zinc-800');
+    if (title) card.append(el('p', 'mb-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300', title));
+    const dl = el('dl', 'space-y-2.5');
+    for (const [label, text] of parts) {
+      const row = el('div');
+      row.append(el('dt', 'text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500', label));
+      if (Array.isArray(text)) {
+        const ul = el('ul', 'mt-0.5 list-disc space-y-0.5 pl-4 text-sm leading-relaxed marker:text-zinc-400');
+        for (const t of text) ul.append(el('li', 'whitespace-pre-wrap break-words', t));
+        row.append(ul);
+      } else row.append(el('dd', 'mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed', text));
+      dl.append(row);
+    }
+    card.append(dl);
+    return card;
+  };
+
   // Reflexões
   const sec8 = section('Reflexões');
   const R = S.months[mk]?.refl;
-  const reflLines = (r) => [r?.wins && `Conquistas: ${r.wins}`, r?.sins && `Onde pequei: ${r.sins}`, r?.better && `Onde melhorei: ${r.better}`,
-    r?.improve?.length && `Melhorar: ${r.improve.map((x) => (typeof x === 'string' ? x : x.text)).join('; ')}`].filter(Boolean);
-  sec8.append(el('p', 'mt-2 eyebrow', 'Do mês'), list(reflLines(R), 'Reflexão do mês ainda não escrita.'));
-  const wr = [];
+  const reflParts = (r) => [r?.wins?.trim() && ['Conquistas', r.wins.trim()], r?.sins?.trim() && ['Onde pequei', r.sins.trim()],
+    r?.better?.trim() && ['Onde melhorei', r.better.trim()],
+    r?.improve?.length && ['Melhorar', r.improve.map((x) => (typeof x === 'string' ? x : x.text)).filter(Boolean)]].filter(Boolean);
+  sec8.append(el('p', 'mt-2 eyebrow', 'Do mês'));
+  const mParts = reflParts(R);
+  sec8.append(mParts.length ? el('div', 'mt-2') : el('p', 'mt-1 text-xs text-zinc-500', 'Reflexão do mês ainda não escrita.'));
+  if (mParts.length) sec8.lastChild.append(entryCard('', mParts));
+  sec8.append(el('p', 'mt-4 eyebrow', 'Das semanas'));
+  const ww = el('div', 'mt-2 space-y-3');
   for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
     const W = S.weeks[keyOf(w)];
-    const lines = [...reflLines(W?.refl), W?.review && `Foco: ${W.review}`].filter(Boolean);
-    if (lines.length) wr.push([`sem. ${fmtShort.format(w).replace('.', '')}`, lines.join('\n')]);
+    const parts = [...reflParts(W?.refl), W?.review?.trim() && ['Foco da próxima semana', W.review.trim()]].filter(Boolean);
+    if (parts.length) ww.append(entryCard(`Semana de ${fmtShort.format(w).replace('.', '')} a ${fmtShort.format(addDays(w, 6)).replace('.', '')}`, parts));
   }
-  sec8.append(el('p', 'mt-3 eyebrow', 'Das semanas'), list(wr, 'Nenhuma revisão semanal escrita.'));
+  if (!ww.children.length) ww.append(el('p', 'text-xs text-zinc-500', 'Nenhuma revisão semanal escrita.'));
+  sec8.append(ww);
 
-  // Diário: tudo que foi escrito em cada dia
+  // Diário: tudo que foi escrito em cada dia (um bloco por dia, mais recente primeiro)
   const textQs = S.questions.filter((q) => q.type === 'text');
-  // Cada dia é um bloco: data em cima, cada item com rótulo próprio
   const diary = recs.map(([k, r]) => {
     const parts = [r.oneThing && ['One Thing', `${r.oneThing}${r.oneDone ? ' ✓' : ''}`], r.win && ['Vitória', r.win], r.improve && ['Melhorar', r.improve],
       ...textQs.map((q) => r.answers?.[q.id] && [q.text, r.answers[q.id]]),
@@ -5046,19 +5070,7 @@ function renderMonthDetail() {
   const sec9 = section('Diário', 'One Thing, reflexão noturna, respostas escritas e tags de cada dia · mais recente primeiro');
   const dw = el('div', 'mt-3 space-y-3');
   if (!diary.length) dw.append(el('p', 'text-xs text-zinc-500', 'Nada escrito nos dias deste mês.'));
-  for (const [k, parts] of diary) {
-    const card = el('div', 'rounded-lg border border-zinc-100 px-3 py-2.5 dark:border-zinc-800');
-    card.append(el('p', 'text-xs font-semibold text-zinc-700 dark:text-zinc-300', cap(dayLbl(k))));
-    const dl = el('dl', 'mt-2 space-y-2');
-    for (const [label, text] of parts) {
-      const row = el('div');
-      row.append(el('dt', 'text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500', label),
-                 el('dd', 'mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed', text));
-      dl.append(row);
-    }
-    card.append(dl);
-    dw.append(card);
-  }
+  for (const [k, parts] of diary) dw.append(entryCard(cap(dayLbl(k)), parts));
   sec9.append(dw);
 
   // Tags
