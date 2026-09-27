@@ -4194,7 +4194,8 @@ function renderContrib(ms) {
   const wrap = $('#contrib');
   wrap.replaceChildren();
   const grid = document.createElement('div');
-  grid.className = 'inline-grid items-center gap-1.5';
+  // p-1: espaço para o anel do dia de hoje (ring + offset) não ser cortado pela rolagem horizontal
+  grid.className = 'inline-grid items-center gap-1.5 p-1';
   grid.style.gridTemplateColumns = `28px repeat(${ms.weeks.length}, 32px)`;
   const tk = todayKey();
   const rowLabels = ['Seg', '', 'Qua', '', 'Sex', '', 'Dom'];
