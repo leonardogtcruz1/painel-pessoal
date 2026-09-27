@@ -908,7 +908,7 @@ function freshState() {
       { id: 'q-humor', text: 'Humor', type: 'scale' },
       { id: 'q-foco', text: 'Foco', type: 'scale' },
     ],
-    projects: [],   // { id, name, status: 'active'|'paused'|'done', created, due, milestones: [{ id, text, addedK, doneK }], log: [{ id, k, min, note }] }
+    projects: [],   // { id, name, status: 'active'|'paused'|'done', created, due, milestones: [{ id, text, addedK, doneK }], log: [{ id, k, min, note }] } — hábitos entram via task.projectId
     topics: [],     // tópicos aprendidos (revisão espaçada): { id, title, subjectId, grade, created, stage, due, mastered, reviews: [{ k, ok }] }
     settings: { theme: null, studyGoalH: 10 },
   };
@@ -1212,7 +1212,7 @@ function monthStats(y, m) {
 const fmtPct = (v) => `${Math.round(v * 100)}%`;
 const fmtMin = (m) => {
   const h = Math.floor(m / 60), r = m % 60;
-  return h ? (r ? `${h}h ${pad(r)}m` : `${h}h`) : `${r}m`;
+  return h ? (r ? `${h}h ${pad(r)}min` : `${h}h`) : `${r} min`;
 };
 const fmtSleep = (h) => {
   const whole = Math.floor(h), m = Math.round((h - whole) * 60);
@@ -1454,7 +1454,7 @@ function emptyRow(text) {
  */
 let taskDraft = null;
 function scheduleEditor(t) {
-  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '',
+  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '',
                                               weeklyMode: isWeekly(t), weekly: t.weekly || 3 };
   const dr = taskDraft;
   const wrapLi = document.createElement('li');
@@ -1559,6 +1559,22 @@ function scheduleEditor(t) {
   sel.onchange = () => { dr.metricId = sel.value; };
   mBox.append(sel);
 
+  // 4. Projeto
+  const projs = S.projects.filter((p) => p.status !== 'done' || p.id === dr.projectId);
+  const pBox = document.createElement('div');
+  pBox.append(sectionLabel('Projeto que este hábito move',
+    projs.length ? 'Cada dia feito conta como avanço do projeto. Se o hábito for medido em "min", os minutos entram no tempo do projeto.'
+      : 'Crie um projeto no card "Projetos" para ligar este hábito a ele.'));
+  const psel = document.createElement('select');
+  psel.className = small + ' mt-1.5 w-full max-w-xs';
+  psel.setAttribute('aria-label', 'Projeto que este hábito move');
+  psel.append(new Option('Nenhum', ''));
+  for (const p of projs) psel.append(new Option(p.name, p.id, false, dr.projectId === p.id));
+  psel.value = dr.projectId;
+  psel.disabled = !projs.length;
+  psel.onchange = () => { dr.projectId = psel.value; };
+  pBox.append(psel);
+
   // Ações
   const act = document.createElement('div');
   act.className = 'flex items-center justify-end gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800';
@@ -1574,12 +1590,12 @@ function scheduleEditor(t) {
     if (!dr.weeklyMode && dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 20).'; return; }
     taskDraft = null; editingTask = null;
     const qty = !dr.weeklyMode && dr.qty;
-    setTaskConfig(t.id, { target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null,
+    setTaskConfig(t.id, { target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
                           weekly: dr.weeklyMode ? dr.weekly : null, ...(dr.weeklyMode ? { days: null } : {}) });
   };
   act.append(err, cancel, saveBtn);
 
-  wrapLi.append(...(dr.weeklyMode ? [dBox, mBox, act] : [dBox, qBox, mBox, act]));
+  wrapLi.append(...(dr.weeklyMode ? [dBox, mBox, pBox, act] : [dBox, qBox, mBox, pBox, act]));
   return wrapLi;
 }
 
@@ -1594,8 +1610,10 @@ function renderTasks() {
   else if (!today.length && !weekly.length) ul.append(emptyRow(`Nenhum hábito previsto para ${isToday() ? 'hoje' : 'este dia'} — dia livre.`));
 
   const metricName = (t) => S.metrics.find((m) => m.id === t.metricId)?.name;
+  const projectName = (t) => S.projects.find((p) => p.id === t.projectId)?.name;
+  const links = (t) => [metricName(t), projectName(t)].filter(Boolean).map((n) => `→ ${n}`);
   const row = (t, isOff) => {
-    const badge = [schedLabel(t), metricName(t) ? `→ ${metricName(t)}` : ''].filter(Boolean).join(' · ');
+    const badge = [schedLabel(t), ...links(t)].filter(Boolean).join(' · ');
     ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
       badge, off: isOff, editing: editingTask === t.id,
       qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => setQty(t.id, v) } : null,
@@ -1615,7 +1633,7 @@ function renderTasks() {
     for (const t of weekly) {
       const n = weeklyCount(t, ws), hit = n >= t.weekly;
       ul.append(checkRow(t.title, (d.wk || []).includes(t.id), () => toggleWeekly(t.id), () => removeTask(t.id), undefined, {
-        badge: `${n}/${t.weekly} na semana${hit ? ' ✓' : ''}${S.metrics.find((m) => m.id === t.metricId) ? ` · → ${S.metrics.find((m) => m.id === t.metricId).name}` : ''}`,
+        badge: [`${n}/${t.weekly} na semana${hit ? ' ✓' : ''}`, ...links(t)].join(' · '),
         editing: editingTask === t.id,
         onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
       }));
@@ -1635,11 +1653,11 @@ function renderTasks() {
   }
   $('#task-count').textContent = today.length ? `${d.done.length}/${today.length}` : '';
   // Hábito que não move nenhum número é candidato a sair (ou a ganhar uma métrica)
-  const loose = S.metrics.length ? S.tasks.filter((t) => !t.metricId).length : 0;
+  const loose = S.metrics.length ? S.tasks.filter((t) => !t.metricId && !t.projectId).length : 0;
   if (loose) {
     const li = document.createElement('li');
     li.className = 'pt-2 text-xs text-zinc-500';
-    li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica de resultado — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
+    li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica nem projeto — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
     ul.append(li);
   }
 }
@@ -2960,13 +2978,34 @@ const goalsRatingAvg = (goals) => { const r = goals.map((g) => g.rating).filter(
 // ---------- Projetos ----------
 let projectEditing = null, projectDraft = null, projectLogOpen = null, showClosedProjects = false;
 const projMin = (p, fromK = '0000', toK = '9999') => (p.log || []).filter((l) => l.k >= fromK && l.k <= toK).reduce((a, l) => a + (l.min || 0), 0);
+/** Hábitos ligados ao projeto: dias em que foram feitos e minutos (se o hábito é medido em min). */
+function projHabits(p, fromK = '0000', toK = '9999') {
+  const linked = S.tasks.filter((t) => t.projectId === p.id);
+  const res = { n: 0, min: 0, keys: [] };
+  if (!linked.length) return res;
+  const inMin = (t) => /^min/i.test((t.unit || '').trim());
+  for (const [k, d] of Object.entries(S.days)) {
+    if (k < fromK || k > toK) continue;
+    let hit = false;
+    for (const t of linked) {
+      const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
+      const q = t.target ? d.qty?.[t.id] || 0 : 0;
+      if (done) { res.n++; hit = true; }
+      if (inMin(t) && q > 0) { res.min += q; hit = true; }
+    }
+    if (hit) res.keys.push(k);
+  }
+  return res;
+}
 function projectStats(p) {
   const ms = p.milestones || [], done = ms.filter((m) => m.doneK).length;
-  const acts = [...(p.log || []).map((l) => l.k), ...ms.filter((m) => m.doneK).map((m) => m.doneK)].sort();
-  const last = acts[acts.length - 1] || p.created;
   const tk = todayKey(), ws = keyOf(weekStart(new Date()));
+  const habAll = projHabits(p), habWeek = projHabits(p, ws, tk);
+  const acts = [...(p.log || []).map((l) => l.k), ...ms.filter((m) => m.doneK).map((m) => m.doneK), ...habAll.keys.filter((k) => k <= tk)].sort();
+  const last = acts[acts.length - 1] || p.created;
   const res = { total: ms.length, done, pct: ms.length ? done / ms.length : 0, last, idle: daysBetween(last, tk),
-                minAll: projMin(p), minWeek: projMin(p, ws, tk), next: ms.find((m) => !m.doneK) };
+                minAll: projMin(p) + habAll.min, minWeek: projMin(p, ws, tk) + habWeek.min, habWeek: habWeek.n,
+                habits: S.tasks.filter((t) => t.projectId === p.id), next: ms.find((m) => !m.doneK) };
   if (p.due && p.due > tk && done < ms.length) {
     const weeks = daysBetween(tk, p.due) / 7;
     res.perWeek = (ms.length - done) / weeks;
@@ -3047,6 +3086,12 @@ function renderProjects() {
     info.className = 'mt-1.5 text-xs text-zinc-500';
     info.textContent = `${fmtMin(st.minAll)} no total · ${fmtMin(st.minWeek)} esta semana`;
     card.append(info);
+    if (st.habits.length) {
+      const hb = document.createElement('p');
+      hb.className = 'mt-0.5 text-xs text-zinc-500';
+      hb.textContent = `Hábitos: ${st.habits.map((t) => t.title).join(', ')} · ${st.habWeek}× esta semana`;
+      card.append(hb);
+    }
     if (st.perWeek != null) {
       const pace = document.createElement('p');
       pace.className = 'mt-0.5 text-xs ' + (st.pace == null ? 'text-zinc-500' : st.onTrack ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400');
@@ -3225,7 +3270,12 @@ function logProject(pid, min, note) {
   commit(renderProjects);
 }
 function removeProjectLog(pid, lid) { const p = findProject(pid); if (!p) return; p.log = p.log.filter((x) => x.id !== lid); commit(renderProjects); }
-function removeProject(pid) { S.projects = S.projects.filter((p) => p.id !== pid); projectEditing = null; commit(renderProjects); }
+function removeProject(pid) {
+  S.projects = S.projects.filter((p) => p.id !== pid);
+  for (const t of S.tasks) if (t.projectId === pid) delete t.projectId;
+  projectEditing = null;
+  commit(renderProjects, renderTasks);
+}
 
 // ---------- Dia em edição ----------
 function renderDayNav() {
@@ -4327,7 +4377,7 @@ function renderTabs() {
    AÇÕES
    ========================================================= */
 function commit(...renders) { save(); renders.forEach((r) => r()); }
-const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); };
+const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); renderProjects(); };
 
 function toggleTask(id) {
   const d = wday();
@@ -4375,7 +4425,7 @@ function setTaskDays(id, days) {
   resync();
   commit(renderTasks, renderProgress);
 }
-/** patch: { target, unit, metricId } — null remove o campo. */
+/** patch: { target, unit, metricId, projectId } — null remove o campo. */
 function setTaskConfig(id, patch) {
   const t = S.tasks.find((x) => x.id === id);
   if (!t) return;
