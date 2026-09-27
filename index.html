@@ -2976,7 +2976,7 @@ function setGoalRating(mk, id, r) {
 const goalsRatingAvg = (goals) => { const r = goals.map((g) => g.rating).filter(Boolean); return r.length ? avg(r) : null; };
 
 // ---------- Projetos ----------
-let projectEditing = null, projectDraft = null, projectLogOpen = null, showClosedProjects = false;
+let projectEditing = null, projectDraft = null, projectLogOpen = null, showClosedProjects = false, projectOpen = null;
 const projMin = (p, fromK = '0000', toK = '9999') => (p.log || []).filter((l) => l.k >= fromK && l.k <= toK).reduce((a, l) => a + (l.min || 0), 0);
 /** Hábitos ligados ao projeto: dias em que foram feitos e minutos (se o hábito é medido em min). */
 function projHabits(p, fromK = '0000', toK = '9999') {
@@ -3014,6 +3014,133 @@ function projectStats(p) {
     if (age >= 1) { res.pace = done / age; res.onTrack = res.pace >= res.perWeek; }   // ritmo só depois de 1 semana
   }
   return res;
+}
+
+/** Contribuição dia a dia: { AAAA-MM-DD: { min, log, hab, ms } } — registros manuais, hábitos ligados e marcos. */
+function projectDaily(p) {
+  const out = {}, at = (k) => (out[k] ||= { min: 0, log: 0, hab: 0, ms: 0 });
+  for (const l of p.log || []) { const d = at(l.k); d.min += l.min || 0; d.log++; }
+  for (const m of p.milestones || []) if (m.doneK) at(m.doneK).ms++;
+  const linked = S.tasks.filter((t) => t.projectId === p.id);
+  const inMin = (t) => /^min/i.test((t.unit || '').trim());
+  if (linked.length) for (const [k, d] of Object.entries(S.days)) {
+    for (const t of linked) {
+      const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
+      const q = t.target ? d.qty?.[t.id] || 0 : 0;
+      if (done) at(k).hab++;
+      if (inMin(t) && q > 0) at(k).min += q;
+    }
+  }
+  return out;
+}
+
+/** Painel aberto ao clicar no projeto: quanto você contribuiu ao longo do tempo. */
+function projectDetail(p) {
+  const daily = projectDaily(p), tk = todayKey(), N = 12;
+  const box = document.createElement('div');
+  box.className = 'mt-4 space-y-4 border-t border-zinc-100 pt-4 dark:border-zinc-800';
+
+  // Semanas (segunda-feira), das últimas N até a atual
+  const w0 = weekStart(new Date());
+  const weeks = Array.from({ length: N }, (_, i) => ({ k: keyOf(addDays(w0, (i - N + 1) * 7)), min: 0, active: 0 }));
+  const byKey = Object.fromEntries(weeks.map((w) => [w.k, w]));
+  const actKeys = Object.keys(daily).filter((k) => k <= tk && Object.values(daily[k]).some((v) => v > 0)).sort();
+  for (const k of actKeys) {
+    const w = byKey[weekKey(parseKey(k))];
+    if (w) { w.min += daily[k].min; w.active++; }
+  }
+
+  // Números gerais
+  const totalMin = actKeys.reduce((a, k) => a + daily[k].min, 0);
+  const first = actKeys[0] || p.created;
+  const ageW = Math.max(1, Math.ceil((daysBetween(weekKey(parseKey(first)), tk) + 1) / 7));
+  const recent = weeks.slice(-Math.min(N, ageW));
+  const avgMin = recent.reduce((a, w) => a + w.min, 0) / recent.length;
+  let streak = 0;
+  for (let i = weeks.length - 1; i >= 0; i--) {
+    if (weeks[i].active) streak++;
+    else if (i === weeks.length - 1) continue;   // semana atual ainda em aberto não quebra a sequência
+    else break;
+  }
+  const best = weeks.reduce((a, w) => (w.min > a.min ? w : a), weeks[0]);
+  const habDays = actKeys.filter((k) => daily[k].hab).length;
+  const stat = (label, value, hint) => {
+    const d = document.createElement('div');
+    d.className = 'rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40';
+    d.innerHTML = '<p class="text-[11px] text-zinc-500"></p><p class="text-base font-semibold tabular-nums"></p><p class="text-[11px] text-zinc-500"></p>';
+    d.children[0].textContent = label; d.children[1].textContent = value; d.children[2].textContent = hint || '';
+    return d;
+  };
+  const grid = document.createElement('div');
+  grid.className = 'grid grid-cols-2 gap-2 sm:grid-cols-4';
+  grid.append(
+    stat('Tempo total', fmtMin(totalMin), `desde ${fmtShort.format(parseKey(first)).replace('.', '')}`),
+    stat('Média por semana', fmtMin(Math.round(avgMin)), `últimas ${recent.length} sem`),
+    stat('Dias com avanço', String(actKeys.length), habDays ? `${habDays} via hábitos` : ''),
+    stat('Semanas seguidas', String(streak), best.min ? `melhor: ${fmtMin(best.min)}` : ''),
+  );
+  box.append(grid);
+
+  // Gráfico de barras semanal
+  const bars = (title, key, max, fmt, color) => {
+    const wrap = document.createElement('div');
+    const h = document.createElement('p'); h.className = 'text-xs font-medium'; h.textContent = title;
+    const row = document.createElement('div');
+    row.className = 'mt-2 flex h-20 items-end gap-1';
+    for (const w of weeks) {
+      const col = document.createElement('div');
+      col.className = 'flex h-full flex-1 flex-col justify-end';
+      col.title = `Semana de ${fmtShort.format(parseKey(w.k)).replace('.', '')}: ${fmt(w[key])}`;
+      const b = document.createElement('div');
+      b.className = 'rounded-sm';
+      b.style.background = w[key] ? color : 'var(--c-grid)';
+      b.style.height = w[key] ? `${Math.max(6, (w[key] / max) * 100)}%` : '3px';
+      if (w.k === keyOf(w0)) b.style.opacity = '0.6';
+      col.append(b);
+      row.append(col);
+    }
+    const ax = document.createElement('div');
+    ax.className = 'mt-1 flex justify-between text-[10px] text-zinc-500';
+    ax.innerHTML = '<span></span><span>esta semana</span>';
+    ax.children[0].textContent = fmtShort.format(parseKey(weeks[0].k)).replace('.', '');
+    wrap.append(h, row, ax);
+    return wrap;
+  };
+  const charts = document.createElement('div');
+  charts.className = 'grid gap-4 sm:grid-cols-2';
+  charts.append(
+    bars('Tempo por semana', 'min', Math.max(1, ...weeks.map((w) => w.min)), fmtMin, 'var(--c-goal)'),
+    bars('Dias com avanço por semana', 'active', 7, (v) => `${v} ${v === 1 ? 'dia' : 'dias'}`, 'var(--c-habit)'),
+  );
+  box.append(charts);
+
+  // Histórico recente
+  const hist = document.createElement('div');
+  const hh = document.createElement('p'); hh.className = 'text-xs font-medium'; hh.textContent = 'Histórico';
+  const ul = document.createElement('ul');
+  ul.className = 'mt-1.5 space-y-1 text-xs';
+  const lines = actKeys.slice().reverse().slice(0, 8);
+  if (!lines.length) {
+    const li = document.createElement('li'); li.className = 'text-zinc-500';
+    li.textContent = 'Nada registrado ainda. Registre um avanço, conclua um marco ou ligue um hábito a este projeto (⚙ do hábito).';
+    ul.append(li);
+  }
+  for (const k of lines) {
+    const d = daily[k], parts = [];
+    if (d.min) parts.push(fmtMin(d.min));
+    if (d.ms) parts.push(`${d.ms} ${d.ms === 1 ? 'marco concluído' : 'marcos concluídos'}`);
+    if (d.hab) parts.push(`${d.hab} ${d.hab === 1 ? 'hábito' : 'hábitos'}`);
+    const notes = (p.log || []).filter((l) => l.k === k && l.note).map((l) => l.note);
+    const li = document.createElement('li');
+    li.className = 'flex gap-2';
+    li.innerHTML = '<span class="w-14 shrink-0 tabular-nums text-zinc-500"></span><span class="min-w-0"></span>';
+    li.children[0].textContent = fmtShort.format(parseKey(k)).replace('.', '');
+    li.children[1].textContent = [parts.join(' · '), ...notes].filter(Boolean).join(' — ');
+    ul.append(li);
+  }
+  hist.append(hh, ul);
+  box.append(hist);
+  return box;
 }
 
 /** Gráfico de progresso (burn-up): marcos concluídos acumulados × total de marcos, até o prazo. */
@@ -3058,12 +3185,16 @@ function renderProjects() {
   for (const p of shown) {
     const st = projectStats(p);
     const card = document.createElement('div');
-    card.className = 'rounded-xl border border-zinc-200 p-4 dark:border-zinc-800' + (p.status === 'done' ? ' opacity-70' : '');
+    card.className = 'rounded-xl border border-zinc-200 p-4 dark:border-zinc-800' + (p.status === 'done' ? ' opacity-70' : '') + (projectOpen === p.id ? ' sm:col-span-2' : '');
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     const nm = document.createElement('div');
     nm.className = 'min-w-0';
-    const n = document.createElement('p'); n.className = 'text-sm font-medium'; n.textContent = p.name;
+    const n = document.createElement('button');
+    n.className = 'text-left text-sm font-medium hover:underline';
+    n.textContent = `${p.name} ${projectOpen === p.id ? '▾' : '▸'}`;
+    n.setAttribute('aria-expanded', String(projectOpen === p.id));
+    n.onclick = () => { projectOpen = projectOpen === p.id ? null : p.id; renderProjects(); };
     const sub = document.createElement('p'); sub.className = 'text-xs text-zinc-500';
     sub.textContent = [p.status === 'paused' ? 'pausado' : p.status === 'done' ? 'concluído ✓' : '',
       p.due ? `prazo ${fmtShort.format(parseKey(p.due)).replace('.', '')}` : ''].filter(Boolean).join(' · ');
@@ -3092,6 +3223,7 @@ function renderProjects() {
       hb.textContent = `Hábitos: ${st.habits.map((t) => t.title).join(', ')} · ${st.habWeek}× esta semana`;
       card.append(hb);
     }
+    if (projectOpen === p.id) card.append(projectDetail(p));
     if (st.perWeek != null) {
       const pace = document.createElement('p');
       pace.className = 'mt-0.5 text-xs ' + (st.pace == null ? 'text-zinc-500' : st.onTrack ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400');
