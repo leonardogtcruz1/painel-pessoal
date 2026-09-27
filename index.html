@@ -333,7 +333,7 @@
           </div>
 
           <div class="mt-5 grid gap-6 sm:grid-cols-2 sm:gap-8">
-            <!-- Revisão espaçada + registro de aprendizado + timer compacto -->
+            <!-- Revisão espaçada + registro de aprendizado -->
             <div class="space-y-5">
               <div>
                 <div class="flex items-baseline justify-between">
@@ -355,21 +355,6 @@
                 <p class="text-[11px] leading-snug text-zinc-500">Vou te pedir para revisar em 1, 3, 7, 21 e 60 dias — é o que fixa na memória.</p>
               </form>
 
-              <div class="rounded-xl bg-zinc-50 px-3 py-2.5 dark:bg-zinc-800/40">
-                <div class="flex flex-wrap items-center gap-2">
-                  <div id="mode-toggle" class="inline-flex rounded-md bg-zinc-200/60 p-0.5 text-[11px] font-medium dark:bg-zinc-700/50">
-                    <button data-mode="25" class="rounded px-2 py-0.5 transition">25</button>
-                    <button data-mode="50" class="rounded px-2 py-0.5 transition">50</button>
-                  </div>
-                  <p id="timer-digits" class="text-lg font-semibold tabular-nums tracking-tight">25:00</p>
-                  <div class="ml-auto flex items-center gap-1">
-                    <button id="timer-main" class="btn-primary !px-2.5 !py-1 text-xs"></button>
-                    <button id="timer-stop" class="btn-ghost !px-2 !py-1 text-xs" title="Encerra e registra o tempo já estudado">Encerrar</button>
-                  </div>
-                </div>
-                <div class="track mt-2 !h-1"><div id="timer-bar" class="fill" style="width:0"></div></div>
-                <p id="timer-note" class="mt-1.5 min-h-[1rem] text-[11px] text-zinc-500"></p>
-              </div>
             </div>
 
             <!-- Meta, matéria, registro manual e distribuição -->
@@ -394,7 +379,7 @@
               <div>
                 <p class="eyebrow">Estudando agora</p>
                 <div id="subject-chips" class="mt-1.5 flex flex-wrap gap-1.5"></div>
-                <p class="mt-1.5 text-[11px] text-zinc-500">O timer e o registro manual vão para esta matéria.</p>
+                <p class="mt-1.5 text-[11px] text-zinc-500">O registro manual vai para esta matéria.</p>
               </div>
               <div>
                 <p class="eyebrow">Registro manual</p>
@@ -402,6 +387,8 @@
                   <button class="chip" data-add="15">+15m</button>
                   <button class="chip" data-add="30">+30m</button>
                   <button class="chip" data-add="60">+1h</button>
+                </div>
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
                   <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-15">−15m</button>
                   <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-30">−30m</button>
                   <button class="chip hover:!border-rose-400/60 hover:!text-rose-500" data-add="-60">−1h</button>
@@ -843,7 +830,6 @@ function freshState() {
     subjects: [],   // matérias: { id, name, goalH } — goalH = meta semanal em horas (opcional)
     topics: [],     // tópicos aprendidos (revisão espaçada): { id, title, subjectId, grade, created, stage, due, mastered, reviews: [{ k, ok }] }
     settings: { theme: null, studyGoalH: 10 },
-    timer: { mode: 25, status: 'idle', endAt: null, remaining: 25 * 60 },
   };
 }
 
@@ -852,7 +838,10 @@ function loadState() {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (s && s.version === 1) {
       const base = freshState();
-      return { ...base, ...s, settings: { ...base.settings, ...s.settings }, timer: { ...base.timer, ...s.timer } };
+      const st = { ...base, ...s, settings: { ...base.settings, ...s.settings } };
+      if (s.timer?.subject && !st.settings.studySubject) st.settings.studySubject = s.timer.subject;   // vinha do timer (removido)
+      delete st.timer;
+      return st;
     }
   } catch (e) {}
   return freshState();
@@ -2470,7 +2459,7 @@ function setStudyTotal(min) {
   const d = wday();
   d.studyMin = Math.min(1440, Math.round(min));
   fitStudyBy(d);
-  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights, renderSubjects);
+  commit(renderStudy, renderKPIs, renderMonth, renderReview, renderInsights, renderSubjects);
 }
 
 // ---------- Dia em edição ----------
@@ -2494,7 +2483,8 @@ function setSelDay(k) {
 
 // ---------- Matérias ----------
 const subjectName = (id) => S.subjects.find((x) => x.id === id)?.name || 'Sem matéria';
-const curSubject = () => (S.subjects.some((x) => x.id === S.timer.subject) ? S.timer.subject : null);
+/** Matéria selecionada em "Estudando agora" (fica só neste aparelho, como o tema). */
+const curSubject = () => (S.subjects.some((x) => x.id === S.settings.studySubject) ? S.settings.studySubject : null);
 /** Minutos por matéria entre duas datas. Chave '' = estudo sem matéria (ou de matéria apagada). */
 function subjectMinutes(fromK, toK) {
   const out = {}, known = new Set(S.subjects.map((x) => x.id));
@@ -2529,8 +2519,8 @@ function renderSubjects() {
     b.onclick = onclick;
     return b;
   };
-  for (const sub of S.subjects) chips.append(chip(sub.name, cur === sub.id, () => { S.timer.subject = sub.id; commit(renderSubjects); }));
-  if (S.subjects.length) chips.append(chip('Nenhuma', cur == null, () => { S.timer.subject = null; commit(renderSubjects); }));
+  for (const sub of S.subjects) chips.append(chip(sub.name, cur === sub.id, () => { S.settings.studySubject = sub.id; commit(renderSubjects); }));
+  if (S.subjects.length) chips.append(chip('Nenhuma', cur == null, () => { S.settings.studySubject = null; commit(renderSubjects); }));
   if (addingSubject) {
     const f = document.createElement('form');
     f.className = 'flex gap-1';
@@ -2651,7 +2641,7 @@ function addSubject(name) {
   if (!name) { renderSubjects(); return; }
   const sub = { id: uid(), name, goalH: null };
   S.subjects.push(sub);
-  S.timer.subject = sub.id;
+  S.settings.studySubject = sub.id;
   commit(renderSubjects, renderLearning);
 }
 
@@ -2839,56 +2829,6 @@ function renderTopicsDialog() {
     li.append(dots, body, rm);
     ul.append(li);
   }
-}
-
-// ---------- Pomodoro ----------
-function timerRemaining() {
-  const t = S.timer;
-  return t.status === 'running' ? Math.max(0, Math.ceil((t.endAt - Date.now()) / 1000)) : t.remaining;
-}
-function renderTimer() {
-  const t = S.timer, rem = timerRemaining(), total = t.mode * 60;
-  const txt = `${pad(Math.floor(rem / 60))}:${pad(rem % 60)}`;
-  $('#timer-digits').textContent = txt;
-  $('#timer-digits').classList.toggle('text-zinc-400', t.status === 'paused');
-  $('#timer-bar').style.width = `${((total - rem) / total) * 100}%`;
-  $('#timer-main').textContent = t.status === 'running' ? 'Pausar' : t.status === 'paused' ? 'Continuar' : 'Iniciar';
-  $('#timer-stop').disabled = t.status === 'idle';
-  $$('#mode-toggle button').forEach((b) => {
-    const on = Number(b.dataset.mode) === t.mode;
-    b.className = 'rounded px-2 py-0.5 transition ' +
-      (on ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200') +
-      (t.status !== 'idle' ? ' cursor-not-allowed' : '');
-  });
-  const d = day();
-  if (!$('#timer-note').dataset.flash) {
-    const sub = curSubject();
-    $('#timer-note').textContent = [sub ? `Matéria: ${subjectName(sub)}` : '',
-      d.sessions ? `${d.sessions} ${d.sessions === 1 ? 'sessão concluída' : 'sessões concluídas'} hoje` : ''].filter(Boolean).join(' · ');
-  }
-  document.title = t.status === 'running' ? `${txt} · Foco` : 'Painel Pessoal';
-}
-function flashNote(msg) {
-  const el = $('#timer-note');
-  el.dataset.flash = '1';
-  el.textContent = msg;
-  clearTimeout(flashNote.t);
-  flashNote.t = setTimeout(() => { delete el.dataset.flash; renderTimer(); }, 4000);
-}
-
-function beep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.25].forEach((delay, i) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sine'; o.frequency.value = i ? 880 : 660;
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
-      g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + delay + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.4);
-      o.connect(g).connect(ctx.destination);
-      o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + 0.45);
-    });
-  } catch (e) {}
 }
 
 // ---------- Visão mensal ----------
@@ -3753,9 +3693,9 @@ function setSleep(v) {
   d.sleep = v == null || isNaN(v) ? null : Math.min(16, Math.max(0, Math.round(v * 4) / 4));
   commit(renderSleep, renderInsights);
 }
-/** Registro manual vai para o dia em edição; o pomodoro sempre conta para hoje. */
-function addStudy(min, session = false, manual = false) {
-  const d = manual ? wday() : day();
+/** Registro manual de estudo no dia em edição, na matéria selecionada. */
+function addStudy(min) {
+  const d = wday();
   const before = d.studyMin;
   d.studyMin = Math.max(0, d.studyMin + min);
   const applied = d.studyMin - before;   // o que de fato entrou/saiu (não fica negativo)
@@ -3766,8 +3706,7 @@ function addStudy(min, session = false, manual = false) {
     if (!d.studyBy[sub]) delete d.studyBy[sub];
   }
   if (applied < 0) fitStudyBy(d);
-  if (session) d.sessions++;
-  commit(renderStudy, renderKPIs, renderTimer, renderMonth, renderReview, renderInsights, renderSubjects);
+  commit(renderStudy, renderKPIs, renderMonth, renderReview, renderInsights, renderSubjects);
 }
 /** Se o total ficou menor que a soma por matéria, reduz as matérias na mesma proporção. */
 function fitStudyBy(d) {
@@ -3777,27 +3716,6 @@ function fitStudyBy(d) {
   for (const k of Object.keys(by)) { by[k] = Math.round(by[k] * f); if (!by[k]) delete by[k]; }
 }
 
-const T = () => S.timer;
-function timerMain() {
-  const t = T();
-  if (t.status === 'running') { t.remaining = timerRemaining(); t.status = 'paused'; t.endAt = null; }
-  else { t.endAt = Date.now() + t.remaining * 1000; t.status = 'running'; }
-  commit(renderTimer);
-}
-function timerReset() { const t = T(); t.status = 'idle'; t.endAt = null; t.remaining = t.mode * 60; }
-function timerStop() {
-  const t = T(), mins = Math.floor((t.mode * 60 - timerRemaining()) / 60);
-  timerReset();
-  if (mins > 0) { addStudy(mins); flashNote(`+${fmtMin(mins)} registrados`); }
-  else { commit(renderTimer); flashNote('Menos de 1 min — nada registrado'); }
-}
-function timerComplete() {
-  const mode = T().mode;
-  timerReset();
-  addStudy(mode, true);
-  flashNote(`Sessão de ${mode} min concluída · +${mode} min de estudo`);
-  beep();
-}
 
 /* =========================================================
    EVENTOS
@@ -3904,7 +3822,7 @@ $$('[data-sleep]').forEach((b) => b.onclick = () => {
 });
 $('#sleep-input').addEventListener('change', (e) => setSleep(e.target.value === '' ? null : parseFloat(e.target.value)));
 
-$$('[data-add]').forEach((b) => b.onclick = () => addStudy(Number(b.dataset.add), false, true));
+$$('[data-add]').forEach((b) => b.onclick = () => addStudy(Number(b.dataset.add)));
 
 $('#learn-form').onsubmit = (e) => {
   e.preventDefault();
@@ -3958,15 +3876,6 @@ metricForm.onsubmit = (e) => {
   metricForm.classList.add('hidden');
 };
 
-$('#timer-main').onclick = timerMain;
-$('#timer-stop').onclick = timerStop;
-$$('#mode-toggle button').forEach((b) => b.onclick = () => {
-  const t = T();
-  if (t.status !== 'idle') return;
-  t.mode = Number(b.dataset.mode);
-  t.remaining = t.mode * 60;
-  commit(renderTimer);
-});
 
 let reflectTimer;
 ['win', 'improve'].forEach((id) => $('#' + id).addEventListener('input', (e) => {
@@ -4019,7 +3928,7 @@ let syncCfg = (() => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) |
 const saveSyncCfg = () => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg)); } catch (e) {} };
 let syncStatus = 'off', syncError = '', syncBusy = false, syncAgain = false, syncTimer;
 
-/** O que vai para o gist: tudo menos o timer e o tema (esses são por aparelho). */
+/** O que vai para o gist: tudo menos o tema e a matéria selecionada (esses são por aparelho). */
 function syncPayload() {
   const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
   return { version: 1, startDate: S.startDate, ...lists,
@@ -4164,7 +4073,7 @@ window.addEventListener('online', () => { if (syncStatus === 'error' || syncStat
 setInterval(() => { if (!document.hidden && syncCfg.token) syncNow(); }, 5 * 60 * 1000);
 
 /* =========================================================
-   CICLO DE VIDA — tick do timer + virada do dia à meia-noite
+   CICLO DE VIDA — virada do dia à meia-noite
    ========================================================= */
 let currentDay = todayKey();
 function rollDay() {
@@ -4178,7 +4087,7 @@ function renderAll(openReflection = true) {
   save();
   renderHeader(); renderQuote(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
   renderDayNav();
-  renderSleep(); renderStudy(); renderTimer(); renderReflection(); renderMonth(); renderReview(); renderSync();
+  renderSleep(); renderStudy(); renderReflection(); renderMonth(); renderReview(); renderSync();
   renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview(); renderSubjects(); renderLearning();
   renderTabs();
   // Reflexão abre sozinha à noite
@@ -4187,10 +4096,6 @@ function renderAll(openReflection = true) {
 
 setInterval(() => {
   if (todayKey() !== currentDay) rollDay();   // meia-noite: o dia anterior fica no histórico, hoje começa zerado
-  if (S.timer.status === 'running') {
-    if (timerRemaining() <= 0) timerComplete();
-    else renderTimer();
-  }
 }, 1000);
 
 document.addEventListener('visibilitychange', () => {
@@ -4201,8 +4106,6 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(renderHeader, 60000);
 
-// Se um pomodoro terminou com a aba fechada, registra ao abrir
-if (S.timer.status === 'running' && timerRemaining() <= 0) timerComplete();
 renderAll();
 if (syncCfg.token) syncNow();
 </script>
