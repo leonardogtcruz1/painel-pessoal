@@ -1335,7 +1335,11 @@ const fmtRange = (ws) => {
 /** Qual semana revisar automaticamente: a atual no domingo, a anterior na segunda. */
 function autoReviewWeek() {
   const now = new Date(), dow = now.getDay();
-  if (dow === 0) { const ws = weekStart(now); return S.weeks[keyOf(ws)]?.reviewDone ? null : ws; }
+  if (dow === 0) {
+    // Só aparece se você já usava o painel antes de hoje (evita revisão vazia no 1º dia)
+    const ws = weekStart(now);
+    return S.startDate < todayKey() && !S.weeks[keyOf(ws)]?.reviewDone ? ws : null;
+  }
   if (dow === 1) {
     const ws = addDays(weekStart(now), -7), wk = keyOf(ws);
     const hadData = [...Array(7)].some((_, i) => peek(keyOf(addDays(ws, i))));
