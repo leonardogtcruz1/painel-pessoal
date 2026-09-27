@@ -1454,7 +1454,7 @@ function emptyRow(text) {
  */
 let taskDraft = null;
 function scheduleEditor(t) {
-  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '',
+  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '', metricAdd: !!t.metricAdd, projectMin: t.projectMin || '',
                                               weeklyMode: isWeekly(t), weekly: t.weekly || 3 };
   const dr = taskDraft;
   const wrapLi = document.createElement('li');
@@ -1556,8 +1556,20 @@ function scheduleEditor(t) {
   for (const m of S.metrics) sel.append(new Option(m.name, m.id, false, dr.metricId === m.id));
   sel.value = dr.metricId;
   sel.disabled = !S.metrics.length;
-  sel.onchange = () => { dr.metricId = sel.value; };
+  sel.onchange = () => { dr.metricId = sel.value; renderTasks(); };
   mBox.append(sel);
+  if (dr.metricId) {
+    const qtyNow = !dr.weeklyMode && dr.qty;
+    const aRow = document.createElement('div');
+    aRow.className = 'mt-2 flex flex-wrap items-center gap-1.5';
+    aRow.append(chip('Só acompanhar', !dr.metricAdd, () => { dr.metricAdd = false; renderTasks(); }),
+                chip('Somar na métrica', dr.metricAdd, () => { dr.metricAdd = true; renderTasks(); }));
+    const h = document.createElement('p'); h.className = 'mt-1 text-[11px] leading-snug text-zinc-500';
+    h.textContent = dr.metricAdd
+      ? (qtyNow ? 'Cada dia soma a quantidade feita no valor da métrica (ex.: 20 pág → +20).' : 'Cada vez que marcar soma +1 no valor da métrica (ex.: treinos feitos).')
+      : 'O valor da métrica continua manual; o hábito só mostra quanto você cumpriu. Use para peso, patrimônio, carga…';
+    mBox.append(aRow, h);
+  }
 
   // 4. Projeto
   const projs = S.projects.filter((p) => p.status !== 'done' || p.id === dr.projectId);
@@ -1572,8 +1584,20 @@ function scheduleEditor(t) {
   for (const p of projs) psel.append(new Option(p.name, p.id, false, dr.projectId === p.id));
   psel.value = dr.projectId;
   psel.disabled = !projs.length;
-  psel.onchange = () => { dr.projectId = psel.value; };
+  psel.onchange = () => { dr.projectId = psel.value; renderTasks(); };
   pBox.append(psel);
+  const minUnit = !dr.weeklyMode && dr.qty && /^min/i.test(dr.unit.trim());
+  if (dr.projectId && !minUnit) {
+    const r = document.createElement('label');
+    r.className = 'mt-2 flex items-center gap-1.5 text-xs text-zinc-500';
+    const pm = document.createElement('input');
+    pm.type = 'number'; pm.min = '0'; pm.step = '1'; pm.inputMode = 'numeric';
+    pm.value = dr.projectMin; pm.placeholder = '30';
+    pm.className = small + ' w-20';
+    pm.oninput = () => { dr.projectMin = pm.value; };
+    r.append('Cada vez vale', pm, 'min no projeto (opcional)');
+    pBox.append(r);
+  }
 
   // Ações
   const act = document.createElement('div');
@@ -1591,6 +1615,7 @@ function scheduleEditor(t) {
     taskDraft = null; editingTask = null;
     const qty = !dr.weeklyMode && dr.qty;
     setTaskConfig(t.id, { target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
+                          metricAdd: dr.metricId && dr.metricAdd ? true : null, projectMin: dr.projectId && Number(dr.projectMin) > 0 ? Math.round(Number(dr.projectMin)) : null,
                           weekly: dr.weeklyMode ? dr.weekly : null, ...(dr.weeklyMode ? { days: null } : {}) });
   };
   act.append(err, cancel, saveBtn);
@@ -1889,10 +1914,49 @@ function migrateMetrics() {
  */
 function metricSeries(m) {
   const e = metricEntries(m);
-  if (m.start == null) return e;
-  const base = [m.startKey, m.start];
-  const at = e.findIndex(([k]) => k >= m.startKey);   // início vem antes dos registros do mesmo dia
-  return at === -1 ? [...e, base] : [...e.slice(0, at), base, ...e.slice(at)];
+  let out = e;
+  if (m.start != null) {
+    const base = [m.startKey, m.start];
+    const at = e.findIndex(([k]) => k >= m.startKey);   // início vem antes dos registros do mesmo dia
+    out = at === -1 ? [...e, base] : [...e.slice(0, at), base, ...e.slice(at)];
+  }
+  return withHabitIncrements(m, out);
+}
+/** Quanto um hábito soma num dia: a quantidade feita (hábito de quantidade) ou 1 por vez. */
+function habitAmount(t, d) {
+  if (t.target) return d.qty?.[t.id] || 0;
+  return (d.done || []).includes(t.id) || (d.wk || []).includes(t.id) ? 1 : 0;
+}
+/** Incremento automático por dia dos hábitos com "Somar na métrica". */
+function metricIncrements(m) {
+  const linked = S.tasks.filter((t) => t.metricId === m.id && t.metricAdd);
+  const inc = {};
+  if (!linked.length) return inc;
+  for (const [k, d] of Object.entries(S.days)) {
+    const v = linked.reduce((a, t) => a + habitAmount(t, d), 0);
+    if (v) inc[k] = v;
+  }
+  return inc;
+}
+/**
+ * Soma os hábitos à série: o valor de cada dia é o último registro manual (ou o início)
+ * mais o que os hábitos somaram depois dele. Um registro manual vale como o total do dia.
+ */
+function withHabitIncrements(m, series) {
+  const inc = metricIncrements(m);
+  const incKeys = Object.keys(inc);
+  if (!incKeys.length) return series;
+  const manual = new Map(series), startK = m.start != null ? m.startKey : series[0]?.[0];
+  const keys = [...new Set([...series.map(([k]) => k), ...incKeys.filter((k) => !startK || k >= startK)])].sort();
+  const out = [];
+  let cur = null;
+  for (const k of keys) {
+    if (m.start != null && k === m.startKey && !m.entries?.[k]) { cur = m.start + (inc[k] || 0); }
+    else if (manual.has(k)) cur = manual.get(k);
+    else cur = (cur ?? 0) + inc[k];
+    out.push([k, cur]);
+  }
+  return out;
 }
 function metricStats(m) {
   const e = metricSeries(m);
@@ -2082,7 +2146,8 @@ function renderMetrics() {
       const from = keyOf(addDays(new Date(), -6));
       lk.textContent = 'Movida por: ' + linked.map((t) => {
         const a = taskAdherence(t, from, tk);
-        return a == null ? t.title : `${t.title} ${fmtPct(a)}`;
+        const name = t.metricAdd ? `${t.title} (soma)` : t.title;
+        return a == null ? name : `${name} ${fmtPct(a)}`;
       }).join(' · ') + ' (7 dias)';
     } else {
       lk.textContent = 'Nenhum hábito ligado — no ⚙ de um hábito, escolha “Move a métrica”.';
@@ -2990,7 +3055,7 @@ function projHabits(p, fromK = '0000', toK = '9999') {
     for (const t of linked) {
       const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
       const q = t.target ? d.qty?.[t.id] || 0 : 0;
-      if (done) { res.n++; hit = true; }
+      if (done) { res.n++; hit = true; if (!inMin(t) && t.projectMin) res.min += t.projectMin; }
       if (inMin(t) && q > 0) { res.min += q; hit = true; }
     }
     if (hit) res.keys.push(k);
@@ -3027,7 +3092,7 @@ function projectDaily(p) {
     for (const t of linked) {
       const done = (d.done || []).includes(t.id) || (d.wk || []).includes(t.id);
       const q = t.target ? d.qty?.[t.id] || 0 : 0;
-      if (done) at(k).hab++;
+      if (done) { at(k).hab++; if (!inMin(t) && t.projectMin) at(k).min += t.projectMin; }
       if (inMin(t) && q > 0) at(k).min += q;
     }
   }
@@ -3404,7 +3469,7 @@ function logProject(pid, min, note) {
 function removeProjectLog(pid, lid) { const p = findProject(pid); if (!p) return; p.log = p.log.filter((x) => x.id !== lid); commit(renderProjects); }
 function removeProject(pid) {
   S.projects = S.projects.filter((p) => p.id !== pid);
-  for (const t of S.tasks) if (t.projectId === pid) delete t.projectId;
+  for (const t of S.tasks) if (t.projectId === pid) { delete t.projectId; delete t.projectMin; }
   projectEditing = null;
   commit(renderProjects, renderTasks);
 }
@@ -3970,7 +4035,7 @@ function renderReview() {
     li.className = 'flex items-baseline justify-between gap-3';
     const n = document.createElement('span'); n.className = 'text-zinc-600 dark:text-zinc-400'; n.textContent = m.name;
     const v = document.createElement('span'); v.className = 'font-medium tabular-nums';
-    const loggedThisWeek = Object.keys(m.entries || {}).some((k) => k >= keyOf(ws) && k <= endK);
+    const loggedThisWeek = [...Object.keys(m.entries || {}), ...Object.keys(metricIncrements(m))].some((k) => k >= keyOf(ws) && k <= endK);
     if (!loggedThisWeek) { v.textContent = `${fmtVal(m, now)} · sem registro nesta semana`; v.className += ' text-amber-600 dark:text-amber-400'; }
     else if (before == null || before === now) v.textContent = before == null ? fmtVal(m, now) : `${fmtVal(m, now)} · sem mudança`;
     else {
@@ -4557,7 +4622,7 @@ function setTaskDays(id, days) {
   resync();
   commit(renderTasks, renderProgress);
 }
-/** patch: { target, unit, metricId, projectId } — null remove o campo. */
+/** patch: { target, unit, metricId, projectId, metricAdd, projectMin } — null remove o campo. */
 function setTaskConfig(id, patch) {
   const t = S.tasks.find((x) => x.id === id);
   if (!t) return;
@@ -4607,7 +4672,7 @@ function removeMetricEntry(id, k) {
 }
 function removeMetric(id) {
   S.metrics = S.metrics.filter((m) => m.id !== id);
-  for (const t of S.tasks) if (t.metricId === id) delete t.metricId;
+  for (const t of S.tasks) if (t.metricId === id) { delete t.metricId; delete t.metricAdd; }
   editingMetric = null;
   commit(renderMetrics, renderTasks, renderReview, renderInsights);
 }
