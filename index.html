@@ -43,6 +43,16 @@
       .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-500; }
     }
     html { -webkit-font-smoothing: antialiased; }
+    /* Modo público: desfoca números e textos pessoais (hábitos e navegação continuam visíveis) */
+    html.private :is(#metric-list, #rv-metrics, #rv-wins, #rv-improves, #rv-refl, #mr-refl, #mr-stats, #journal-list,
+      #win, #improve, #insight-list, #month-detail, #checkin textarea, #checkin input, #checkin-summary, #project-list .text-xs) {
+      filter: blur(10px);
+      user-select: none;
+      transition: filter 0.15s;
+    }
+    html.private #private-toggle { color: #f59e0b; }
+    html.private .private-off { display: none; }
+    html.private .private-on { display: block; }
     /* Dia antes do 1º uso do painel: X, fora de qualquer cálculo */
     .day-x {
       background:
@@ -91,6 +101,10 @@
       <button id="sync-btn" class="btn-ghost relative" aria-label="Sincronização entre aparelhos" title="Sincronização">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
         <span id="sync-dot" class="absolute right-1.5 top-1.5 hidden h-1.5 w-1.5 rounded-full"></span>
+      </button>
+      <button id="private-toggle" class="btn-ghost" aria-pressed="false" aria-label="Ocultar informações" title="Ocultar números e textos pessoais (modo público)">
+        <svg class="private-off h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="private-on hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.2 3.3M6.6 6.6A17 17 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>
       </button>
       <button id="theme-toggle" class="btn-ghost" aria-label="Alternar tema claro/escuro">
         <svg class="h-4 w-4 dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -5314,6 +5328,16 @@ function fitStudyBy(d) {
 /* =========================================================
    EVENTOS
    ========================================================= */
+// Modo público: fica só neste aparelho
+const setPrivate = (on) => {
+  document.documentElement.classList.toggle('private', on);
+  $('#private-toggle').setAttribute('aria-pressed', String(on));
+  $('#private-toggle').setAttribute('aria-label', on ? 'Mostrar informações' : 'Ocultar informações');
+  try { localStorage.setItem('evolution-private', on ? '1' : ''); } catch (e) {}
+};
+try { setPrivate(localStorage.getItem('evolution-private') === '1'); } catch (e) {}
+$('#private-toggle').onclick = () => setPrivate(!document.documentElement.classList.contains('private'));
+
 $('#theme-toggle').onclick = () => {
   const dark = document.documentElement.classList.toggle('dark');
   S.settings.theme = dark ? 'dark' : 'light';
