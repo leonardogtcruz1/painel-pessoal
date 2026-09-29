@@ -2165,6 +2165,11 @@ function metricIncrements(m) {
   const linked = S.tasks.filter((t) => t.metricId === m.id && t.metricAdd);
   const qs = S.questions.filter((q) => q.type === 'number' && q.metricId === m.id);
   const inc = {};
+  // Contador diário (ex.: dias na Irlanda): +1 em cada dia depois de `dailyFrom`, até hoje
+  if (m.dailyFrom) {
+    const tk = todayKey();
+    for (let d = addDays(parseKey(m.dailyFrom), 1); keyOf(d) <= tk; d = addDays(d, 1)) inc[keyOf(d)] = 1;
+  }
   if (!linked.length && !qs.length) return inc;
   for (const [k, d] of Object.entries(S.days)) {
     const v = linked.reduce((a, t) => a + habitAmount(t, d, m), 0)
@@ -2377,7 +2382,9 @@ function renderMetrics() {
     const linked = S.tasks.filter((t) => t.metricId === m.id);
     const lk = document.createElement('p');
     lk.className = 'mt-2 text-xs text-zinc-500';
-    if (linked.length) {
+    if (m.dailyFrom) {
+      lk.textContent = 'Conta sozinha: +1 por dia' + (linked.length ? ` · movida também por ${linked.map((t) => t.title).join(', ')}` : '');
+    } else if (linked.length) {
       const from = keyOf(addDays(new Date(), -6));
       lk.textContent = 'Movida por: ' + linked.map((t) => {
         const a = taskAdherence(t, from, tk);
@@ -2425,7 +2432,7 @@ let metricDraft = null;
 function metricEditor(m, st) {
   if (metricDraft?.id !== m.id) {
     metricDraft = { id: m.id, name: m.name, unit: m.unit || '', start: m.start ?? '', startKey: m.startKey || todayKey(),
-                    target: m.target ?? '', deadline: m.deadline || '' };
+                    target: m.target ?? '', deadline: m.deadline || '', daily: !!m.dailyFrom };
   }
   const dr = metricDraft;
   const box = document.createElement('div');
@@ -2451,6 +2458,14 @@ function metricEditor(m, st) {
     field('Data do início', 'startKey', { type: 'date', max: todayKey() }),
     field('Meta', 'target', { type: 'number', step: 'any' }),
     field('Prazo', 'deadline', { type: 'date' }));
+  const dl = document.createElement('label');
+  dl.className = 'flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400';
+  const dc = document.createElement('input');
+  dc.type = 'checkbox'; dc.checked = dr.daily; dc.className = 'mt-0.5 accent-emerald-600';
+  dc.onchange = () => { dr.daily = dc.checked; };
+  const dt = document.createElement('span');
+  dt.innerHTML = '<span class="font-medium text-zinc-800 dark:text-zinc-200">Contador diário</span> — soma +1 sozinho a cada dia (ex.: dias na Irlanda, dias sem fumar). Desmarque para pausar: o valor fica congelado.';
+  dl.append(dc, dt);
   const act = document.createElement('div');
   act.className = 'flex items-center justify-end gap-2';
   const err = document.createElement('span');
@@ -2466,11 +2481,23 @@ function metricEditor(m, st) {
     if (dr.start === '' || !Number.isFinite(start)) { err.textContent = 'Informe o valor inicial.'; return; }
     if (target != null && !Number.isFinite(target)) { err.textContent = 'Meta inválida.'; return; }
     metricDraft = null; editingMetric = null;
-    updateMetric(m.id, { name: dr.name.trim(), unit: dr.unit.trim() || null, start, startKey: dr.startKey || todayKey(),
-                         target, deadline: dr.deadline || null });
+    const tk = todayKey(), patch = { name: dr.name.trim(), unit: dr.unit.trim() || null, start, startKey: dr.startKey || tk,
+                                     target, deadline: dr.deadline || null };
+    if (dr.daily && !m.dailyFrom) {
+      // Começa a contar a partir do último valor registrado (o dia seguinte já soma +1)
+      const last = metricSeries(m).filter(([k]) => k <= tk).pop();
+      patch.dailyFrom = last ? last[0] : patch.startKey;
+    }
+    if (!dr.daily && m.dailyFrom) {
+      // Pausa: congela o valor de hoje como registro manual
+      const cur = metricAt(m, tk);
+      if (cur != null) patch.entries = { ...m.entries, [tk]: cur };
+      patch.dailyFrom = null;
+    }
+    updateMetric(m.id, patch);
   };
   act.append(err, close, saveBtn);
-  box.append(grid, act);
+  box.append(grid, dl, act);
 
   const e = metricEntries(m);
   if (e.length) {
