@@ -1113,6 +1113,10 @@ function syncDay(k = todayKey()) {
     if (full && !has) d.done.push(t.id);
     if (!full && has) d.done = d.done.filter((x) => x !== t.id);
   }
+  // Meio feito: só hábitos de marcar previstos no dia e ainda não completos
+  const qtyIds = new Set(list.filter((t) => t.target || t.sleep || t.checkin).map((t) => t.id));
+  d.half = (d.half || []).filter((id) => ids.has(id) && !qtyIds.has(id) && !d.done.includes(id));
+  if (!d.half.length) delete d.half;
   d.total = ids.size;
 }
 const syncToday = () => syncDay();
@@ -1140,6 +1144,7 @@ function dayScore(d) {
   const done = new Set(d.done);
   let s = done.size;
   for (const [id, v] of Object.entries(d.qty || {})) if (!done.has(id) && d.tgt?.[id]) s += Math.min(1, v / d.tgt[id]);
+  for (const id of d.half || []) if (!done.has(id)) s += 0.5;   // hábito de marcar feito pela metade
   return Math.min(s, d.total) / d.total;
 }
 /** Minutos que um hábito vale num dia: pela unidade (min/hora) ou "cada vez vale X min" (`t.projectMin`). */
@@ -1177,6 +1182,7 @@ function habitDone(rec, id) {
     return qs.length ? qs.filter((q) => rec.answers?.[q.id] != null && rec.answers[q.id] !== '').length / qs.length : 0;
   }
   if (rec.done.includes(id) || rec.wk?.includes(id)) return 1;
+  if (rec.half?.includes(id)) return 0.5;
   const v = rec.qty?.[id], t = rec.tgt?.[id];
   return v && t ? Math.min(1, v / t) : 0;
 }
@@ -1317,9 +1323,16 @@ const fmtSleep = (h) => {
    ========================================================= */
 const CHECK_SVG = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
-function paintCheck(el, on, tone) {
+const PARTIAL_SVG = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6.5 12h11"/></svg>';
+/** `partial` = feito em parte (quantidade abaixo da meta): caixa amarela com traço. */
+function paintCheck(el, on, tone, partial = false) {
   el.setAttribute('role', 'checkbox');
-  el.setAttribute('aria-checked', String(on));
+  el.setAttribute('aria-checked', on ? 'true' : partial ? 'mixed' : 'false');
+  if (!on && partial) {
+    el.className = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-amber-400 bg-amber-400 text-white transition hover:border-amber-500 dark:border-amber-500 dark:bg-amber-500';
+    el.innerHTML = PARTIAL_SVG;
+    return;
+  }
   const onCls = tone === 'goal' ? 'border-[color:var(--c-goal)] bg-[color:var(--c-goal)] text-white'
     : tone === 'month' ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
     : 'border-emerald-500 bg-emerald-500 text-white';
@@ -1469,6 +1482,7 @@ const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover
  * Linha de lista com checkbox + remover (hábitos e metas).
  * opts: { badge, onEdit, editing, off, qty } — `off` = hábito fora do dia (sem checkbox);
  * `qty` = { value, target, unit, onSet } para hábitos com quantidade (mostra 14/20 pág).
+ * `partial` = feito em parte → caixa amarela.
  */
 function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   const li = document.createElement('li');
@@ -1481,7 +1495,7 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     check.textContent = '–';
   } else {
     check = document.createElement('button');
-    paintCheck(check, on, tone);
+    paintCheck(check, on, tone, opts.partial);
     check.setAttribute('aria-label', title);
     check.onclick = onToggle;
   }
@@ -1772,8 +1786,9 @@ function renderTasks() {
   const links = (t) => [metricName(t), projectName(t)].filter(Boolean).map((n) => `→ ${n}`);
   const row = (t, isOff) => {
     const badge = [schedLabel(t), t.sleep ? 'vem do card Sono' : '', t.checkin ? `vem do Check-in · ${d.qty?.[t.id] || 0}/${checkinQs().length}` : '', ...links(t)].filter(Boolean).join(' · ');
+    const frac = habitDone(d, t.id);
     ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
-      badge, off: isOff, editing: editingTask === t.id,
+      badge, off: isOff, editing: editingTask === t.id, partial: frac > 0 && frac < 1,
       qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => (t.sleep ? setSleep(v) : setQty(t.id, v)) } : null,
       onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
     }));
@@ -5164,7 +5179,12 @@ function toggleTask(id) {
     d.qty[id] = d.done.includes(id) ? 0 : t.target;   // marcar = meta cheia; desmarcar = zero
     syncDay(selKey);
   } else {
-    d.done = d.done.includes(id) ? d.done.filter((x) => x !== id) : [...d.done, id];
+    // Hábito de marcar: vazio → meio feito (amarelo, 50%) → feito → vazio
+    const half = d.half?.includes(id);
+    if (d.done.includes(id)) d.done = d.done.filter((x) => x !== id);
+    else if (half) { d.half = d.half.filter((x) => x !== id); d.done = [...d.done, id]; }
+    else d.half = [...(d.half || []), id];
+    if (!d.half?.length) delete d.half;
   }
   commit(renderTasks, renderProgress);
 }
@@ -5460,7 +5480,7 @@ $('#reset-day').onclick = (e) => {
   btn.textContent = 'Zerar dia';
   btn.classList.remove('text-rose-500');
   const d = wday();
-  d.done = []; d.qty = {}; d.wk = [];
+  d.done = []; d.qty = {}; d.wk = []; delete d.half;
   syncDay(selKey);
   commit(renderTasks, renderProgress);
 };
