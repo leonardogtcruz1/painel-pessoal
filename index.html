@@ -4086,11 +4086,12 @@ function renderLearning() {
   for (const t of due.slice(0, 6)) {
     const li = document.createElement('li');
     li.className = 'rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800';
+    // Coluna estreita: título e detalhes em cima, botões numa linha própria embaixo
     const top = document.createElement('div');
-    top.className = 'flex items-start justify-between gap-2';
+    top.className = 'space-y-2';
     const body = document.createElement('div');
     body.className = 'min-w-0';
-    const title = document.createElement('p'); title.className = 'text-sm font-medium'; title.textContent = t.title;
+    const title = document.createElement('p'); title.className = 'break-words text-sm font-medium'; title.textContent = t.title;
     const meta = document.createElement('p'); meta.className = 'text-[11px] text-zinc-500';
     const late = daysBetween(t.due, tk);
     meta.textContent = [subjectName(t.subjectId), `revisão ${t.stage + 1} de ${INTERVALS.length}`,
@@ -4098,7 +4099,7 @@ function renderLearning() {
     if (late > 0) meta.className = 'text-[11px] text-amber-600 dark:text-amber-400';
     body.append(title, meta);
     const btns = document.createElement('div');
-    btns.className = 'flex shrink-0 gap-1';
+    btns.className = 'grid grid-cols-2 gap-1.5';
     const yes = document.createElement('button');
     yes.className = 'rounded-md border border-emerald-500/40 px-2 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-500/10 dark:text-emerald-400';
     yes.textContent = 'Lembrei'; yes.title = `Próxima revisão em ${INTERVALS[t.stage + 1] ?? '—'} dias`;
