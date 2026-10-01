@@ -2127,8 +2127,36 @@ function renderStudyTrend() {
 
 // ---------- Métricas de resultado ----------
 const fmtNum = (v) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v);
-const fmtVal = (m, v) => `${fmtNum(v)}${m.unit ? ' ' + m.unit : ''}`;
-const signed = (m, v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${fmtVal(m, Math.abs(v))}`;
+/*
+ * Valores em dinheiro (métrica ou pergunta com unidade R$, $, €…) podem ser ocultados com o olhinho:
+ * viram "****". Fica só neste aparelho.
+ */
+const isMoneyUnit = (u) => /^(r\$|us\$|\$|€|£|brl|usd|eur|reais?|d[oó]lar(es)?|euros?)$/i.test((u || '').trim());
+let moneyHidden = false;
+try { moneyHidden = localStorage.getItem('evolution-money-hidden') === '1'; } catch (e) {}
+const maskMoney = (u) => moneyHidden && isMoneyUnit(u);
+/** Número de uma métrica/unidade, mascarado se for dinheiro oculto. */
+const fmtAmt = (u, v) => (maskMoney(u) ? '****' : fmtNum(v));
+const fmtVal = (m, v) => `${fmtAmt(m.unit, v)}${m.unit ? ' ' + m.unit : ''}`;
+function toggleMoney() {
+  moneyHidden = !moneyHidden;
+  try { localStorage.setItem('evolution-money-hidden', moneyHidden ? '1' : ''); } catch (e) {}
+  renderMetrics(); renderReview(); renderInsights(); renderCheckin(); renderMonthDetail();
+}
+const EYE_OPEN = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_SHUT = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.2 3.3M6.6 6.6A17 17 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>';
+/** Botão de olhinho para valores em dinheiro. */
+function moneyEye() {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'inline-flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200';
+  b.innerHTML = moneyHidden ? EYE_SHUT : EYE_OPEN;
+  b.setAttribute('aria-label', moneyHidden ? 'Mostrar valores em dinheiro' : 'Ocultar valores em dinheiro');
+  b.title = b.getAttribute('aria-label');
+  b.onclick = (e) => { e.stopPropagation(); toggleMoney(); };
+  return b;
+}
+const signed = (m, v) => (maskMoney(m.unit) ? `±${fmtVal(m, 0)}` : `${v > 0 ? '+' : v < 0 ? '−' : '±'}${fmtVal(m, Math.abs(v))}`);
 const daysBetween = (a, b) => Math.round((parseKey(b) - parseKey(a)) / 864e5);
 const metricEntries = (m) => Object.entries(m.entries || {}).sort(([a], [b]) => (a < b ? -1 : 1));
 /** Último valor registrado até a data `k` (inclusive). */
@@ -2346,9 +2374,11 @@ function renderMetrics() {
       v.className = 'text-2xl font-semibold tabular-nums tracking-tight';
       v.textContent = fmtVal(m, st.cur);
       big.append(v);
+      if (isMoneyUnit(m.unit)) big.append(moneyEye());
       if (st.e.length > 1) {
         const dl = document.createElement('span');
-        dl.className = 'text-xs font-medium tabular-nums ' + (st.delta30 === 0 ? 'text-zinc-500' : st.good(st.delta30) ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500');
+        // Oculto: sem verde/vermelho, para a cor não entregar se subiu ou desceu
+        dl.className = 'text-xs font-medium tabular-nums ' + (st.delta30 === 0 || maskMoney(m.unit) ? 'text-zinc-500' : st.good(st.delta30) ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500');
         dl.textContent = `${signed(m, st.delta30)} ${st.deltaLabel}`;
         big.append(dl);
       }
@@ -2420,6 +2450,7 @@ function renderMetrics() {
     inp.placeholder = st ? `novo valor (${m.unit || 'número'})` : `valor atual (${m.unit || 'número'})`;
     const existing = m.entries?.[selKey];
     if (existing != null) inp.value = existing;
+    if (maskMoney(m.unit)) { inp.type = 'password'; inp.autocomplete = 'off'; }   // dinheiro oculto: digita sem mostrar
     const btn = document.createElement('button');
     btn.type = 'submit';
     btn.className = 'btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800';
@@ -2744,7 +2775,7 @@ function reflectionHints(cur, prev, goals, studyGoalMin, weeks = 1) {
   }
   for (const x of cur.metrics) {
     if (x.before == null || x.before === x.after) continue;
-    const txt = `${x.m.name}: ${fmtNum(x.before)} → ${fmtVal(x.m, x.after)}`;
+    const txt = `${x.m.name}: ${fmtAmt(x.m.unit, x.before)} → ${fmtVal(x.m, x.after)}`;
     (x.st.good(x.after - x.before) ? H.wins : H.sins).push(x.st.good(x.after - x.before) ? txt : `${txt} (direção contrária da meta)`);
   }
   for (const x of cur.metrics) if (!x.logged) H.sins.push(`Não registrei ${q(x.m.name)} no período`);
@@ -3102,8 +3133,8 @@ function renderCheckinSummary() {
     if (!a.length) continue;
     const isScale = q.type === 'scale';
     const cur = isScale ? avg(a) : a.reduce((x, y) => x + y, 0), prev = b.length ? (isScale ? avg(b) : b.reduce((x, y) => x + y, 0)) : null;
-    const fmt = (v) => (isScale ? `${fmtNum(+v.toFixed(1))}/5` : `${fmtNum(+v.toFixed(2))}${q.unit ? ' ' + q.unit : ''}`);
-    const diff = prev == null ? '' : cur > prev ? ` · ↑ vs ${fmt(prev)}` : cur < prev ? ` · ↓ vs ${fmt(prev)}` : ' · igual à semana passada';
+    const fmt = (v) => (isScale ? `${fmtNum(+v.toFixed(1))}/5` : `${fmtAmt(q.unit, +v.toFixed(2))}${q.unit ? ' ' + q.unit : ''}`);
+    const diff = prev == null || maskMoney(q.unit) ? '' : cur > prev ? ` · ↑ vs ${fmt(prev)}` : cur < prev ? ` · ↓ vs ${fmt(prev)}` : ' · igual à semana passada';
     const metric = q.metricId && S.metrics.find((m) => m.id === q.metricId);
     lines.push(`${q.text}: ${isScale ? 'média' : 'total'} ${fmt(cur)} esta semana${diff}${metric ? ` · → ${metric.name}` : ''}`);
   }
@@ -3144,6 +3175,7 @@ function renderCheckin() {
       const l = document.createElement('p');
       l.className = 'eyebrow';
       l.textContent = q.text + (q.type === 'number' && q.unit ? ` (${q.unit})` : '');
+      if (q.type === 'number' && isMoneyUnit(q.unit)) { l.className += ' flex items-center gap-1'; l.append(moneyEye()); }
       row.append(l);
       if (q.type === 'scale') {
         const g = document.createElement('div');
@@ -3164,7 +3196,7 @@ function renderCheckin() {
         row.append(g);
       } else {
         const i = document.createElement(q.type === 'text' ? 'textarea' : 'input');
-        if (q.type === 'number') { i.type = 'number'; i.step = 'any'; i.inputMode = 'decimal'; }
+        if (q.type === 'number') { i.type = maskMoney(q.unit) ? 'password' : 'number'; i.step = 'any'; i.inputMode = 'decimal'; }
         else i.rows = 2;
         i.className = 'field mt-1.5 resize-none';
         i.value = v ?? '';
@@ -4393,9 +4425,10 @@ function renderReview() {
     if (!loggedThisWeek) { v.textContent = `${fmtVal(m, now)} · sem registro nesta semana`; v.className += ' text-amber-600 dark:text-amber-400'; }
     else if (before == null || before === now) v.textContent = before == null ? fmtVal(m, now) : `${fmtVal(m, now)} · sem mudança`;
     else {
-      v.textContent = `${fmtNum(before)} → ${fmtVal(m, now)} (${signed(m, now - before)})`;
-      v.className += st.good(now - before) ? ' text-emerald-600 dark:text-emerald-400' : ' text-rose-500';
+      v.textContent = `${fmtAmt(m.unit, before)} → ${fmtVal(m, now)} (${signed(m, now - before)})`;
+      if (!maskMoney(m.unit)) v.className += st.good(now - before) ? ' text-emerald-600 dark:text-emerald-400' : ' text-rose-500';
     }
+    if (isMoneyUnit(m.unit)) { n.className += ' inline-flex items-center gap-1'; n.append(moneyEye()); }
     li.append(n, v);
     rvm.append(li);
   }
@@ -5015,7 +5048,7 @@ function renderMonthDetail() {
     if (!vals.length) continue;
     anyQ = true;
     if (q.type === 'scale') qWrap.append(bar(q.text, avg(vals), 5, `${fmtNum(+avg(vals).toFixed(1))}/5 · ${vals.length}d`));
-    else { const sum = vals.reduce((a, b) => a + b, 0); qWrap.append(bar(q.text, 1, 1, `${fmtNum(+sum.toFixed(2))}${q.unit ? ' ' + q.unit : ''}`, 'var(--c-goal)')); }
+    else { const sum = vals.reduce((a, b) => a + b, 0); qWrap.append(bar(q.text, 1, 1, `${fmtAmt(q.unit, +sum.toFixed(2))}${q.unit ? ' ' + q.unit : ''}`, 'var(--c-goal)')); }
   }
   const ch = checkinHabit();
   if (ch) { const n = recs.filter(([, r]) => habitDone(r, ch.id) >= 1).length; qWrap.append(el('p', 'pt-1 text-xs text-zinc-500', `Check-in completo em ${n} de ${dayKeys.length} dias`)); anyQ = true; }
@@ -5059,7 +5092,7 @@ function renderMonthDetail() {
   // Métricas e projetos
   const sec6 = section('Resultados & projetos');
   sec6.append(list(st.metrics.map(({ m: mt, before, after }) => [mt.name,
-    before == null || before === after ? fmtVal(mt, after) : `${fmtNum(before)} → ${fmtVal(mt, after)} (${signed(mt, after - before)})`]), 'Nenhuma métrica.'));
+    before == null || before === after ? fmtVal(mt, after) : `${fmtAmt(mt.unit, before)} → ${fmtVal(mt, after)} (${signed(mt, after - before)})`]), 'Nenhuma métrica.'));
   const projItems = S.projects.map((p) => {
     const daily = projectDaily(p);
     const ks = Object.keys(daily).filter((k) => k >= first && k <= last);
