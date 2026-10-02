@@ -43,9 +43,12 @@
       .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-500; }
     }
     html { -webkit-font-smoothing: antialiased; }
+    /* Celular: a página nunca rola para os lados (gráficos largos rolam dentro do próprio card) */
+    html, body { overflow-x: hidden; overscroll-behavior-x: none; }
+    @supports (overflow: clip) { html, body { overflow-x: clip; } }
     /* Modo público: desfoca números e textos pessoais (hábitos e navegação continuam visíveis) */
     html.private :is(#metric-list, #rv-metrics, #rv-wins, #rv-improves, #rv-refl, #mr-refl, #mr-stats, #journal-list,
-      #win, #improve, #insight-list, #month-detail, #checkin textarea, #checkin input, #checkin-summary, #project-list .text-xs) {
+      #win, #improve, #insight-list, #month-detail, #checkin textarea, #checkin input, #checkin-summary, #project-list .text-xs, #exp-stats, #exp-cats-chart, #exp-trend, #exp-list) {
       filter: blur(10px);
       user-select: none;
       transition: filter 0.15s;
@@ -360,6 +363,46 @@
       </form>
       <div id="project-list" class="mt-4 grid gap-4 sm:grid-cols-2"></div>
       <button id="projects-closed" class="btn-ghost -mx-2.5 mt-2 hidden text-xs"></button>
+    </section>
+
+    <!-- ============ GASTOS ============ -->
+    <section id="expenses-card" class="card">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 class="flex items-center gap-1 text-sm font-semibold">Gastos <span id="exp-eye"></span></h2>
+          <p class="text-xs text-zinc-500">Registre na hora, em 2 toques · resumo por semana e por mês</p>
+        </div>
+        <div class="flex items-center gap-1">
+          <div id="exp-mode" class="flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
+          <button id="exp-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Período anterior"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button id="exp-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo período"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+      <form id="exp-form" class="mt-4 space-y-2">
+        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+          <select id="exp-cur" class="field !w-auto shrink-0" aria-label="Moeda"></select>
+          <input id="exp-amount" class="field min-w-0 flex-1 tabular-nums" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Valor" />
+          <input id="exp-note" class="field order-last min-w-0 basis-full sm:order-none sm:basis-0 sm:flex-[2]" type="text" maxlength="60" autocomplete="off" placeholder="O quê? (opcional)" aria-label="Descrição" />
+          <button class="btn-primary shrink-0" type="submit">Adicionar</button>
+        </div>
+        <div id="exp-cats" class="flex flex-wrap gap-1.5"></div>
+        <p id="exp-err" class="h-4 text-xs text-rose-500"></p>
+      </form>
+      <div class="border-t border-zinc-100 pt-4 dark:border-zinc-800">
+        <p id="exp-range" class="eyebrow"></p>
+        <div id="exp-stats" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4"></div>
+        <div class="mt-5 grid gap-6 lg:grid-cols-2">
+          <div>
+            <p class="text-xs font-medium">Por categoria</p>
+            <div id="exp-cats-chart" class="mt-2 space-y-1.5"></div>
+          </div>
+          <div>
+            <p id="exp-trend-title" class="text-xs font-medium"></p>
+            <div id="exp-trend" class="mt-2"></div>
+          </div>
+        </div>
+        <div id="exp-list" class="mt-5"></div>
+      </div>
     </section>
 
     <!-- ============ GRID PRINCIPAL ============ -->
@@ -950,7 +993,8 @@ function freshState() {
     ],
     projects: [],   // { id, name, status: 'active'|'paused'|'done', created, due, milestones: [{ id, text, addedK, doneK }], log: [{ id, k, min, note }] } — hábitos entram via task.projectId
     topics: [],     // tópicos aprendidos (revisão espaçada): { id, title, subjectId, grade, created, stage, due, mastered, reviews: [{ k, ok }] }
-    settings: { theme: null, studyGoalH: 10 },
+    expenses: [],   // gastos: { id, k (AAAA-MM-DD), amount, cat, note }
+    settings: { theme: null, studyGoalH: 10, currency: 'R$' },
   };
 }
 
@@ -978,10 +1022,10 @@ let S = loadState();
  */
 const SYNCED = ['days', 'weeks', 'months'];
 /** Listas sincronizadas inteiras (vale a versão editada por último), cada uma com carimbo `<nome>U`. */
-const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics', 'questions', 'projects'];
+const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics', 'questions', 'projects', 'expenses'];
 const sigs = new Map();
 const sigOf = (rec) => { const { u, ...rest } = rec; return JSON.stringify(rest); };
-const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH });
+const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH, currency: S.settings.currency });
 function rememberSigs() {
   sigs.clear();
   for (const col of SYNCED) for (const [k, rec] of Object.entries(S[col])) sigs.set(`${col}:${k}`, sigOf(rec));
@@ -1482,7 +1526,7 @@ const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover
  * Linha de lista com checkbox + remover (hábitos e metas).
  * opts: { badge, onEdit, editing, off, qty } — `off` = hábito fora do dia (sem checkbox);
  * `qty` = { value, target, unit, onSet } para hábitos com quantidade (mostra 14/20 pág).
- * `partial` = feito em parte → caixa amarela.
+ * `partial` = feito em parte → caixa amarela. `dragId`/`dragGroup` = linha arrastável (ver enableDrag).
  */
 function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   const li = document.createElement('li');
@@ -1519,6 +1563,18 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     textCol.append(b);
   }
   li.append(check, textCol);
+  if (opts.dragId) {
+    // Alça para arrastar (mouse e toque); a ordem é aplicada por enableDrag()
+    li.dataset.dragId = opts.dragId;
+    li.dataset.dragGroup = opts.dragGroup || 'main';
+    const h = document.createElement('span');
+    h.dataset.dragHandle = '';
+    h.className = '-ml-1 flex h-6 w-3 shrink-0 cursor-grab touch-none select-none items-center justify-center text-zinc-300 transition sm:opacity-0 sm:group-hover:opacity-100 dark:text-zinc-600';
+    h.setAttribute('aria-label', `Arrastar “${title}” para reordenar`);
+    h.title = 'Arraste para reordenar';
+    h.innerHTML = '<svg class="h-3.5 w-2" viewBox="0 0 8 14" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="7" r="1.2"/><circle cx="6" cy="7" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="6" cy="12" r="1.2"/></svg>';
+    li.prepend(h);
+  }
 
   if (opts.qty && !opts.off) {
     const q = opts.qty, box = document.createElement('span');
@@ -1789,6 +1845,7 @@ function renderTasks() {
     const frac = habitDone(d, t.id);
     ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
       badge, off: isOff, editing: editingTask === t.id, partial: frac > 0 && frac < 1,
+      dragId: editingTask ? null : t.id, dragGroup: isOff ? 'off' : 'day',
       qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => (t.sleep ? setSleep(v) : setQty(t.id, v)) } : null,
       onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
     }));
@@ -1807,6 +1864,7 @@ function renderTasks() {
       const n = weeklyCount(t, ws), hit = n >= t.weekly;
       ul.append(checkRow(t.title, (d.wk || []).includes(t.id), () => toggleWeekly(t.id), () => removeTask(t.id), undefined, {
         badge: [`${n}/${t.weekly} na semana${hit ? ' ✓' : ''}`, ...links(t)].join(' · '),
+        dragId: editingTask ? null : t.id, dragGroup: 'week',
         editing: editingTask === t.id,
         onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
       }));
@@ -1833,6 +1891,50 @@ function renderTasks() {
     li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica, projeto ou estudo — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
     ul.append(li);
   }
+  enableDrag(ul, reorderTasks);
+}
+
+/**
+ * Arrastar para reordenar (mouse e toque, via pointer events): a linha segue o dedo entre as
+ * linhas do mesmo grupo; ao soltar, `onDrop(ids na nova ordem)`.
+ */
+function enableDrag(ul, onDrop) {
+  for (const h of ul.querySelectorAll('[data-drag-handle]')) {
+    h.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      const li = h.closest('li'), group = li.dataset.dragGroup;
+      const before = [...ul.querySelectorAll(`li[data-drag-group="${group}"]`)].map((x) => x.dataset.dragId).join();
+      // Escuta na janela: mover a linha no DOM solta a captura do ponteiro da alça
+      li.classList.add('relative', 'z-10', 'bg-zinc-100', 'shadow-sm', 'dark:bg-zinc-800');
+      document.body.classList.add('select-none');
+      const move = (ev) => {
+        const sibs = [...ul.querySelectorAll(`li[data-drag-group="${group}"]`)].filter((x) => x !== li);
+        const target = sibs.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+        if (target) { if (li.nextElementSibling !== target) ul.insertBefore(li, target); }
+        else if (sibs.length && sibs[sibs.length - 1].nextElementSibling !== li) sibs[sibs.length - 1].after(li);
+      };
+      const end = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
+        li.classList.remove('relative', 'z-10', 'bg-zinc-100', 'shadow-sm', 'dark:bg-zinc-800');
+        document.body.classList.remove('select-none');
+        const ids = [...ul.querySelectorAll(`li[data-drag-group="${group}"]`)].map((x) => x.dataset.dragId);
+        if (ids.join() !== before) onDrop(ids);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+    });
+  }
+}
+/** Aplica a nova ordem de um grupo de hábitos sem mexer na posição dos outros. */
+function reorderTasks(ids) {
+  const pos = ids.map((id) => S.tasks.findIndex((t) => t.id === id)).filter((i) => i >= 0).sort((a, b) => a - b);
+  const moved = ids.map((id) => S.tasks.find((t) => t.id === id)).filter(Boolean);
+  pos.forEach((p, i) => { S.tasks[p] = moved[i]; });
+  commit(renderTasks);
 }
 
 // ---------- Pendentes ----------
@@ -2141,7 +2243,7 @@ const fmtVal = (m, v) => `${fmtAmt(m.unit, v)}${m.unit ? ' ' + m.unit : ''}`;
 function toggleMoney() {
   moneyHidden = !moneyHidden;
   try { localStorage.setItem('evolution-money-hidden', moneyHidden ? '1' : ''); } catch (e) {}
-  renderMetrics(); renderReview(); renderInsights(); renderCheckin(); renderMonthDetail();
+  renderMetrics(); renderReview(); renderInsights(); renderCheckin(); renderMonthDetail(); renderExpenses();
 }
 const EYE_OPEN = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_SHUT = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.2 3.3M6.6 6.6A17 17 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>';
@@ -3869,7 +3971,7 @@ function setSelDay(k) {
   selKey = k;
   editingTask = null;
   renderDayNav(); renderOne(); renderTasks(); renderSleep(); renderStudy(); renderReflection(); renderMetrics(); renderSubjects();
-  renderCheckin(); renderProjects(); renderPending(); paintOnce();
+  renderCheckin(); renderProjects(); renderPending(); renderExpenses(); paintOnce();
 }
 
 // ---------- Matérias ----------
@@ -4991,7 +5093,7 @@ function renderMonthDetail() {
     const t = el('div', 'track flex-1');
     const f = el('div', 'h-full rounded-full'); f.style.width = `${max ? (v / max) * 100 : 0}%`; f.style.background = color;
     t.append(f);
-    row.append(el('span', 'w-32 shrink-0 truncate text-zinc-600 dark:text-zinc-400', label), t, el('span', 'w-20 shrink-0 text-right tabular-nums text-zinc-500', text));
+    row.append(el('span', 'w-32 shrink-0 truncate text-zinc-600 dark:text-zinc-400', label), t, el('span', 'w-36 shrink-0 text-right tabular-nums text-zinc-500', text));
     return row;
   };
 
@@ -5101,6 +5203,18 @@ function renderMonthDetail() {
   }).filter(Boolean);
   sec6.append(el('p', 'mt-3 eyebrow', 'Projetos'), list(projItems, 'Nenhum avanço em projetos.'));
 
+  // Gastos do mês
+  const ex = expIn(first, last);
+  if (ex.length) {
+    const tot = expSum(ex), byC = {};
+    for (const e of ex) byC[e.cat] = (byC[e.cat] || 0) + e.amount;
+    const rows = Object.entries(byC).sort((a, b) => b[1] - a[1]);
+    const secE = section('Gastos', `${fmtMoney(tot)} em ${ex.length} ${ex.length === 1 ? 'gasto' : 'gastos'} · média de ${fmtMoney(tot / Math.max(1, dayKeys.length))} por dia`);
+    const gw = el('div', 'mt-2 space-y-1.5');
+    for (const [id, v] of rows) gw.append(bar(`${expCat(id)[1]} ${expCat(id)[2]}`, v, rows[0][1], `${fmtMoney(v)} · ${fmtPct(v / tot)}`, 'var(--c-goal)'));
+    secE.append(gw);
+  }
+
   // Pontuais / pendentes
   const pont = S.tasks.filter((t) => t.once && t.once >= first && t.once <= last);
   if (pont.length) {
@@ -5174,6 +5288,207 @@ function renderMonthDetail() {
     sec10.append(tw);
   }
 }
+
+// ---------- Gastos ----------
+const EXP_CATS = [
+  ['mercado', '🛒', 'Mercado'], ['comida', '🍔', 'Comer fora'], ['transporte', '🚌', 'Transporte'], ['moradia', '🏠', 'Moradia'],
+  ['contas', '💡', 'Contas'], ['lazer', '🎉', 'Lazer'], ['saude', '💊', 'Saúde'], ['educacao', '📚', 'Educação'],
+  ['compras', '🛍️', 'Compras'], ['outros', '📦', 'Outros'],
+];
+const expCat = (id) => EXP_CATS.find((c) => c[0] === id) || EXP_CATS[EXP_CATS.length - 1];
+const CURRENCIES = ['R$', '€', 'US$', '£'];
+const expCur = () => S.settings.currency || 'R$';
+/** "25,50" ou "1.234,5" → número; dinheiro é sempre na moeda escolhida. */
+function parseMoney(t) {
+  t = String(t).trim().replace(/[^\d,.\-]/g, '');
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  const v = Number(t);
+  return Number.isFinite(v) ? Math.round(v * 100) / 100 : NaN;
+}
+const fmtMoney = (v) => (maskMoney(expCur()) ? `${expCur()} ****`
+  : `${expCur()} ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)}`);
+let expMode = 'week', expAnchor = null, expCatSel = 'mercado', expShowAll = false;
+/** Período exibido: semana (seg→dom) ou mês, deslocado por `expAnchor`. */
+function expPeriod(offset = 0) {
+  const base = expAnchor ? new Date(expAnchor) : new Date();
+  if (expMode === 'week') {
+    const ws = addDays(weekStart(base), 7 * offset);
+    return { from: keyOf(ws), to: keyOf(addDays(ws, 6)), days: 7,
+             label: `Semana de ${fmtShort.format(ws).replace('.', '')} a ${fmtShort.format(addDays(ws, 6)).replace('.', '')}` };
+  }
+  const f = new Date(base.getFullYear(), base.getMonth() + offset, 1), l = new Date(f.getFullYear(), f.getMonth() + 1, 0);
+  return { from: keyOf(f), to: keyOf(l), days: l.getDate(), label: cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(f)) };
+}
+const expIn = (from, to) => S.expenses.filter((e) => e.k >= from && e.k <= to);
+const expSum = (list) => list.reduce((a, e) => a + e.amount, 0);
+function addExpense() {
+  const amount = parseMoney($('#exp-amount').value);
+  if (!(amount > 0)) { $('#exp-err').textContent = 'Informe um valor maior que zero.'; return; }
+  S.expenses.push({ id: uid(), k: selKey, amount, cat: expCatSel, note: $('#exp-note').value.trim() });
+  $('#exp-amount').value = ''; $('#exp-note').value = ''; $('#exp-err').textContent = '';
+  commit(renderExpenses, renderMonthDetail);
+  $('#exp-amount').focus();
+}
+function removeExpense(id) { S.expenses = S.expenses.filter((e) => e.id !== id); commit(renderExpenses, renderMonthDetail); }
+
+function renderExpenses() {
+  const P = expPeriod(), prev = expPeriod(-1), tk = todayKey();
+  const list = expIn(P.from, P.to), total = expSum(list), prevTotal = expSum(expIn(prev.from, prev.to));
+  $('#exp-eye').replaceChildren(moneyEye());
+
+  // Moeda e categorias
+  const cs = $('#exp-cur');
+  if (!cs.options.length) {
+    for (const c of CURRENCIES) cs.append(new Option(c, c));
+    cs.onchange = () => { S.settings.currency = cs.value; commit(renderExpenses, renderMonthDetail); };
+  }
+  cs.value = expCur();
+  const cats = $('#exp-cats');
+  cats.replaceChildren();
+  for (const [id, ic, name] of EXP_CATS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const on = expCatSel === id;
+    b.className = 'rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
+      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900'
+      : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:border-zinc-800 dark:text-zinc-400');
+    b.textContent = `${ic} ${name}`;
+    b.setAttribute('aria-pressed', String(on));
+    b.onclick = () => { expCatSel = id; renderExpenses(); $('#exp-amount').focus(); };
+    cats.append(b);
+  }
+  $('#exp-amount').type = maskMoney(expCur()) ? 'password' : 'text';
+  $('#exp-form').querySelector('button[type=submit]').textContent = isToday() ? 'Adicionar' : `Adicionar em ${fmtShort.format(parseKey(selKey)).replace('.', '')}`;
+
+  // Modo semana/mês + navegação
+  const mode = $('#exp-mode');
+  mode.replaceChildren();
+  for (const [m, l] of [['week', 'Semana'], ['month', 'Mês']]) {
+    const b = document.createElement('button');
+    b.className = 'rounded-md px-2.5 py-1 transition ' + (expMode === m ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500');
+    b.textContent = l;
+    b.onclick = () => { expMode = m; expAnchor = null; renderExpenses(); };
+    mode.append(b);
+  }
+  $('#exp-next').disabled = P.to >= tk;
+  $('#exp-range').textContent = P.label;
+
+  // Resumo
+  const elapsed = Math.max(1, Math.min(P.days, daysBetween(P.from, tk < P.to ? tk : P.to) + 1));
+  const byCat = {};
+  for (const e of list) byCat[e.cat] = (byCat[e.cat] || 0) + e.amount;
+  const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const diff = prevTotal ? (total - prevTotal) / prevTotal : null;
+  const stat = (label, value, hint) => {
+    const d = document.createElement('div');
+    d.className = 'rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40';
+    d.innerHTML = '<p class="text-[11px] text-zinc-500"></p><p class="text-base font-semibold tabular-nums"></p><p class="text-[11px] text-zinc-500"></p>';
+    d.children[0].textContent = label; d.children[1].textContent = value; d.children[2].textContent = hint || '';
+    return d;
+  };
+  const top = catRows[0];
+  $('#exp-stats').replaceChildren(
+    stat('Total', fmtMoney(total), `${list.length} ${list.length === 1 ? 'gasto' : 'gastos'}`),
+    stat(expMode === 'week' ? 'Vs semana anterior' : 'Vs mês anterior',
+      diff == null || maskMoney(expCur()) ? '—' : `${diff > 0 ? '+' : ''}${fmtPct(diff)}`,
+      prevTotal ? `antes: ${fmtMoney(prevTotal)}` : 'sem gastos antes'),
+    stat('Média por dia', fmtMoney(total / elapsed), `${elapsed} ${elapsed === 1 ? 'dia' : 'dias'}`),
+    stat('Maior categoria', top ? `${expCat(top[0])[1]} ${expCat(top[0])[2]}` : '—', top ? `${fmtPct(top[1] / total)} do total` : ''),
+  );
+
+  // Gráfico por categoria: barras horizontais, uma cor, ordenadas do maior para o menor
+  const cc = $('#exp-cats-chart');
+  cc.replaceChildren();
+  if (!catRows.length) cc.append(Object.assign(document.createElement('p'), { className: 'text-xs text-zinc-500', textContent: 'Nenhum gasto neste período.' }));
+  const max = catRows.length ? catRows[0][1] : 1;
+  for (const [id, v] of catRows) {
+    const [, ic, name] = expCat(id), n = list.filter((e) => e.cat === id).length;
+    const row = document.createElement('div');
+    row.className = 'group flex items-center gap-2 text-xs';
+    const lbl = document.createElement('span'); lbl.className = 'w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400'; lbl.textContent = `${ic} ${name}`;
+    const track = document.createElement('div'); track.className = 'h-3 flex-1';
+    const bar = document.createElement('div');
+    bar.className = 'h-full rounded-r-[4px] transition group-hover:opacity-80';
+    bar.style.width = `${Math.max(2, (v / max) * 100)}%`; bar.style.background = 'var(--c-goal)';
+    track.append(bar);
+    const val = document.createElement('span'); val.className = 'w-32 shrink-0 text-right tabular-nums text-zinc-700 dark:text-zinc-300';
+    val.textContent = `${fmtMoney(v)} · ${fmtPct(v / total)}`;
+    row.append(lbl, track, val);
+    row.addEventListener('pointerenter', (e) => showTip(e, `${ic} ${name}`, [
+      { value: fmtMoney(v), label: `${fmtPct(v / total)} do total`, color: 'var(--c-goal)', box: true },
+      { value: String(n), label: n === 1 ? 'gasto' : 'gastos' }]));
+    row.addEventListener('pointermove', moveTip);
+    row.addEventListener('pointerleave', hideTip);
+    cc.append(row);
+  }
+
+  // Tendência: últimas 8 semanas ou 6 meses, período atual destacado
+  const N = expMode === 'week' ? 8 : 6;
+  $('#exp-trend-title').textContent = expMode === 'week' ? 'Últimas 8 semanas' : 'Últimos 6 meses';
+  const periods = Array.from({ length: N }, (_, i) => expPeriod(i - N + 1)).map((x) => ({ ...x, total: expSum(expIn(x.from, x.to)) }));
+  const tmax = Math.max(1, ...periods.map((x) => x.total));
+  const tr = $('#exp-trend');
+  tr.replaceChildren();
+  const bars = document.createElement('div');
+  bars.className = 'flex h-28 items-end gap-1.5 border-b border-zinc-200 dark:border-zinc-800';
+  const axis = document.createElement('div');
+  axis.className = 'mt-1 flex gap-1.5 text-[10px] text-zinc-500';
+  periods.forEach((x, i) => {
+    const cur = i === N - 1;
+    const col = document.createElement('div');
+    col.className = 'flex h-full flex-1 flex-col justify-end';
+    const b = document.createElement('div');
+    b.className = 'rounded-t-[4px] transition hover:opacity-80';
+    b.style.height = x.total ? `${Math.max(3, (x.total / tmax) * 100)}%` : '2px';
+    b.style.background = x.total ? 'var(--c-goal)' : 'var(--c-grid)';
+    if (!cur) b.style.opacity = '0.45';
+    col.append(b);
+    col.addEventListener('pointerenter', (e) => showTip(e, x.label, [{ value: fmtMoney(x.total), label: cur ? 'período exibido' : '', color: 'var(--c-goal)', box: true }]));
+    col.addEventListener('pointermove', moveTip);
+    col.addEventListener('pointerleave', hideTip);
+    bars.append(col);
+    const l = document.createElement('span');
+    l.className = 'flex-1 truncate text-center' + (cur ? ' font-medium text-zinc-700 dark:text-zinc-300' : '');
+    l.textContent = expMode === 'week' ? fmtShort.format(parseKey(x.from)).replace('.', '').replace(/ de /, ' ') : fmtMonthShort.format(parseKey(x.from)).replace('.', '');
+    axis.append(l);
+  });
+  tr.append(bars, axis);
+
+  // Lista de gastos do período
+  const lw = $('#exp-list');
+  lw.replaceChildren();
+  if (!list.length) return;
+  const sorted = [...list].sort((a, b) => (a.k < b.k ? 1 : a.k > b.k ? -1 : 0));
+  const shown = expShowAll ? sorted : sorted.slice(0, 5);
+  const ul = document.createElement('ul');
+  ul.className = 'divide-y divide-zinc-100 dark:divide-zinc-800';
+  for (const e of shown) {
+    const [, ic, name] = expCat(e.cat);
+    const li = document.createElement('li');
+    li.className = 'group flex items-center gap-3 py-2 text-sm';
+    li.innerHTML = '<span class="w-6 text-center"></span><span class="min-w-0 flex-1"><span class="block truncate"></span><span class="block text-[11px] text-zinc-500"></span></span><span class="tabular-nums font-medium"></span>';
+    li.children[0].textContent = ic;
+    li.children[1].children[0].textContent = e.note || name;
+    li.children[1].children[1].textContent = `${cap(fmtDay.format(parseKey(e.k)).replace(/\./g, ''))}${e.note ? ` · ${name}` : ''}`;
+    li.children[2].textContent = fmtMoney(e.amount);
+    const rm = document.createElement('button');
+    rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar gasto ${e.note || name}`);
+    rm.onclick = () => removeExpense(e.id);
+    li.append(rm);
+    ul.append(li);
+  }
+  lw.append(ul);
+  if (sorted.length > 5) {
+    const b = document.createElement('button');
+    b.className = 'btn-ghost -mx-2.5 mt-1 text-xs';
+    b.textContent = expShowAll ? 'Mostrar menos' : `Ver todos os ${sorted.length} gastos`;
+    b.onclick = () => { expShowAll = !expShowAll; renderExpenses(); };
+    lw.append(b);
+  }
+}
+$('#exp-form').onsubmit = (e) => { e.preventDefault(); addExpense(); };
+$('#exp-prev').onclick = () => { const P = expPeriod(-1); expAnchor = parseKey(P.from); renderExpenses(); };
+$('#exp-next').onclick = () => { const P = expPeriod(1); expAnchor = parseKey(P.from); renderExpenses(); };
 
 // ---------- Abas ----------
 function currentTab() { return location.hash === '#meses' ? 'meses' : 'hoje'; }
@@ -5666,7 +5981,7 @@ function syncPayload() {
   const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
   return { version: 1, resetAt: S.resetAt || 0, startDate: S.startDate, ...lists,
            days: S.days, weeks: S.weeks, months: S.months,
-           settings: { studyGoalH: S.settings.studyGoalH }, settingsU: S.settingsU || 0 };
+           settings: { studyGoalH: S.settings.studyGoalH, currency: S.settings.currency }, settingsU: S.settingsU || 0 };
 }
 /** JSON com as chaves ordenadas: o Postgres (jsonb) reordena as chaves, então é assim que se compara. */
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)
@@ -5702,6 +6017,7 @@ function mergeRemote(r) {
   }
   if ((r.settingsU || 0) > (S.settingsU || 0)) {
     S.settings.studyGoalH = r.settings?.studyGoalH ?? S.settings.studyGoalH;
+    S.settings.currency = r.settings?.currency ?? S.settings.currency;
     S.settingsU = r.settingsU; changed = true;
   }
   if (r.startDate && r.startDate < S.startDate) { S.startDate = r.startDate; changed = true; }
@@ -5864,7 +6180,7 @@ function renderAll(openReflection = true) {
   renderDayNav();
   renderSleep(); renderStudy(); renderReflection(); renderMonth(); renderReview(); renderSync();
   renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview(); renderSubjects(); renderLearning();
-  renderCheckin(); renderProjects(); renderPending();
+  renderCheckin(); renderProjects(); renderPending(); renderExpenses();
   renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
