@@ -19,6 +19,7 @@
         dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
       } catch (e) {}
       if (dark) document.documentElement.classList.add('dark');
+      try { var a = s.settings && s.settings.accent; if (a && a !== 'verde') document.documentElement.dataset.accent = a; } catch (e) {}
     })();
   </script>
 
@@ -27,7 +28,15 @@
   <script>
     tailwind.config = {
       darkMode: 'class',
-      theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] } } },
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        colors: {
+          // "emerald" é a cor de destaque escolhida nas configurações (variáveis --acc-*)
+          emerald: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((n) => [n, `rgb(var(--acc-${n}) / <alpha-value>)`])),
+          // "ok" = verde fixo para coisas boas (saldo positivo, no ritmo…), independente da paleta
+          ok: { 400: '#34d399', 600: '#059669' },
+        },
+      } },
     };
   </script>
 
@@ -43,6 +52,44 @@
       .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-500; }
     }
     html { -webkit-font-smoothing: antialiased; }
+    /* ---------- Layout da aba Hoje (ver comentário no #today-grid) ---------- */
+    #today-grid { display: grid; gap: 1rem; }
+    @media (min-width: 640px) { #today-grid { gap: 1.25rem; } }
+    @media (min-width: 1024px) {
+      #today-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto 1fr;
+                    grid-template-areas: "b a" "b c"; align-items: start; }
+      #col-a { grid-area: a; } #col-b { grid-area: b; } #col-c { grid-area: c; }
+    }
+    @media (min-width: 1280px) {
+      #today-grid { grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "a b c";
+                    column-gap: 2rem; position: relative; }
+      /* Divisor vertical entre a coluna fixa (A) e o resto, na altura toda */
+      #today-grid::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(300px + 1rem); width: 1px; background: #d4d4d8; }
+      html.dark #today-grid::before { background: #3f3f46; }
+      #col-a { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; scrollbar-width: none; }
+      #col-a::-webkit-scrollbar { display: none; }
+    }
+    /* ---------- Revisões: gaveta pela direita no computador ---------- */
+    #drawer:not(:has(> section:not(.hidden))) { display: none; }
+    #drawer-bd { display: none; }
+    @media (min-width: 1024px) {
+      #drawer > section:not(.hidden) {
+        position: fixed; top: 0; right: 0; bottom: 0; z-index: 50; width: min(640px, 92vw); margin: 0;
+        overflow-y: auto; border-radius: 0; border-width: 0 0 0 1px; box-shadow: -24px 0 48px -12px rgba(0, 0, 0, 0.35);
+        animation: drawer-in 0.18s ease-out;
+      }
+      #drawer > section:not(.hidden) ~ section:not(.hidden) { display: none; }   /* uma por vez */
+      body:has(#drawer > section:not(.hidden)) #drawer-bd { display: block; position: fixed; inset: 0; z-index: 40; background: rgba(9, 9, 11, 0.45); }
+      body:has(#drawer > section:not(.hidden)) { overflow: hidden; }
+      #drawer > section { background: var(--c-surface); border-left: 1px solid #d4d4d8; }   /* divisor da gaveta */
+      html.dark #drawer > section { border-left-color: #52525b; }
+    }
+    @keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+    /* Divisor horizontal entre seções (mesma cor do divisor vertical das colunas) */
+    .section-divider { border: 0; border-top: 1px solid #d4d4d8; margin-top: 2rem !important; margin-bottom: 0.75rem; }
+    html.dark .section-divider { border-top-color: #3f3f46; }
+    /* ---------- Cards recolhíveis ---------- */
+    .card.is-collapsed > :not(:first-child) { display: none !important; }
     /* Todos os seletores: seta própria, afastada da borda direita */
     select:not([multiple]) {
       -webkit-appearance: none;
@@ -76,9 +123,18 @@
     body { background: #fafafa; }
     html.dark body { background: #09090b; }
 
-    /* Cores dos gráficos (par validado para daltonismo nos dois temas) */
+    /* Paletas de destaque (Configurações → Cor de destaque): degraus 50–950 em RGB */
+    :root, [data-accent="verde"] { --acc-50: 236 253 245; --acc-100: 209 250 229; --acc-200: 167 243 208; --acc-300: 110 231 183; --acc-400: 52 211 153; --acc-500: 16 185 129; --acc-600: 5 150 105; --acc-700: 4 120 87; --acc-800: 6 95 70; --acc-900: 6 78 59; --acc-950: 2 44 34; }
+    [data-accent="azul"] { --acc-50: 239 246 255; --acc-100: 219 234 254; --acc-200: 191 219 254; --acc-300: 147 197 253; --acc-400: 96 165 250; --acc-500: 59 130 246; --acc-600: 37 99 235; --acc-700: 29 78 216; --acc-800: 30 64 175; --acc-900: 30 58 138; --acc-950: 23 37 84; }
+    [data-accent="ciano"] { --acc-50: 236 254 255; --acc-100: 207 250 254; --acc-200: 165 243 252; --acc-300: 103 232 249; --acc-400: 34 211 238; --acc-500: 6 182 212; --acc-600: 8 145 178; --acc-700: 14 116 144; --acc-800: 21 94 117; --acc-900: 22 78 99; --acc-950: 8 51 68; }
+    [data-accent="roxo"] { --acc-50: 245 243 255; --acc-100: 237 233 254; --acc-200: 221 214 254; --acc-300: 196 181 253; --acc-400: 167 139 250; --acc-500: 139 92 246; --acc-600: 124 58 237; --acc-700: 109 40 217; --acc-800: 91 33 182; --acc-900: 76 29 149; --acc-950: 46 16 101; }
+    [data-accent="rosa"] { --acc-50: 253 242 248; --acc-100: 252 231 243; --acc-200: 251 207 232; --acc-300: 249 168 212; --acc-400: 244 114 182; --acc-500: 236 72 153; --acc-600: 219 39 119; --acc-700: 190 24 93; --acc-800: 157 23 77; --acc-900: 131 24 67; --acc-950: 80 7 36; }
+    [data-accent="vermelho"] { --acc-50: 254 242 242; --acc-100: 254 226 226; --acc-200: 254 202 202; --acc-300: 252 165 165; --acc-400: 248 113 113; --acc-500: 239 68 68; --acc-600: 220 38 38; --acc-700: 185 28 28; --acc-800: 153 27 27; --acc-900: 127 29 29; --acc-950: 69 10 10; }
+    [data-accent="laranja"] { --acc-50: 255 247 237; --acc-100: 255 237 213; --acc-200: 254 215 170; --acc-300: 253 186 116; --acc-400: 251 146 60; --acc-500: 249 115 22; --acc-600: 234 88 12; --acc-700: 194 65 12; --acc-800: 154 52 18; --acc-900: 124 45 18; --acc-950: 67 20 7; }
+
+    /* Cores dos gráficos (pares validados para daltonismo nos dois temas) */
     :root {
-      --c-habit: #059669;  /* hábitos diários */
+      --c-habit: rgb(var(--acc-600));  /* hábitos diários = cor de destaque */
       --c-goal: #2a78d6;   /* metas semanais */
       --c-avg: #18181b;    /* linha de média */
       --c-grid: #f0f0f1;
@@ -87,7 +143,7 @@
       --c-hover: rgba(24, 24, 27, 0.04);
     }
     html.dark {
-      --c-habit: #059669;
+      --c-habit: rgb(var(--acc-600));
       --c-goal: #3987e5;
       --c-avg: #e4e4e7;
       --c-grid: #232326;
@@ -95,6 +151,8 @@
       --c-surface: #111113;
       --c-hover: rgba(255, 255, 255, 0.04);
     }
+    /* Destaque azul/ciano/roxo: a 2ª série (metas, gastos) vira laranja para não confundir */
+    html[data-accent="azul"], html[data-accent="ciano"], html[data-accent="roxo"] { --c-goal: #ea580c; }
     details > summary::-webkit-details-marker { display: none; }
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
     input[type=number] { -moz-appearance: textfield; }
@@ -102,7 +160,7 @@
 </head>
 
 <body class="min-h-screen font-sans text-zinc-900 dark:text-zinc-100">
-  <main class="mx-auto max-w-5xl space-y-4 px-4 py-8 sm:space-y-5 sm:px-6 sm:py-12">
+  <main class="mx-auto max-w-5xl space-y-4 px-4 py-8 sm:space-y-5 sm:px-6 sm:py-12 xl:max-w-[1440px]">
 
     <!-- ============ HEADER ============ -->
     <header class="flex items-start justify-between gap-4 pb-2">
@@ -118,6 +176,9 @@
       <button id="private-toggle" class="btn-ghost" aria-pressed="false" aria-label="Ocultar informações" title="Ocultar números e textos pessoais (modo público)">
         <svg class="private-off h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg class="private-on hidden h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.2 3.3M6.6 6.6A17 17 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>
+      </button>
+      <button id="settings-open" class="btn-ghost" aria-label="Configurações" title="Configurações">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <button id="theme-toggle" class="btn-ghost" aria-label="Alternar tema claro/escuro">
         <svg class="h-4 w-4 dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -158,286 +219,209 @@
       </div>
     </div>
 
-    <!-- ============ THE ONE THING ============ -->
-    <section id="one-card" class="card relative overflow-hidden transition">
-      <span id="one-accent" class="absolute inset-y-0 left-0 w-1 bg-zinc-200 transition dark:bg-zinc-800"></span>
-      <div class="flex items-center justify-between">
-        <p class="eyebrow">The One Thing · foco único</p>
-        <span id="won-badge" class="hidden rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Dia ganho ✓</span>
-      </div>
-      <div class="mt-3 flex items-center gap-3">
-        <button id="one-check" data-check class="shrink-0" aria-label="Marcar foco do dia como feito"></button>
-        <input id="one-input" type="text" maxlength="140" autocomplete="off"
-          class="w-full bg-transparent text-lg font-medium tracking-tight outline-none placeholder:text-zinc-400 sm:text-xl dark:placeholder:text-zinc-600"
-          placeholder="Se eu fizer só uma coisa hoje, será…" />
-      </div>
-    </section>
-
-    <!-- ============ PRIORIDADES DE MELHORIA ============ -->
-    <section id="prio-card" class="card hidden">
-      <div class="flex items-center justify-between">
-        <p class="eyebrow">Prioridades de melhoria</p>
-        <span class="text-xs text-zinc-500">escolhidas nas suas reflexões</span>
-      </div>
-      <ol id="prio-list" class="mt-3 space-y-1"></ol>
-    </section>
-
-    <!-- ============ REVISÃO DA SEMANA (domingo) ============ -->
-    <section id="review-card" class="card hidden">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <p class="eyebrow">Revisão da semana</p>
-          <h2 id="review-range" class="mt-1 text-lg font-semibold tracking-tight"></h2>
+    <!-- ============ REVISÕES: gaveta lateral no computador, no fluxo no celular ============ -->
+    <div id="drawer" class="space-y-4 sm:space-y-5" aria-label="Revisões">
+      <!-- ============ REVISÃO DA SEMANA (domingo) ============ -->
+      <section id="review-card" class="card hidden">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="eyebrow">Revisão da semana</p>
+            <h2 id="review-range" class="mt-1 text-lg font-semibold tracking-tight"></h2>
+          </div>
+          <div class="flex items-center gap-1">
+            <button id="review-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Semana anterior">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button id="review-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próxima semana">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button id="review-close" class="btn-ghost h-7 w-7 p-0" aria-label="Fechar revisão">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
         </div>
-        <div class="flex items-center gap-1">
-          <button id="review-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Semana anterior">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
-          </button>
-          <button id="review-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próxima semana">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
-          </button>
-          <button id="review-close" class="btn-ghost h-7 w-7 p-0" aria-label="Fechar revisão">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-      </div>
 
-      <div class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
-        <div><p class="eyebrow">Hábitos</p><p id="rv-habits" class="mt-1 text-xl font-semibold"></p><p id="rv-habits-sub" class="text-xs text-zinc-500"></p></div>
-        <div><p class="eyebrow">Metas</p><p id="rv-goals" class="mt-1 text-xl font-semibold"></p><p id="rv-goals-sub" class="text-xs text-zinc-500"></p></div>
-        <div><p class="eyebrow">Estudo</p><p id="rv-study" class="mt-1 text-xl font-semibold"></p><p id="rv-study-sub" class="text-xs text-zinc-500"></p></div>
-        <div><p class="eyebrow">Sono médio</p><p id="rv-sleep" class="mt-1 text-xl font-semibold"></p><p id="rv-sleep-sub" class="text-xs text-zinc-500"></p></div>
-        <div><p class="eyebrow">Dias 100%</p><p id="rv-perfect" class="mt-1 text-xl font-semibold"></p><p id="rv-perfect-sub" class="text-xs text-zinc-500"></p></div>
-      </div>
-      <p id="rv-bestworst" class="mt-4 text-sm text-zinc-600 dark:text-zinc-400"></p>
-
-      <div id="rv-metrics-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
-        <p class="eyebrow">Resultados da semana</p>
-        <ul id="rv-metrics" class="mt-2 space-y-1.5 text-sm"></ul>
-      </div>
-
-      <div class="mt-5 grid gap-5 border-t border-zinc-100 pt-5 sm:grid-cols-2 dark:border-zinc-800">
-        <div>
-          <p class="eyebrow">Vitórias da semana</p>
-          <ul id="rv-wins" class="mt-2 space-y-2 text-sm"></ul>
+        <div class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
+          <div><p class="eyebrow">Hábitos</p><p id="rv-habits" class="mt-1 text-xl font-semibold"></p><p id="rv-habits-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Metas</p><p id="rv-goals" class="mt-1 text-xl font-semibold"></p><p id="rv-goals-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Estudo</p><p id="rv-study" class="mt-1 text-xl font-semibold"></p><p id="rv-study-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Sono médio</p><p id="rv-sleep" class="mt-1 text-xl font-semibold"></p><p id="rv-sleep-sub" class="text-xs text-zinc-500"></p></div>
+          <div><p class="eyebrow">Dias 100%</p><p id="rv-perfect" class="mt-1 text-xl font-semibold"></p><p id="rv-perfect-sub" class="text-xs text-zinc-500"></p></div>
         </div>
-        <div>
-          <p class="eyebrow">O que melhorar</p>
-          <ul id="rv-improves" class="mt-2 space-y-2 text-sm"></ul>
-        </div>
-      </div>
+        <p id="rv-bestworst" class="mt-4 text-sm text-zinc-600 dark:text-zinc-400"></p>
 
-      <div id="rv-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
+        <div id="rv-metrics-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
+          <p class="eyebrow">Resultados da semana</p>
+          <ul id="rv-metrics" class="mt-2 space-y-1.5 text-sm"></ul>
+        </div>
 
-      <div class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800">
-        <label for="review-note" class="eyebrow">Foco da próxima semana</label>
-        <textarea id="review-note" rows="2" class="field mt-1.5 resize-none" placeholder="Uma frase: no que vou me concentrar?"></textarea>
-        <div class="mt-3 flex justify-end">
-          <button id="review-done" class="btn-primary">Concluir revisão</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ REFLEXÃO DO MÊS ============ -->
-    <section id="mreview-card" class="card hidden">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <p class="eyebrow">Reflexão do mês</p>
-          <h2 id="mr-title" class="mt-1 text-lg font-semibold capitalize tracking-tight"></h2>
-        </div>
-        <div class="flex items-center gap-1">
-          <button id="mr-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Mês anterior">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
-          </button>
-          <button id="mr-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo mês">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
-          </button>
-          <button id="mr-close" class="btn-ghost h-7 w-7 p-0" aria-label="Fechar reflexão do mês">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-      </div>
-      <div id="mr-stats" class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6"></div>
-      <div id="mr-rate-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
-        <p class="text-sm font-semibold">Avaliação das metas do mês</p>
-        <p class="text-xs text-zinc-500">De 1 a 5: quanto você avançou em cada uma — vale mesmo para as que não foram concluídas.</p>
-        <ul id="mr-rate" class="mt-3 space-y-2"></ul>
-      </div>
-      <div id="mr-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
-      <div class="mt-5 flex justify-end">
-        <button id="mr-done" class="btn-primary">Concluir reflexão do mês</button>
-      </div>
-    </section>
-
-    <!-- ============ KPIs ============ -->
-    <section class="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
-      <div class="card col-span-2 flex items-center gap-4 lg:col-span-1">
-        <svg class="h-14 w-14 shrink-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
-          <circle cx="28" cy="28" r="23" fill="none" stroke-width="5" class="stroke-zinc-100 dark:stroke-zinc-800" />
-          <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round"
-            class="stroke-emerald-500 transition-[stroke-dashoffset] duration-500" />
-        </svg>
-        <div class="min-w-0">
-          <p class="eyebrow">Hoje</p>
-          <p id="kpi-today" class="text-2xl font-semibold tabular-nums tracking-tight">0%</p>
-          <p id="kpi-today-sub" class="truncate text-xs text-zinc-500"></p>
-        </div>
-      </div>
-      <div class="card">
-        <p class="eyebrow">Semana</p>
-        <p id="kpi-week" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
-        <div class="track mt-2"><div id="kpi-week-bar" class="fill" style="width:0"></div></div>
-        <p id="kpi-week-sub" class="mt-1.5 text-xs text-zinc-500">média · 7 dias</p>
-      </div>
-      <div class="card">
-        <p id="kpi-month-label" class="eyebrow">Mês</p>
-        <p id="kpi-month" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
-        <div class="track mt-2"><div id="kpi-month-bar" class="fill" style="width:0"></div></div>
-        <p id="kpi-month-sub" class="mt-1.5 text-xs text-zinc-500"></p>
-      </div>
-      <div class="card col-span-2 lg:col-span-1">
-        <p class="eyebrow">Ofensiva de estudo</p>
-        <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight"><span id="kpi-streak">0</span> <span id="kpi-streak-unit" class="text-base font-medium text-zinc-500">dias</span></p>
-        <p id="kpi-streak-sub" class="mt-1.5 text-xs text-zinc-500"></p>
-      </div>
-    </section>
-
-    <!-- ============ MÉTRICAS DE RESULTADO ============ -->
-    <section class="card">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <h2 class="text-sm font-semibold">Resultados</h2>
-          <p class="text-xs text-zinc-500">Números que provam que você está evoluindo · registre 1× por semana</p>
-        </div>
-        <button id="metric-new" class="btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800">+ Nova métrica</button>
-      </div>
-      <form id="metric-form" class="mt-4 hidden rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div class="col-span-2">
-            <label for="mf-name" class="eyebrow">Métrica</label>
-            <input id="mf-name" class="field mt-1.5" maxlength="40" autocomplete="off" placeholder="Carga no supino" required />
+        <div class="mt-5 grid gap-5 border-t border-zinc-100 pt-5 sm:grid-cols-2 dark:border-zinc-800">
+          <div>
+            <p class="eyebrow">Vitórias da semana</p>
+            <ul id="rv-wins" class="mt-2 space-y-2 text-sm"></ul>
           </div>
           <div>
-            <label for="mf-unit" class="eyebrow">Unidade</label>
-            <input id="mf-unit" class="field mt-1.5" maxlength="10" autocomplete="off" placeholder="kg" />
-          </div>
-          <div>
-            <label for="mf-cur" class="eyebrow">Valor atual</label>
-            <input id="mf-cur" class="field mt-1.5" type="number" step="any" inputmode="decimal" placeholder="60" required />
-          </div>
-          <div>
-            <label for="mf-target" class="eyebrow">Meta</label>
-            <input id="mf-target" class="field mt-1.5" type="number" step="any" inputmode="decimal" placeholder="80" required />
-          </div>
-          <div class="col-span-2 sm:col-span-2">
-            <label for="mf-deadline" class="eyebrow">Prazo (opcional)</label>
-            <input id="mf-deadline" class="field mt-1.5" type="date" />
-          </div>
-          <div class="col-span-2 flex items-end justify-end gap-2 sm:col-span-3">
-            <button type="button" id="mf-cancel" class="btn-ghost">Cancelar</button>
-            <button type="submit" class="btn-primary">Criar métrica</button>
+            <p class="eyebrow">O que melhorar</p>
+            <ul id="rv-improves" class="mt-2 space-y-2 text-sm"></ul>
           </div>
         </div>
-      </form>
-      <div id="metric-list" class="mt-4 grid gap-4 sm:grid-cols-2"></div>
-    </section>
 
-    <!-- ============ PROJETOS ============ -->
-    <section class="card">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <h2 class="text-sm font-semibold">Projetos</h2>
-          <p class="text-xs text-zinc-500">Coisas grandes, divididas em marcos · registre cada avanço</p>
-        </div>
-        <button id="project-new" class="btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800">+ Novo projeto</button>
-      </div>
-      <form id="project-form" class="mt-4 hidden space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-        <div class="grid gap-3 sm:grid-cols-3">
-          <div class="sm:col-span-2">
-            <label for="pf-name" class="eyebrow">Projeto</label>
-            <input id="pf-name" class="field mt-1.5" maxlength="60" autocomplete="off" placeholder="Terminar o curso de Python" required />
-          </div>
-          <div>
-            <label for="pf-due" class="eyebrow">Prazo (opcional)</label>
-            <input id="pf-due" class="field mt-1.5" type="date" />
-          </div>
-        </div>
-        <div>
-          <label for="pf-miles" class="eyebrow">Marcos · um por linha</label>
-          <textarea id="pf-miles" rows="4" class="field mt-1.5 resize-y" placeholder="Módulo 1 — fundamentos&#10;Módulo 2 — funções&#10;Projeto final"></textarea>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button type="button" id="pf-cancel" class="btn-ghost">Cancelar</button>
-          <button type="submit" class="btn-primary">Criar projeto</button>
-        </div>
-      </form>
-      <div id="project-list" class="mt-4 grid gap-4 sm:grid-cols-2"></div>
-      <button id="projects-closed" class="btn-ghost -mx-2.5 mt-2 hidden text-xs"></button>
-    </section>
+        <div id="rv-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
 
-    <!-- ============ GASTOS ============ -->
-    <section id="expenses-card" class="card">
-      <div class="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 class="flex items-center gap-1 text-sm font-semibold">Gastos &amp; ganhos <span id="exp-eye"></span></h2>
-          <p class="text-xs text-zinc-500">Registre na hora, em 2 toques · quanto entrou, quanto saiu e o saldo de cada semana e mês</p>
+        <div class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800">
+          <label for="review-note" class="eyebrow">Foco da próxima semana</label>
+          <textarea id="review-note" rows="2" class="field mt-1.5 resize-none" placeholder="Uma frase: no que vou me concentrar?"></textarea>
+          <div class="mt-3 flex justify-end">
+            <button id="review-done" class="btn-primary">Concluir revisão</button>
+          </div>
         </div>
-        <div class="flex flex-wrap items-center gap-1">
-          <span class="text-[11px] text-zinc-500">Ver em</span>
-          <div id="exp-disp" class="mr-2 flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
-          <div id="exp-mode" class="flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
-          <button id="exp-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Período anterior"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
-          <button id="exp-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo período"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
-        </div>
-      </div>
-      <div id="fx-box" class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-800/40">
-        <span id="fx-rate" class="font-medium tabular-nums"></span>
-        <span id="fx-when" class="text-zinc-500"></span>
-        <span class="flex items-center gap-1.5 sm:ml-auto">
-          <input id="fx-amount" class="w-20 rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-emerald-500 dark:border-zinc-700"
-            type="text" inputmode="decimal" value="100" aria-label="Valor para converter" />
-          <span id="fx-from" class="text-zinc-500"></span>
-          <button id="fx-swap" type="button" class="btn-ghost h-6 w-6 p-0" aria-label="Inverter moedas" title="Inverter">⇄</button>
-          <span id="fx-out" class="font-semibold tabular-nums"></span>
-        </span>
-      </div>
-      <form id="exp-form" class="mt-3 space-y-2">
-        <div id="exp-kind" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
-        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-          <select id="exp-cur" class="field !w-auto shrink-0" aria-label="Moeda"></select>
-          <input id="exp-amount" class="field min-w-0 flex-1 tabular-nums" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Valor" />
-          <input id="exp-note" class="field order-last min-w-0 basis-full sm:order-none sm:basis-0 sm:flex-[2]" type="text" maxlength="60" autocomplete="off" placeholder="O quê? (opcional)" aria-label="Descrição" />
-          <button class="btn-primary shrink-0" type="submit">Adicionar</button>
-        </div>
-        <div id="exp-cats" class="flex flex-wrap gap-1.5"></div>
-        <p id="exp-err" class="h-4 text-xs text-rose-500"></p>
-      </form>
-      <div class="border-t border-zinc-100 pt-4 dark:border-zinc-800">
-        <p id="exp-range" class="eyebrow"></p>
-        <div id="exp-stats" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4"></div>
-        <div class="mt-5 grid gap-6 lg:grid-cols-2">
-          <div id="exp-cats-chart" class="space-y-4"></div>
+      </section>
+
+      <!-- ============ REFLEXÃO DO MÊS ============ -->
+      <section id="mreview-card" class="card hidden">
+        <div class="flex items-start justify-between gap-4">
           <div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p id="exp-trend-title" class="text-xs font-medium"></p>
-              <div class="flex items-center gap-3 text-[11px] text-zinc-500">
-                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Ganhos</span>
-                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Gastos</span>
-              </div>
+            <p class="eyebrow">Reflexão do mês</p>
+            <h2 id="mr-title" class="mt-1 text-lg font-semibold tracking-tight"></h2>
+          </div>
+          <div class="flex items-center gap-1">
+            <button id="mr-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Mês anterior">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button id="mr-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo mês">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <button id="mr-close" class="btn-ghost h-7 w-7 p-0" aria-label="Fechar reflexão do mês">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="mr-stats" class="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3"></div>
+        <div id="mr-rate-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
+          <p class="text-sm font-semibold">Avaliação das metas do mês</p>
+          <p class="text-xs text-zinc-500">De 1 a 5: quanto você avançou em cada uma — vale mesmo para as que não foram concluídas.</p>
+          <ul id="mr-rate" class="mt-3 space-y-2"></ul>
+        </div>
+        <div id="mr-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
+        <div class="mt-5 flex justify-end">
+          <button id="mr-done" class="btn-primary">Concluir reflexão do mês</button>
+        </div>
+      </section>
+
+    </div>
+    <div id="drawer-bd" aria-hidden="true"></div>
+
+    <!--
+      Layout da aba Hoje:
+      celular → uma coluna (A, B, C); ≥1024px → B à esquerda, A e C à direita; ≥1280px → três colunas,
+      com a coluna A (o resumo do dia) fixa ao rolar.
+    -->
+    <div id="today-grid">
+      <!-- A · resumo do dia -->
+      <div id="col-a" class="space-y-4 sm:space-y-5">
+        <!-- ============ THE ONE THING ============ -->
+        <section id="one-card" class="card relative overflow-hidden transition">
+          <span id="one-accent" class="absolute inset-y-0 left-0 w-1 bg-zinc-200 transition dark:bg-zinc-800"></span>
+          <div class="flex items-center justify-between">
+            <p class="eyebrow">The One Thing · foco único</p>
+            <span id="won-badge" class="hidden rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Dia ganho ✓</span>
+          </div>
+          <div class="mt-3 flex items-center gap-3">
+            <button id="one-check" data-check class="shrink-0" aria-label="Marcar foco do dia como feito"></button>
+            <input id="one-input" type="text" maxlength="140" autocomplete="off"
+              class="w-full bg-transparent text-lg font-medium tracking-tight outline-none placeholder:text-zinc-400 sm:text-xl dark:placeholder:text-zinc-600"
+              placeholder="Se eu fizer só uma coisa hoje, será…" />
+          </div>
+        </section>
+
+        <!-- ============ PRIORIDADES DE MELHORIA ============ -->
+        <section id="prio-card" class="card hidden">
+          <div class="flex items-center justify-between">
+            <p class="eyebrow">Prioridades de melhoria</p>
+            <span class="text-xs text-zinc-500">escolhidas nas suas reflexões</span>
+          </div>
+          <ol id="prio-list" class="mt-3 space-y-1"></ol>
+        </section>
+
+        <!-- ============ KPIs ============ -->
+        <section id="kpis" class="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5 lg:grid-cols-2">
+          <div class="card col-span-2 flex items-center gap-4 sm:col-span-1 lg:col-span-2">
+            <svg class="h-14 w-14 shrink-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
+              <circle cx="28" cy="28" r="23" fill="none" stroke-width="5" class="stroke-zinc-100 dark:stroke-zinc-800" />
+              <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round"
+                class="stroke-emerald-500 transition-[stroke-dashoffset] duration-500" />
+            </svg>
+            <div class="min-w-0">
+              <p class="eyebrow">Hoje</p>
+              <p id="kpi-today" class="text-2xl font-semibold tabular-nums tracking-tight">0%</p>
+              <p id="kpi-today-sub" class="truncate text-xs text-zinc-500"></p>
             </div>
-            <div id="exp-trend" class="mt-2"></div>
           </div>
-        </div>
-        <div id="exp-list" class="mt-5"></div>
+          <div class="card">
+            <p class="eyebrow">Semana</p>
+            <p id="kpi-week" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
+            <div class="track mt-2"><div id="kpi-week-bar" class="fill" style="width:0"></div></div>
+            <p id="kpi-week-sub" class="mt-1.5 text-xs text-zinc-500">média · 7 dias</p>
+          </div>
+          <div class="card">
+            <p id="kpi-month-label" class="eyebrow">Mês</p>
+            <p id="kpi-month" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
+            <div class="track mt-2"><div id="kpi-month-bar" class="fill" style="width:0"></div></div>
+            <p id="kpi-month-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+          </div>
+          <div class="card col-span-2 sm:col-span-1 lg:col-span-2">
+            <p class="eyebrow">Ofensiva de estudo</p>
+            <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight"><span id="kpi-streak">0</span> <span id="kpi-streak-unit" class="text-base font-medium text-zinc-500">dias</span></p>
+            <p id="kpi-streak-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+          </div>
+        </section>
+
+        <!-- Metas da semana -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <div class="flex items-baseline gap-2">
+              <h2 class="text-sm font-semibold">Metas da semana</h2>
+              <span id="goal-count" class="text-xs tabular-nums text-zinc-500"></span>
+            </div>
+            <span id="week-range" class="text-xs text-zinc-500"></span>
+          </div>
+          <p id="week-focus" class="mt-2 hidden text-xs leading-relaxed text-zinc-500"></p>
+          <div class="track mt-3"><div id="goal-bar" class="h-full rounded-full transition-[width] duration-500" style="width:0;background:var(--c-goal)"></div></div>
+          <ul id="goal-list" class="mt-3 space-y-0.5"></ul>
+          <button id="copy-goals" class="btn-ghost -mx-2.5 hidden text-xs">↺ Copiar metas da semana passada</button>
+          <form id="goal-form" class="mt-3 flex gap-2">
+            <input id="goal-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Meta para esta semana…" />
+            <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar meta">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </form>
+          <div class="mt-2 flex justify-end">
+            <button id="review-open" class="btn-ghost -mr-2.5 text-xs">Revisão da semana →</button>
+          </div>
+        </section>
+
+        <!-- Heatmap -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold">Últimos 7 dias</h2>
+            <span id="heat-sub" class="text-xs text-zinc-500"></span>
+          </div>
+          <div id="heatmap" class="mt-4 grid grid-cols-7 gap-2"></div>
+          <div class="mt-4 flex items-center justify-end gap-1 text-[10px] text-zinc-500">
+            <span class="mr-1">menos</span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-300 dark:bg-emerald-800"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
+            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
+            <span class="ml-1">mais</span>
+          </div>
+        </section>
+
       </div>
-    </section>
 
-    <!-- ============ GRID PRINCIPAL ============ -->
-    <div class="grid gap-4 sm:gap-5 lg:grid-cols-5">
-
-      <!-- Coluna esquerda -->
-      <div class="space-y-4 sm:space-y-5 lg:col-span-3">
-
+      <!-- B · o que você faz hoje -->
+      <div id="col-b" class="space-y-4 sm:space-y-5">
         <!-- Tarefas -->
         <section class="card">
           <div class="flex items-center justify-between">
@@ -469,6 +453,53 @@
           <ul id="pending-list" class="mt-3 space-y-0.5"></ul>
         </section>
 
+        <!-- Sono & energia -->
+        <section class="card">
+          <h2 class="text-sm font-semibold">Sono & energia</h2>
+          <div class="mt-4 flex items-end justify-between gap-4">
+            <div>
+              <p class="eyebrow">Horas dormidas</p>
+              <div class="mt-1.5 flex items-center gap-1">
+                <button class="btn-ghost h-8 w-8 p-0" data-sleep="-0.5" aria-label="Menos meia hora">−</button>
+                <input id="sleep-input" type="number" step="0.25" min="0" max="16" placeholder="0"
+                  class="w-16 bg-transparent text-center text-2xl font-semibold tabular-nums tracking-tight outline-none placeholder:text-zinc-400" />
+                <button class="btn-ghost h-8 w-8 p-0" data-sleep="0.5" aria-label="Mais meia hora">+</button>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="eyebrow">Energia</p>
+              <div id="energy" class="mt-2 flex items-center justify-end">
+                <div class="flex h-6 items-stretch gap-[3px] rounded-md border border-zinc-300 p-[3px] dark:border-zinc-700" id="energy-cells"></div>
+                <span class="ml-[2px] h-2.5 w-[3px] rounded-r-sm bg-zinc-300 dark:bg-zinc-700"></span>
+              </div>
+              <p id="energy-label" class="mt-1.5 h-4 text-xs text-zinc-500"></p>
+            </div>
+          </div>
+          <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <p class="text-xs text-zinc-500">Média da semana: <span id="sleep-avg" class="font-medium text-zinc-900 tabular-nums dark:text-zinc-100">—</span></p>
+            <p id="sleep-goal" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
+            <p id="sleep-insight" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
+          </div>
+        </section>
+
+        <!-- Check-in do dia: perguntas configuráveis + tags -->
+        <section class="card">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold">Check-in do dia</h2>
+            <div class="flex items-center gap-1">
+              <button id="tags-open" class="btn-ghost text-xs">Análise por tag</button>
+              <button id="questions-manage" class="btn-ghost h-7 w-7 p-0" aria-label="Configurar perguntas" title="Configurar perguntas"></button>
+            </div>
+          </div>
+          <div id="checkin" class="mt-4 space-y-4"></div>
+          <div id="checkin-summary" class="mt-4 space-y-1.5 text-xs text-zinc-500"></div>
+          <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <p class="eyebrow">Tags do dia</p>
+            <div id="day-tags" class="mt-2 flex flex-wrap gap-1.5"></div>
+            <p class="mt-2 text-[11px] leading-snug text-zinc-500">#tags escritas no foco, na reflexão ou nas respostas também contam. Os insights comparam dias com e sem cada tag.</p>
+          </div>
+        </section>
+
         <!-- Estudos -->
         <section class="card">
           <div class="flex items-center justify-between">
@@ -476,7 +507,7 @@
             <span class="text-xs text-zinc-500"><span id="study-today" class="font-medium text-zinc-900 tabular-nums dark:text-zinc-100">0m</span> <span id="study-today-label">hoje</span></span>
           </div>
 
-          <div class="mt-5 grid gap-6 sm:grid-cols-2 sm:gap-8">
+          <div class="mt-5 grid gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-1">
             <!-- Revisão espaçada + registro de aprendizado -->
             <div class="space-y-5">
               <div>
@@ -502,7 +533,7 @@
             </div>
 
             <!-- Meta, matéria, registro manual e distribuição -->
-            <div class="space-y-5 sm:border-l sm:border-zinc-100 sm:pl-6 dark:sm:border-zinc-800">
+            <div class="space-y-5 sm:border-l sm:border-zinc-100 sm:pl-6 dark:sm:border-zinc-800 lg:border-l-0 lg:border-t lg:pl-0 lg:pt-6">
               <div class="flex items-center gap-3">
                 <svg class="h-11 w-11 shrink-0 -rotate-90" viewBox="0 0 44 44" aria-hidden="true">
                   <circle cx="22" cy="22" r="18" fill="none" stroke-width="4" class="stroke-zinc-100 dark:stroke-zinc-800" />
@@ -598,110 +629,153 @@
         </details>
       </div>
 
-      <!-- Coluna direita -->
-      <div class="space-y-4 sm:space-y-5 lg:col-span-2">
-
-        <!-- Metas da semana -->
+      <!-- C · resultados, projetos e dinheiro -->
+      <div id="col-c" class="space-y-4 sm:space-y-5">
+        <!-- ============ MÉTRICAS DE RESULTADO ============ -->
         <section class="card">
-          <div class="flex items-center justify-between">
-            <div class="flex items-baseline gap-2">
-              <h2 class="text-sm font-semibold">Metas da semana</h2>
-              <span id="goal-count" class="text-xs tabular-nums text-zinc-500"></span>
-            </div>
-            <span id="week-range" class="text-xs text-zinc-500"></span>
-          </div>
-          <p id="week-focus" class="mt-2 hidden text-xs leading-relaxed text-zinc-500"></p>
-          <div class="track mt-3"><div id="goal-bar" class="h-full rounded-full transition-[width] duration-500" style="width:0;background:var(--c-goal)"></div></div>
-          <ul id="goal-list" class="mt-3 space-y-0.5"></ul>
-          <button id="copy-goals" class="btn-ghost -mx-2.5 hidden text-xs">↺ Copiar metas da semana passada</button>
-          <form id="goal-form" class="mt-3 flex gap-2">
-            <input id="goal-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Meta para esta semana…" />
-            <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar meta">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </form>
-          <div class="mt-2 flex justify-end">
-            <button id="review-open" class="btn-ghost -mr-2.5 text-xs">Revisão da semana →</button>
-          </div>
-        </section>
-
-        <!-- Heatmap -->
-        <section class="card">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold">Últimos 7 dias</h2>
-            <span id="heat-sub" class="text-xs text-zinc-500"></span>
-          </div>
-          <div id="heatmap" class="mt-4 grid grid-cols-7 gap-2"></div>
-          <div class="mt-4 flex items-center justify-end gap-1 text-[10px] text-zinc-500">
-            <span class="mr-1">menos</span>
-            <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
-            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
-            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-300 dark:bg-emerald-800"></span>
-            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
-            <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
-            <span class="ml-1">mais</span>
-          </div>
-        </section>
-
-        <!-- Sono & energia -->
-        <section class="card">
-          <h2 class="text-sm font-semibold">Sono & energia</h2>
-          <div class="mt-4 flex items-end justify-between gap-4">
+          <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow">Horas dormidas</p>
-              <div class="mt-1.5 flex items-center gap-1">
-                <button class="btn-ghost h-8 w-8 p-0" data-sleep="-0.5" aria-label="Menos meia hora">−</button>
-                <input id="sleep-input" type="number" step="0.25" min="0" max="16" placeholder="0"
-                  class="w-16 bg-transparent text-center text-2xl font-semibold tabular-nums tracking-tight outline-none placeholder:text-zinc-400" />
-                <button class="btn-ghost h-8 w-8 p-0" data-sleep="0.5" aria-label="Mais meia hora">+</button>
+              <h2 class="text-sm font-semibold">Resultados</h2>
+              <p class="text-xs text-zinc-500">Números que provam que você está evoluindo · registre 1× por semana</p>
+            </div>
+            <button id="metric-new" class="btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800">+ Nova métrica</button>
+          </div>
+          <form id="metric-form" class="mt-4 hidden rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <div class="col-span-2">
+                <label for="mf-name" class="eyebrow">Métrica</label>
+                <input id="mf-name" class="field mt-1.5" maxlength="40" autocomplete="off" placeholder="Carga no supino" required />
+              </div>
+              <div>
+                <label for="mf-unit" class="eyebrow">Unidade</label>
+                <input id="mf-unit" class="field mt-1.5" maxlength="10" autocomplete="off" placeholder="kg" />
+              </div>
+              <div>
+                <label for="mf-cur" class="eyebrow">Valor atual</label>
+                <input id="mf-cur" class="field mt-1.5" type="number" step="any" inputmode="decimal" placeholder="60" required />
+              </div>
+              <div>
+                <label for="mf-target" class="eyebrow">Meta</label>
+                <input id="mf-target" class="field mt-1.5" type="number" step="any" inputmode="decimal" placeholder="80" required />
+              </div>
+              <div class="col-span-2 sm:col-span-2">
+                <label for="mf-deadline" class="eyebrow">Prazo (opcional)</label>
+                <input id="mf-deadline" class="field mt-1.5" type="date" />
+              </div>
+              <div class="col-span-2 flex items-end justify-end gap-2 sm:col-span-3">
+                <button type="button" id="mf-cancel" class="btn-ghost">Cancelar</button>
+                <button type="submit" class="btn-primary">Criar métrica</button>
               </div>
             </div>
-            <div class="text-right">
-              <p class="eyebrow">Energia</p>
-              <div id="energy" class="mt-2 flex items-center justify-end">
-                <div class="flex h-6 items-stretch gap-[3px] rounded-md border border-zinc-300 p-[3px] dark:border-zinc-700" id="energy-cells"></div>
-                <span class="ml-[2px] h-2.5 w-[3px] rounded-r-sm bg-zinc-300 dark:bg-zinc-700"></span>
+          </form>
+          <div id="metric-list" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1"></div>
+        </section>
+
+        <!-- ============ PROJETOS ============ -->
+        <section class="card">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold">Projetos</h2>
+              <p class="text-xs text-zinc-500">Coisas grandes, divididas em marcos · registre cada avanço</p>
+            </div>
+            <button id="project-new" class="btn-ghost shrink-0 border border-zinc-200 text-xs dark:border-zinc-800">+ Novo projeto</button>
+          </div>
+          <form id="project-form" class="mt-4 hidden space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div class="sm:col-span-2">
+                <label for="pf-name" class="eyebrow">Projeto</label>
+                <input id="pf-name" class="field mt-1.5" maxlength="60" autocomplete="off" placeholder="Terminar o curso de Python" required />
               </div>
-              <p id="energy-label" class="mt-1.5 h-4 text-xs text-zinc-500"></p>
+              <div>
+                <label for="pf-due" class="eyebrow">Prazo (opcional)</label>
+                <input id="pf-due" class="field mt-1.5" type="date" />
+              </div>
+            </div>
+            <div>
+              <label for="pf-miles" class="eyebrow">Marcos · um por linha</label>
+              <textarea id="pf-miles" rows="4" class="field mt-1.5 resize-y" placeholder="Módulo 1 — fundamentos&#10;Módulo 2 — funções&#10;Projeto final"></textarea>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" id="pf-cancel" class="btn-ghost">Cancelar</button>
+              <button type="submit" class="btn-primary">Criar projeto</button>
+            </div>
+          </form>
+          <div id="project-list" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1"></div>
+          <button id="projects-closed" class="btn-ghost -mx-2.5 mt-2 hidden text-xs"></button>
+        </section>
+
+        <!-- ============ GASTOS ============ -->
+        <section id="expenses-card" class="card">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 class="flex items-center gap-1 text-sm font-semibold">Gastos &amp; ganhos <span id="exp-eye"></span></h2>
+              <p class="text-xs text-zinc-500">Registre na hora, em 2 toques · quanto entrou, quanto saiu e o saldo de cada semana e mês</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="text-[11px] text-zinc-500">Ver em</span>
+              <div id="exp-disp" class="mr-2 flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
+              <div id="exp-mode" class="flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
+              <button id="exp-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Período anterior"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+              <button id="exp-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo período"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
             </div>
           </div>
-          <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-            <p class="text-xs text-zinc-500">Média da semana: <span id="sleep-avg" class="font-medium text-zinc-900 tabular-nums dark:text-zinc-100">—</span></p>
-            <p id="sleep-goal" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
-            <p id="sleep-insight" class="mt-1.5 text-xs leading-relaxed text-zinc-500"></p>
+          <div id="fx-box" class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-800/40">
+            <span id="fx-rate" class="font-medium tabular-nums"></span>
+            <span id="fx-when" class="text-zinc-500"></span>
+            <span class="flex items-center gap-1.5 sm:ml-auto">
+              <input id="fx-amount" class="w-20 rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-emerald-500 dark:border-zinc-700"
+                type="text" inputmode="decimal" value="100" aria-label="Valor para converter" />
+              <span id="fx-from" class="text-zinc-500"></span>
+              <button id="fx-swap" type="button" class="btn-ghost h-6 w-6 p-0" aria-label="Inverter moedas" title="Inverter">⇄</button>
+              <span id="fx-out" class="font-semibold tabular-nums"></span>
+            </span>
+          </div>
+          <form id="exp-form" class="mt-3 space-y-2">
+            <div id="exp-kind" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
+            <div class="flex flex-wrap gap-2">
+              <select id="exp-cur" class="field !w-auto shrink-0" aria-label="Moeda"></select>
+              <input id="exp-amount" class="field min-w-0 flex-1 tabular-nums" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Valor" />
+              <input id="exp-note" class="field order-last min-w-0 basis-full" type="text" maxlength="60" autocomplete="off" placeholder="O quê? (opcional)" aria-label="Descrição" />
+              <button class="btn-primary shrink-0" type="submit">Adicionar</button>
+            </div>
+            <div id="exp-cats" class="flex flex-wrap gap-1.5"></div>
+            <p id="exp-err" class="h-4 text-xs text-rose-500"></p>
+          </form>
+          <div class="border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <p id="exp-range" class="eyebrow"></p>
+            <div id="exp-stats" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2"></div>
+            <div class="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-1">
+              <div id="exp-cats-chart" class="space-y-4"></div>
+              <div>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p id="exp-trend-title" class="text-xs font-medium"></p>
+                  <div class="flex items-center gap-3 text-[11px] text-zinc-500">
+                    <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Ganhos</span>
+                    <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Gastos</span>
+                  </div>
+                </div>
+                <div id="exp-trend" class="mt-2"></div>
+              </div>
+            </div>
+            <div id="exp-list" class="mt-5"></div>
           </div>
         </section>
 
-        <!-- Check-in do dia: perguntas configuráveis + tags -->
+        <!-- ============ INSIGHTS ============ -->
         <section class="card">
           <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold">Check-in do dia</h2>
-            <div class="flex items-center gap-1">
-              <button id="tags-open" class="btn-ghost text-xs">Análise por tag</button>
-              <button id="questions-manage" class="btn-ghost h-7 w-7 p-0" aria-label="Configurar perguntas" title="Configurar perguntas"></button>
-            </div>
+            <h2 class="text-sm font-semibold">O que os seus dados dizem</h2>
+            <span class="text-xs text-zinc-500">últimos 60 dias</span>
           </div>
-          <div id="checkin" class="mt-4 space-y-4"></div>
-          <div id="checkin-summary" class="mt-4 space-y-1.5 text-xs text-zinc-500"></div>
-          <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-            <p class="eyebrow">Tags do dia</p>
-            <div id="day-tags" class="mt-2 flex flex-wrap gap-1.5"></div>
-            <p class="mt-2 text-[11px] leading-snug text-zinc-500">#tags escritas no foco, na reflexão ou nas respostas também contam. Os insights comparam dias com e sem cada tag.</p>
-          </div>
+          <ul id="insight-list" class="mt-3 space-y-2.5 text-sm"></ul>
+          <p class="mt-3 text-xs text-zinc-500">Correlação não é prova. Use cada padrão como pista e teste por 2 semanas.</p>
         </section>
 
       </div>
     </div>
 
-    <!-- ============ INSIGHTS ============ -->
-    <section class="card">
-      <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold">O que os seus dados dizem</h2>
-        <span class="text-xs text-zinc-500">últimos 60 dias</span>
-      </div>
-      <ul id="insight-list" class="mt-3 space-y-2.5 text-sm"></ul>
-      <p class="mt-3 text-xs text-zinc-500">Correlação não é prova. Use cada padrão como pista e teste por 2 semanas.</p>
-    </section>
+    <!-- Divisor entre o dia (colunas) e a visão mensal -->
+    <hr class="section-divider" aria-hidden="true" />
 
     <!-- ============ VISÃO MENSAL ============ -->
     <section id="month-card" class="card">
@@ -890,6 +964,26 @@
   <div id="tip" role="tooltip" class="pointer-events-none fixed z-50 hidden min-w-[140px] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-lg shadow-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900"></div>
 
   <!-- Diário das reflexões -->
+  <dialog id="settings" class="m-auto w-[min(480px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+    <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+      <h2 class="text-base font-semibold">Configurações</h2>
+      <button class="btn-ghost h-7 w-7 p-0" data-close aria-label="Fechar">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="space-y-6 px-5 py-5">
+      <div>
+        <p class="text-sm font-medium">Cor de destaque</p>
+        <p class="text-xs text-zinc-500">Muda botões, checks, barras e gráficos. Verde de "bom" e vermelho de "ruim" continuam iguais.</p>
+        <div id="accent-list" class="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7"></div>
+      </div>
+      <div>
+        <p class="text-sm font-medium">Tema</p>
+        <div id="theme-list" class="mt-2 inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="journal" class="m-auto max-h-[85vh] w-[min(640px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
     <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
       <div class="flex items-baseline gap-2">
@@ -1052,7 +1146,7 @@ const SYNCED = ['days', 'weeks', 'months'];
 const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics', 'questions', 'projects', 'expenses'];
 const sigs = new Map();
 const sigOf = (rec) => { const { u, ...rest } = rec; return JSON.stringify(rest); };
-const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH, currency: S.settings.currency });
+const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH, currency: S.settings.currency, accent: S.settings.accent });
 function rememberSigs() {
   sigs.clear();
   for (const col of SYNCED) for (const [k, rec] of Object.entries(S[col])) sigs.set(`${col}:${k}`, sigOf(rec));
@@ -2055,9 +2149,10 @@ function renderGoals() {
 function paintTab(p) {
   document.title = p == null ? 'Evolução' : `${fmtPct(p)} hoje · Evolução`;
   const C = 2 * Math.PI * 9, v = Math.max(0, Math.min(1, p || 0));
-  const arc = v ? `<circle cx='16' cy='16' r='9' fill='none' stroke='${v >= 1 ? '#34d399' : '#10b981'}' stroke-width='4' stroke-linecap='round'
+  const acc = (n) => `rgb(${getComputedStyle(document.documentElement).getPropertyValue(`--acc-${n}`).trim().replace(/ /g, ',')})`;
+  const arc = v ? `<circle cx='16' cy='16' r='9' fill='none' stroke='${v >= 1 ? acc(400) : acc(500)}' stroke-width='4' stroke-linecap='round'
     stroke-dasharray='${(C * v).toFixed(2)} ${C.toFixed(2)}' transform='rotate(-90 16 16)'/>` : '';
-  const check = v >= 1 ? `<path d='M11.5 16.2l3 3 6-6.4' fill='none' stroke='#34d399' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/>` : '';
+  const check = v >= 1 ? `<path d='M11.5 16.2l3 3 6-6.4' fill='none' stroke='${acc(400)}' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/>` : '';
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='#09090b'/>` +
     `<circle cx='16' cy='16' r='9' fill='none' stroke='#27272a' stroke-width='4'/>${arc}${check}</svg>`;
   $('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(svg);
@@ -2245,7 +2340,7 @@ function renderStudyTrend() {
   if (prev.length && avg(prev) > 0) {
     const pct = Math.round((last7 / avg(prev) - 1) * 100);
     el.textContent = `${pct >= 0 ? '+' : ''}${pct}% vs média`;
-    el.className = 'text-xs font-medium tabular-nums ' + (pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500');
+    el.className = 'text-xs font-medium tabular-nums ' + (pct >= 0 ? 'text-ok-600 dark:text-ok-400' : 'text-rose-500');
     $('#st-sub').textContent = `${fmtMin(last7)} nos últimos 7 dias · média de ${fmtMin(Math.round(avg(prev)))} nas ${prev.length} semanas anteriores`;
   } else {
     el.textContent = '';
@@ -2507,7 +2602,7 @@ function renderMetrics() {
       if (st.e.length > 1) {
         const dl = document.createElement('span');
         // Oculto: sem verde/vermelho, para a cor não entregar se subiu ou desceu
-        dl.className = 'text-xs font-medium tabular-nums ' + (st.delta30 === 0 || maskMoney(m.unit) ? 'text-zinc-500' : st.good(st.delta30) ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500');
+        dl.className = 'text-xs font-medium tabular-nums ' + (st.delta30 === 0 || maskMoney(m.unit) ? 'text-zinc-500' : st.good(st.delta30) ? 'text-ok-600 dark:text-ok-400' : 'text-rose-500');
         dl.textContent = `${signed(m, st.delta30)} ${st.deltaLabel}`;
         big.append(dl);
       }
@@ -2538,7 +2633,7 @@ function renderMetrics() {
         const perWeek = `${signed(m, st.slope * 7)}/sem`;
         if (st.eta) {
           const late = m.deadline && keyOf(st.eta) > m.deadline;
-          pace.className += late ? ' text-amber-600 dark:text-amber-400' : ' text-emerald-600 dark:text-emerald-400';
+          pace.className += late ? ' text-amber-600 dark:text-amber-400' : ' text-ok-600 dark:text-ok-400';
           pace.textContent = `Ritmo ${perWeek} → meta em ~${fmtShort.format(st.eta).replace('.', '')}${st.eta.getFullYear() !== new Date().getFullYear() ? ` de ${st.eta.getFullYear()}` : ''}` +
             (late && st.needPerWeek ? ` · precisa de ${signed(m, st.needPerWeek)}/sem para o prazo` : '');
         } else {
@@ -3141,7 +3236,7 @@ function renderMonthReview() {
   const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0));
   const pm = m ? [y, m - 1] : [y - 1, 11];
   const cur = periodStats(first, last), prev = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
-  $('#mr-title').textContent = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1));
+  $('#mr-title').textContent = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)));
   const now = new Date();
   $('#mr-next').disabled = y > now.getFullYear() || (y === now.getFullYear() && m >= now.getMonth());
   $('#mr-prev').disabled = keyOf(new Date(y, m, 0)) < S.startDate;
@@ -3798,7 +3893,7 @@ function renderProjects() {
     if (projectOpen === p.id) card.append(projectDetail(p));
     if (st.perWeek != null) {
       const pace = document.createElement('p');
-      pace.className = 'mt-0.5 text-xs ' + (st.pace == null ? 'text-zinc-500' : st.onTrack ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400');
+      pace.className = 'mt-0.5 text-xs ' + (st.pace == null ? 'text-zinc-500' : st.onTrack ? 'text-ok-600 dark:text-ok-400' : 'text-amber-600 dark:text-amber-400');
       pace.textContent = `Precisa de ${fmtNum(+st.perWeek.toFixed(1))} marco/sem até o prazo` + (st.pace == null ? '' : ` · seu ritmo: ${fmtNum(+st.pace.toFixed(1))}/sem`);
       card.append(pace);
     }
@@ -4303,7 +4398,7 @@ function renderLearning() {
   $('#lm-learned-sub').textContent = `na semana · ${mo} no mês`;
   const r = retention(keyOf(addDays(new Date(), -29)), tk);
   $('#lm-retention').textContent = r.rate == null ? '—' : fmtPct(r.rate);
-  $('#lm-retention').className = 'mt-1 text-xl font-semibold tabular-nums ' + (r.rate == null ? '' : r.rate >= 0.8 ? 'text-emerald-600 dark:text-emerald-400' : r.rate < 0.6 ? 'text-rose-500' : '');
+  $('#lm-retention').className = 'mt-1 text-xl font-semibold tabular-nums ' + (r.rate == null ? '' : r.rate >= 0.8 ? 'text-ok-600 dark:text-ok-400' : r.rate < 0.6 ? 'text-rose-500' : '');
   $('#lm-retention-sub').textContent = r.n ? `${r.ok}/${r.n} revisões · 30 dias` : 'sem revisões ainda';
   const overdue = S.topics.filter((t) => !t.mastered && t.due && t.due < tk).length;
   $('#lm-overdue').textContent = overdue;
@@ -4555,7 +4650,7 @@ function renderReview() {
     else if (before == null || before === now) v.textContent = before == null ? fmtVal(m, now) : `${fmtVal(m, now)} · sem mudança`;
     else {
       v.textContent = `${fmtAmt(m.unit, before)} → ${fmtVal(m, now)} (${signed(m, now - before)})`;
-      if (!maskMoney(m.unit)) v.className += st.good(now - before) ? ' text-emerald-600 dark:text-emerald-400' : ' text-rose-500';
+      if (!maskMoney(m.unit)) v.className += st.good(now - before) ? ' text-ok-600 dark:text-ok-400' : ' text-rose-500';
     }
     if (isMoneyUnit(m.unit)) { n.className += ' inline-flex items-center gap-1'; n.append(moneyEye()); }
     li.append(n, v);
@@ -5490,7 +5585,7 @@ function renderExpenses() {
     stat('Gastos', fmtMoney(T.out), `${fmtMoney(T.out / elapsed)}/dia${vs(T.out, PT.out)}`),
     stat('Saldo', `${T.net > 0 && !hidden ? '+' : ''}${fmtMoney(T.net)}`,
       saved == null ? 'sem ganhos no período' : T.net >= 0 ? `guardou ${fmtPct(saved)} do que ganhou` : 'gastou mais do que ganhou',
-      T.net > 0 ? 'text-emerald-600 dark:text-emerald-400' : T.net < 0 ? 'text-rose-500' : ''),
+      T.net > 0 ? 'text-ok-600 dark:text-ok-400' : T.net < 0 ? 'text-rose-500' : ''),
     stat(expMode === 'week' ? 'Saldo semana anterior' : 'Saldo mês anterior', `${PT.net > 0 && !hidden ? '+' : ''}${fmtMoney(PT.net)}`,
       PT.inc || PT.out ? `ganhou ${fmtMoney(PT.inc)} · gastou ${fmtMoney(PT.out)}` : 'sem lançamentos'),
   );
@@ -5863,6 +5958,45 @@ const setPrivate = (on) => {
 try { setPrivate(localStorage.getItem('evolution-private') === '1'); } catch (e) {}
 $('#private-toggle').onclick = () => setPrivate(!document.documentElement.classList.contains('private'));
 
+// ---------- Configurações: cor de destaque e tema ----------
+const ACCENTS = [['verde', 'Verde'], ['azul', 'Azul'], ['ciano', 'Ciano'], ['roxo', 'Roxo'], ['rosa', 'Rosa'], ['vermelho', 'Vermelho'], ['laranja', 'Laranja']];
+function applyAccent() {
+  const a = S.settings.accent || 'verde';
+  if (a === 'verde') delete document.documentElement.dataset.accent; else document.documentElement.dataset.accent = a;
+}
+function renderSettings() {
+  const list = $('#accent-list'), cur = S.settings.accent || 'verde';
+  list.replaceChildren();
+  for (const [key, name] of ACCENTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.accent = key;
+    const on = key === cur;
+    b.className = 'flex flex-col items-center gap-1.5 rounded-lg border p-2 text-[11px] font-medium transition ' +
+      (on ? 'border-zinc-900 dark:border-zinc-100' : 'border-transparent text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700');
+    b.setAttribute('aria-pressed', String(on));
+    // a amostra usa a própria paleta (data-accent no botão redefine --acc-*)
+    b.innerHTML = '<span class="flex h-7 w-7 items-center justify-center rounded-full text-white" style="background:rgb(var(--acc-600))"></span><span></span>';
+    if (on) b.children[0].innerHTML = CHECK_SVG;
+    b.children[1].textContent = name;
+    b.onclick = () => { S.settings.accent = key === 'verde' ? null : key; applyAccent(); save(); renderSettings(); renderAll(false); };
+    list.append(b);
+  }
+  const dark = document.documentElement.classList.contains('dark');
+  const tl = $('#theme-list');
+  tl.replaceChildren();
+  for (const [v, l] of [['light', 'Claro'], ['dark', 'Escuro']]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rounded-md px-3 py-1 transition ' + ((v === 'dark') === dark ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500');
+    b.textContent = l;
+    b.onclick = () => { if ((v === 'dark') !== document.documentElement.classList.contains('dark')) $('#theme-toggle').click(); renderSettings(); };
+    tl.append(b);
+  }
+}
+$('#settings-open').onclick = () => { renderSettings(); $('#settings').showModal(); };
+applyAccent();
+
 $('#theme-toggle').onclick = () => {
   const dark = document.documentElement.classList.toggle('dark');
   S.settings.theme = dark ? 'dark' : 'light';
@@ -5937,6 +6071,43 @@ $('#review-done').onclick = () => {
   reviewManual = false; reviewWeek = null;
   commit(renderReview);
 };
+
+// Gaveta das revisões: fecha clicando fora ou com Esc
+const closeDrawer = () => {
+  if (!$('#review-card').classList.contains('hidden')) $('#review-close').click();
+  else if (!$('#mreview-card').classList.contains('hidden')) $('#mr-close').click();
+};
+$('#drawer-bd').onclick = closeDrawer;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !document.querySelector('dialog[open]') && innerWidth >= 1024) closeDrawer(); });
+
+// Cards recolhíveis: ▾ no título; o que fica recolhido é lembrado neste aparelho
+const COLLAPSIBLE = { tasks: '#task-list', pending: '#pending-list', study: '#study-today', goals: '#goal-list',
+  heat: '#heatmap', sleep: '#sleep-input', checkin: '#checkin', metrics: '#metric-list', projects: '#project-list',
+  money: '#exp-stats', insights: '#insight-list', month: '#month-card' };
+let collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('evolution-collapsed')) || []; } catch (e) { return []; } })());
+for (const [key, sel] of Object.entries(COLLAPSIBLE)) {
+  const sec = $(sel)?.closest('section');
+  if (!sec) continue;
+  const head = sec.firstElementChild;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md align-middle text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200';
+  const paint = () => {
+    const c = collapsed.has(key);
+    sec.classList.toggle('is-collapsed', c);
+    b.innerHTML = `<svg class="h-4 w-4 transition ${c ? '-rotate-90' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+    b.setAttribute('aria-expanded', String(!c));
+    b.setAttribute('aria-label', c ? 'Expandir' : 'Recolher');
+    b.title = c ? 'Expandir' : 'Recolher';
+  };
+  b.onclick = () => {
+    collapsed.has(key) ? collapsed.delete(key) : collapsed.add(key);
+    try { localStorage.setItem('evolution-collapsed', JSON.stringify([...collapsed])); } catch (e) {}
+    paint();
+  };
+  paint();
+  head.append(b);
+}
 
 // Diálogos: fechar no X ou clicando fora
 $$('dialog').forEach((dlg) => {
@@ -6110,7 +6281,7 @@ function syncPayload() {
   const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
   return { version: 1, resetAt: S.resetAt || 0, startDate: S.startDate, ...lists,
            days: S.days, weeks: S.weeks, months: S.months,
-           settings: { studyGoalH: S.settings.studyGoalH, currency: S.settings.currency }, settingsU: S.settingsU || 0 };
+           settings: { studyGoalH: S.settings.studyGoalH, currency: S.settings.currency, accent: S.settings.accent }, settingsU: S.settingsU || 0 };
 }
 /** JSON com as chaves ordenadas: o Postgres (jsonb) reordena as chaves, então é assim que se compara. */
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)
@@ -6147,6 +6318,8 @@ function mergeRemote(r) {
   if ((r.settingsU || 0) > (S.settingsU || 0)) {
     S.settings.studyGoalH = r.settings?.studyGoalH ?? S.settings.studyGoalH;
     S.settings.currency = r.settings?.currency ?? S.settings.currency;
+    S.settings.accent = r.settings?.accent ?? S.settings.accent;
+    applyAccent();
     S.settingsU = r.settingsU; changed = true;
   }
   if (r.startDate && r.startDate < S.startDate) { S.startDate = r.startDate; changed = true; }
