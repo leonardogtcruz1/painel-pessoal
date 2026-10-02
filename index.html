@@ -369,8 +369,8 @@
     <section id="expenses-card" class="card">
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 class="flex items-center gap-1 text-sm font-semibold">Gastos <span id="exp-eye"></span></h2>
-          <p class="text-xs text-zinc-500">Registre na hora, em 2 toques · resumo por semana e por mês</p>
+          <h2 class="flex items-center gap-1 text-sm font-semibold">Gastos &amp; ganhos <span id="exp-eye"></span></h2>
+          <p class="text-xs text-zinc-500">Registre na hora, em 2 toques · quanto entrou, quanto saiu e o saldo de cada semana e mês</p>
         </div>
         <div class="flex items-center gap-1">
           <div id="exp-mode" class="flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
@@ -379,6 +379,7 @@
         </div>
       </div>
       <form id="exp-form" class="mt-4 space-y-2">
+        <div id="exp-kind" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
         <div class="flex flex-wrap gap-2 sm:flex-nowrap">
           <select id="exp-cur" class="field !w-auto shrink-0" aria-label="Moeda"></select>
           <input id="exp-amount" class="field min-w-0 flex-1 tabular-nums" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" aria-label="Valor" />
@@ -392,12 +393,15 @@
         <p id="exp-range" class="eyebrow"></p>
         <div id="exp-stats" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4"></div>
         <div class="mt-5 grid gap-6 lg:grid-cols-2">
+          <div id="exp-cats-chart" class="space-y-4"></div>
           <div>
-            <p class="text-xs font-medium">Por categoria</p>
-            <div id="exp-cats-chart" class="mt-2 space-y-1.5"></div>
-          </div>
-          <div>
-            <p id="exp-trend-title" class="text-xs font-medium"></p>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p id="exp-trend-title" class="text-xs font-medium"></p>
+              <div class="flex items-center gap-3 text-[11px] text-zinc-500">
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Ganhos</span>
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Gastos</span>
+              </div>
+            </div>
             <div id="exp-trend" class="mt-2"></div>
           </div>
         </div>
@@ -5203,15 +5207,16 @@ function renderMonthDetail() {
   }).filter(Boolean);
   sec6.append(el('p', 'mt-3 eyebrow', 'Projetos'), list(projItems, 'Nenhum avanço em projetos.'));
 
-  // Gastos do mês
+  // Dinheiro do mês: ganhos, gastos e saldo
   const ex = expIn(first, last);
   if (ex.length) {
-    const tot = expSum(ex), byC = {};
-    for (const e of ex) byC[e.cat] = (byC[e.cat] || 0) + e.amount;
+    const T = moneyTotals(ex), outs = ex.filter((e) => !isIncome(e)), byC = {};
+    for (const e of outs) byC[e.cat] = (byC[e.cat] || 0) + e.amount;
     const rows = Object.entries(byC).sort((a, b) => b[1] - a[1]);
-    const secE = section('Gastos', `${fmtMoney(tot)} em ${ex.length} ${ex.length === 1 ? 'gasto' : 'gastos'} · média de ${fmtMoney(tot / Math.max(1, dayKeys.length))} por dia`);
+    const secE = section('Gastos & ganhos', `Ganhos ${fmtMoney(T.inc)} · gastos ${fmtMoney(T.out)} · saldo ${T.net > 0 && !maskMoney(expCur()) ? '+' : ''}${fmtMoney(T.net)}`
+      + (T.inc ? ` (${T.net >= 0 ? `guardou ${fmtPct(T.net / T.inc)}` : 'gastou mais do que ganhou'})` : ''));
     const gw = el('div', 'mt-2 space-y-1.5');
-    for (const [id, v] of rows) gw.append(bar(`${expCat(id)[1]} ${expCat(id)[2]}`, v, rows[0][1], `${fmtMoney(v)} · ${fmtPct(v / tot)}`, 'var(--c-goal)'));
+    for (const [id, v] of rows) gw.append(bar(`${expCat(id)[1]} ${expCat(id)[2]}`, v, rows[0][1], `${fmtMoney(v)} · ${fmtPct(v / T.out)}`, 'var(--c-goal)'));
     secE.append(gw);
   }
 
@@ -5289,13 +5294,19 @@ function renderMonthDetail() {
   }
 }
 
-// ---------- Gastos ----------
+// ---------- Gastos & ganhos ----------
+// Cada lançamento: { id, k, amount, cat, note, kind? }; kind 'in' = ganho, ausente = gasto.
 const EXP_CATS = [
   ['mercado', '🛒', 'Mercado'], ['comida', '🍔', 'Comer fora'], ['transporte', '🚌', 'Transporte'], ['moradia', '🏠', 'Moradia'],
   ['contas', '💡', 'Contas'], ['lazer', '🎉', 'Lazer'], ['saude', '💊', 'Saúde'], ['educacao', '📚', 'Educação'],
   ['compras', '🛍️', 'Compras'], ['outros', '📦', 'Outros'],
 ];
-const expCat = (id) => EXP_CATS.find((c) => c[0] === id) || EXP_CATS[EXP_CATS.length - 1];
+const INC_CATS = [
+  ['salario', '💼', 'Salário'], ['freela', '💻', 'Freela'], ['vendas', '🤝', 'Vendas'], ['invest', '📈', 'Investimentos'],
+  ['presente', '🎁', 'Presente'], ['outros-in', '💰', 'Outros'],
+];
+const isIncome = (e) => e.kind === 'in';
+const expCat = (id) => [...EXP_CATS, ...INC_CATS].find((c) => c[0] === id) || EXP_CATS[EXP_CATS.length - 1];
 const CURRENCIES = ['R$', '€', 'US$', '£'];
 const expCur = () => S.settings.currency || 'R$';
 /** "25,50" ou "1.234,5" → número; dinheiro é sempre na moeda escolhida. */
@@ -5306,8 +5317,8 @@ function parseMoney(t) {
   return Number.isFinite(v) ? Math.round(v * 100) / 100 : NaN;
 }
 const fmtMoney = (v) => (maskMoney(expCur()) ? `${expCur()} ****`
-  : `${expCur()} ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)}`);
-let expMode = 'week', expAnchor = null, expCatSel = 'mercado', expShowAll = false;
+  : `${v < 0 ? '−' : ''}${expCur()} ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v))}`);
+let expMode = 'week', expAnchor = null, expKind = 'out', expCatSel = { out: 'mercado', in: 'salario' }, expShowAll = false;
 /** Período exibido: semana (seg→dom) ou mês, deslocado por `expAnchor`. */
 function expPeriod(offset = 0) {
   const base = expAnchor ? new Date(expAnchor) : new Date();
@@ -5321,10 +5332,15 @@ function expPeriod(offset = 0) {
 }
 const expIn = (from, to) => S.expenses.filter((e) => e.k >= from && e.k <= to);
 const expSum = (list) => list.reduce((a, e) => a + e.amount, 0);
+/** Ganhos, gastos e saldo de uma lista de lançamentos. */
+const moneyTotals = (list) => {
+  const inc = expSum(list.filter(isIncome)), out = expSum(list.filter((e) => !isIncome(e)));
+  return { inc, out, net: inc - out };
+};
 function addExpense() {
   const amount = parseMoney($('#exp-amount').value);
   if (!(amount > 0)) { $('#exp-err').textContent = 'Informe um valor maior que zero.'; return; }
-  S.expenses.push({ id: uid(), k: selKey, amount, cat: expCatSel, note: $('#exp-note').value.trim() });
+  S.expenses.push({ id: uid(), k: selKey, amount, cat: expCatSel[expKind], note: $('#exp-note').value.trim(), ...(expKind === 'in' ? { kind: 'in' } : {}) });
   $('#exp-amount').value = ''; $('#exp-note').value = ''; $('#exp-err').textContent = '';
   commit(renderExpenses, renderMonthDetail);
   $('#exp-amount').focus();
@@ -5333,10 +5349,24 @@ function removeExpense(id) { S.expenses = S.expenses.filter((e) => e.id !== id);
 
 function renderExpenses() {
   const P = expPeriod(), prev = expPeriod(-1), tk = todayKey();
-  const list = expIn(P.from, P.to), total = expSum(list), prevTotal = expSum(expIn(prev.from, prev.to));
+  const list = expIn(P.from, P.to), T = moneyTotals(list), PT = moneyTotals(expIn(prev.from, prev.to));
+  const outs = list.filter((e) => !isIncome(e)), ins = list.filter(isIncome);
   $('#exp-eye').replaceChildren(moneyEye());
+  const seg = (host, items, cur, onPick) => {
+    host.replaceChildren();
+    for (const [v, l] of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rounded-md px-2.5 py-1 transition ' + (cur === v ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500');
+      b.textContent = l;
+      b.setAttribute('aria-pressed', String(cur === v));
+      b.onclick = () => onPick(v);
+      host.append(b);
+    }
+  };
 
-  // Moeda e categorias
+  // Formulário: gasto ou ganho, moeda, categorias
+  seg($('#exp-kind'), [['out', '− Gasto'], ['in', '+ Ganho']], expKind, (v) => { expKind = v; renderExpenses(); $('#exp-amount').focus(); });
   const cs = $('#exp-cur');
   if (!cs.options.length) {
     for (const c of CURRENCIES) cs.append(new Option(c, c));
@@ -5345,105 +5375,115 @@ function renderExpenses() {
   cs.value = expCur();
   const cats = $('#exp-cats');
   cats.replaceChildren();
-  for (const [id, ic, name] of EXP_CATS) {
+  for (const [id, ic, name] of expKind === 'in' ? INC_CATS : EXP_CATS) {
     const b = document.createElement('button');
     b.type = 'button';
-    const on = expCatSel === id;
+    const on = expCatSel[expKind] === id;
     b.className = 'rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
       ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900'
       : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:border-zinc-800 dark:text-zinc-400');
     b.textContent = `${ic} ${name}`;
     b.setAttribute('aria-pressed', String(on));
-    b.onclick = () => { expCatSel = id; renderExpenses(); $('#exp-amount').focus(); };
+    b.onclick = () => { expCatSel[expKind] = id; renderExpenses(); $('#exp-amount').focus(); };
     cats.append(b);
   }
   $('#exp-amount').type = maskMoney(expCur()) ? 'password' : 'text';
-  $('#exp-form').querySelector('button[type=submit]').textContent = isToday() ? 'Adicionar' : `Adicionar em ${fmtShort.format(parseKey(selKey)).replace('.', '')}`;
+  const when = isToday() ? '' : ` em ${fmtShort.format(parseKey(selKey)).replace('.', '')}`;
+  $('#exp-form').querySelector('button[type=submit]').textContent = (expKind === 'in' ? 'Adicionar ganho' : 'Adicionar gasto') + when;
 
   // Modo semana/mês + navegação
-  const mode = $('#exp-mode');
-  mode.replaceChildren();
-  for (const [m, l] of [['week', 'Semana'], ['month', 'Mês']]) {
-    const b = document.createElement('button');
-    b.className = 'rounded-md px-2.5 py-1 transition ' + (expMode === m ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500');
-    b.textContent = l;
-    b.onclick = () => { expMode = m; expAnchor = null; renderExpenses(); };
-    mode.append(b);
-  }
+  seg($('#exp-mode'), [['week', 'Semana'], ['month', 'Mês']], expMode, (m) => { expMode = m; expAnchor = null; renderExpenses(); });
   $('#exp-next').disabled = P.to >= tk;
   $('#exp-range').textContent = P.label;
 
-  // Resumo
+  // Resumo: ganhos, gastos, saldo e quanto foi guardado
   const elapsed = Math.max(1, Math.min(P.days, daysBetween(P.from, tk < P.to ? tk : P.to) + 1));
-  const byCat = {};
-  for (const e of list) byCat[e.cat] = (byCat[e.cat] || 0) + e.amount;
-  const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-  const diff = prevTotal ? (total - prevTotal) / prevTotal : null;
-  const stat = (label, value, hint) => {
+  const hidden = maskMoney(expCur());
+  const stat = (label, value, hint, tone = '') => {
     const d = document.createElement('div');
     d.className = 'rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40';
     d.innerHTML = '<p class="text-[11px] text-zinc-500"></p><p class="text-base font-semibold tabular-nums"></p><p class="text-[11px] text-zinc-500"></p>';
     d.children[0].textContent = label; d.children[1].textContent = value; d.children[2].textContent = hint || '';
+    if (tone && !hidden) d.children[1].className += ' ' + tone;
     return d;
   };
-  const top = catRows[0];
+  const vs = (cur, before) => (hidden || !before ? '' : ` · ${cur >= before ? '+' : ''}${fmtPct((cur - before) / before)} vs antes`);
+  const saved = T.inc ? T.net / T.inc : null;
   $('#exp-stats').replaceChildren(
-    stat('Total', fmtMoney(total), `${list.length} ${list.length === 1 ? 'gasto' : 'gastos'}`),
-    stat(expMode === 'week' ? 'Vs semana anterior' : 'Vs mês anterior',
-      diff == null || maskMoney(expCur()) ? '—' : `${diff > 0 ? '+' : ''}${fmtPct(diff)}`,
-      prevTotal ? `antes: ${fmtMoney(prevTotal)}` : 'sem gastos antes'),
-    stat('Média por dia', fmtMoney(total / elapsed), `${elapsed} ${elapsed === 1 ? 'dia' : 'dias'}`),
-    stat('Maior categoria', top ? `${expCat(top[0])[1]} ${expCat(top[0])[2]}` : '—', top ? `${fmtPct(top[1] / total)} do total` : ''),
+    stat('Ganhos', fmtMoney(T.inc), `${ins.length} ${ins.length === 1 ? 'entrada' : 'entradas'}${vs(T.inc, PT.inc)}`),
+    stat('Gastos', fmtMoney(T.out), `${fmtMoney(T.out / elapsed)}/dia${vs(T.out, PT.out)}`),
+    stat('Saldo', `${T.net > 0 && !hidden ? '+' : ''}${fmtMoney(T.net)}`,
+      saved == null ? 'sem ganhos no período' : T.net >= 0 ? `guardou ${fmtPct(saved)} do que ganhou` : 'gastou mais do que ganhou',
+      T.net > 0 ? 'text-emerald-600 dark:text-emerald-400' : T.net < 0 ? 'text-rose-500' : ''),
+    stat(expMode === 'week' ? 'Saldo semana anterior' : 'Saldo mês anterior', `${PT.net > 0 && !hidden ? '+' : ''}${fmtMoney(PT.net)}`,
+      PT.inc || PT.out ? `ganhou ${fmtMoney(PT.inc)} · gastou ${fmtMoney(PT.out)}` : 'sem lançamentos'),
   );
 
-  // Gráfico por categoria: barras horizontais, uma cor, ordenadas do maior para o menor
+  // Por categoria: barras horizontais (uma cor por tipo), da maior para a menor
   const cc = $('#exp-cats-chart');
   cc.replaceChildren();
-  if (!catRows.length) cc.append(Object.assign(document.createElement('p'), { className: 'text-xs text-zinc-500', textContent: 'Nenhum gasto neste período.' }));
-  const max = catRows.length ? catRows[0][1] : 1;
-  for (const [id, v] of catRows) {
-    const [, ic, name] = expCat(id), n = list.filter((e) => e.cat === id).length;
-    const row = document.createElement('div');
-    row.className = 'group flex items-center gap-2 text-xs';
-    const lbl = document.createElement('span'); lbl.className = 'w-28 shrink-0 truncate text-zinc-600 dark:text-zinc-400'; lbl.textContent = `${ic} ${name}`;
-    const track = document.createElement('div'); track.className = 'h-3 flex-1';
-    const bar = document.createElement('div');
-    bar.className = 'h-full rounded-r-[4px] transition group-hover:opacity-80';
-    bar.style.width = `${Math.max(2, (v / max) * 100)}%`; bar.style.background = 'var(--c-goal)';
-    track.append(bar);
-    const val = document.createElement('span'); val.className = 'w-32 shrink-0 text-right tabular-nums text-zinc-700 dark:text-zinc-300';
-    val.textContent = `${fmtMoney(v)} · ${fmtPct(v / total)}`;
-    row.append(lbl, track, val);
-    row.addEventListener('pointerenter', (e) => showTip(e, `${ic} ${name}`, [
-      { value: fmtMoney(v), label: `${fmtPct(v / total)} do total`, color: 'var(--c-goal)', box: true },
-      { value: String(n), label: n === 1 ? 'gasto' : 'gastos' }]));
-    row.addEventListener('pointermove', moveTip);
-    row.addEventListener('pointerleave', hideTip);
-    cc.append(row);
-  }
+  const catBlock = (title, items, color) => {
+    const wrap = document.createElement('div');
+    const h = document.createElement('p'); h.className = 'text-xs font-medium'; h.textContent = title;
+    wrap.append(h);
+    const by = {};
+    for (const e of items) by[e.cat] = (by[e.cat] || 0) + e.amount;
+    const rows = Object.entries(by).sort((a, b) => b[1] - a[1]), tot = expSum(items);
+    const box = document.createElement('div'); box.className = 'mt-2 space-y-1.5';
+    if (!rows.length) box.append(Object.assign(document.createElement('p'), { className: 'text-xs text-zinc-500', textContent: 'Nada neste período.' }));
+    for (const [id, v] of rows) {
+      const [, ic, name] = expCat(id), n = items.filter((e) => e.cat === id).length;
+      const row = document.createElement('div');
+      row.className = 'group flex items-center gap-2 text-xs';
+      const lbl = document.createElement('span'); lbl.className = 'w-24 shrink-0 truncate text-zinc-600 sm:w-28 dark:text-zinc-400'; lbl.textContent = `${ic} ${name}`;
+      const track = document.createElement('div'); track.className = 'h-3 flex-1';
+      const bar = document.createElement('div');
+      bar.className = 'h-full rounded-r-[4px] transition group-hover:opacity-80';
+      bar.style.width = `${Math.max(2, (v / rows[0][1]) * 100)}%`; bar.style.background = color;
+      track.append(bar);
+      const val = document.createElement('span'); val.className = 'shrink-0 text-right tabular-nums text-zinc-700 dark:text-zinc-300';
+      val.textContent = `${fmtMoney(v)} · ${fmtPct(v / tot)}`;
+      row.append(lbl, track, val);
+      row.addEventListener('pointerenter', (e) => showTip(e, `${ic} ${name}`, [
+        { value: fmtMoney(v), label: `${fmtPct(v / tot)} do total`, color, box: true },
+        { value: String(n), label: n === 1 ? 'lançamento' : 'lançamentos' }]));
+      row.addEventListener('pointermove', moveTip);
+      row.addEventListener('pointerleave', hideTip);
+      box.append(row);
+    }
+    wrap.append(box);
+    return wrap;
+  };
+  cc.append(catBlock('Gastos por categoria', outs, 'var(--c-goal)'));
+  if (ins.length) cc.append(catBlock('Ganhos por fonte', ins, 'var(--c-habit)'));
 
-  // Tendência: últimas 8 semanas ou 6 meses, período atual destacado
+  // Tendência: ganhos × gastos lado a lado, últimas 8 semanas ou 6 meses
   const N = expMode === 'week' ? 8 : 6;
   $('#exp-trend-title').textContent = expMode === 'week' ? 'Últimas 8 semanas' : 'Últimos 6 meses';
-  const periods = Array.from({ length: N }, (_, i) => expPeriod(i - N + 1)).map((x) => ({ ...x, total: expSum(expIn(x.from, x.to)) }));
-  const tmax = Math.max(1, ...periods.map((x) => x.total));
+  const periods = Array.from({ length: N }, (_, i) => expPeriod(i - N + 1)).map((x) => ({ ...x, ...moneyTotals(expIn(x.from, x.to)) }));
+  const tmax = Math.max(1, ...periods.map((x) => Math.max(x.inc, x.out)));
   const tr = $('#exp-trend');
   tr.replaceChildren();
   const bars = document.createElement('div');
-  bars.className = 'flex h-28 items-end gap-1.5 border-b border-zinc-200 dark:border-zinc-800';
+  bars.className = 'flex h-32 items-end gap-2 border-b border-zinc-200 dark:border-zinc-800';
   const axis = document.createElement('div');
-  axis.className = 'mt-1 flex gap-1.5 text-[10px] text-zinc-500';
+  axis.className = 'mt-1 flex gap-2 text-[10px] text-zinc-500';
   periods.forEach((x, i) => {
     const cur = i === N - 1;
     const col = document.createElement('div');
-    col.className = 'flex h-full flex-1 flex-col justify-end';
-    const b = document.createElement('div');
-    b.className = 'rounded-t-[4px] transition hover:opacity-80';
-    b.style.height = x.total ? `${Math.max(3, (x.total / tmax) * 100)}%` : '2px';
-    b.style.background = x.total ? 'var(--c-goal)' : 'var(--c-grid)';
-    if (!cur) b.style.opacity = '0.45';
-    col.append(b);
-    col.addEventListener('pointerenter', (e) => showTip(e, x.label, [{ value: fmtMoney(x.total), label: cur ? 'período exibido' : '', color: 'var(--c-goal)', box: true }]));
+    col.className = 'flex h-full flex-1 items-end justify-center gap-[2px]';
+    for (const [v, color] of [[x.inc, 'var(--c-habit)'], [x.out, 'var(--c-goal)']]) {
+      const b = document.createElement('div');
+      b.className = 'w-1/2 max-w-[14px] rounded-t-[4px]';
+      b.style.height = v ? `${Math.max(3, (v / tmax) * 100)}%` : '2px';
+      b.style.background = v ? color : 'var(--c-grid)';
+      if (!cur) b.style.opacity = '0.55';
+      col.append(b);
+    }
+    col.addEventListener('pointerenter', (e) => showTip(e, x.label, [
+      { value: fmtMoney(x.inc), label: 'ganhos', color: 'var(--c-habit)', box: true },
+      { value: fmtMoney(x.out), label: 'gastos', color: 'var(--c-goal)', box: true },
+      { value: `${x.net > 0 && !hidden ? '+' : ''}${fmtMoney(x.net)}`, label: 'saldo' }]));
     col.addEventListener('pointermove', moveTip);
     col.addEventListener('pointerleave', hideTip);
     bars.append(col);
@@ -5454,7 +5494,7 @@ function renderExpenses() {
   });
   tr.append(bars, axis);
 
-  // Lista de gastos do período
+  // Lançamentos do período
   const lw = $('#exp-list');
   lw.replaceChildren();
   if (!list.length) return;
@@ -5463,16 +5503,16 @@ function renderExpenses() {
   const ul = document.createElement('ul');
   ul.className = 'divide-y divide-zinc-100 dark:divide-zinc-800';
   for (const e of shown) {
-    const [, ic, name] = expCat(e.cat);
+    const [, ic, name] = expCat(e.cat), inc = isIncome(e);
     const li = document.createElement('li');
     li.className = 'group flex items-center gap-3 py-2 text-sm';
     li.innerHTML = '<span class="w-6 text-center"></span><span class="min-w-0 flex-1"><span class="block truncate"></span><span class="block text-[11px] text-zinc-500"></span></span><span class="tabular-nums font-medium"></span>';
     li.children[0].textContent = ic;
     li.children[1].children[0].textContent = e.note || name;
-    li.children[1].children[1].textContent = `${cap(fmtDay.format(parseKey(e.k)).replace(/\./g, ''))}${e.note ? ` · ${name}` : ''}`;
-    li.children[2].textContent = fmtMoney(e.amount);
+    li.children[1].children[1].textContent = `${cap(fmtDay.format(parseKey(e.k)).replace(/\./g, ''))} · ${inc ? 'ganho' : 'gasto'}${e.note ? ` · ${name}` : ''}`;
+    li.children[2].textContent = `${inc ? '+' : '−'} ${fmtMoney(e.amount)}`;
     const rm = document.createElement('button');
-    rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar gasto ${e.note || name}`);
+    rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar ${e.note || name}`);
     rm.onclick = () => removeExpense(e.id);
     li.append(rm);
     ul.append(li);
@@ -5481,7 +5521,7 @@ function renderExpenses() {
   if (sorted.length > 5) {
     const b = document.createElement('button');
     b.className = 'btn-ghost -mx-2.5 mt-1 text-xs';
-    b.textContent = expShowAll ? 'Mostrar menos' : `Ver todos os ${sorted.length} gastos`;
+    b.textContent = expShowAll ? 'Mostrar menos' : `Ver todos os ${sorted.length} lançamentos`;
     b.onclick = () => { expShowAll = !expShowAll; renderExpenses(); };
     lw.append(b);
   }
