@@ -372,13 +372,26 @@
           <h2 class="flex items-center gap-1 text-sm font-semibold">Gastos &amp; ganhos <span id="exp-eye"></span></h2>
           <p class="text-xs text-zinc-500">Registre na hora, em 2 toques · quanto entrou, quanto saiu e o saldo de cada semana e mês</p>
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex flex-wrap items-center gap-1">
+          <span class="text-[11px] text-zinc-500">Ver em</span>
+          <div id="exp-disp" class="mr-2 flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
           <div id="exp-mode" class="flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
           <button id="exp-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Período anterior"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
           <button id="exp-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo período"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
         </div>
       </div>
-      <form id="exp-form" class="mt-4 space-y-2">
+      <div id="fx-box" class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-800/40">
+        <span id="fx-rate" class="font-medium tabular-nums"></span>
+        <span id="fx-when" class="text-zinc-500"></span>
+        <span class="flex items-center gap-1.5 sm:ml-auto">
+          <input id="fx-amount" class="w-20 rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-emerald-500 dark:border-zinc-700"
+            type="text" inputmode="decimal" value="100" aria-label="Valor para converter" />
+          <span id="fx-from" class="text-zinc-500"></span>
+          <button id="fx-swap" type="button" class="btn-ghost h-6 w-6 p-0" aria-label="Inverter moedas" title="Inverter">⇄</button>
+          <span id="fx-out" class="font-semibold tabular-nums"></span>
+        </span>
+      </div>
+      <form id="exp-form" class="mt-3 space-y-2">
         <div id="exp-kind" class="inline-flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium dark:bg-zinc-800"></div>
         <div class="flex flex-wrap gap-2 sm:flex-nowrap">
           <select id="exp-cur" class="field !w-auto shrink-0" aria-label="Moeda"></select>
@@ -5211,7 +5224,7 @@ function renderMonthDetail() {
   const ex = expIn(first, last);
   if (ex.length) {
     const T = moneyTotals(ex), outs = ex.filter((e) => !isIncome(e)), byC = {};
-    for (const e of outs) byC[e.cat] = (byC[e.cat] || 0) + e.amount;
+    for (const e of outs) byC[e.cat] = (byC[e.cat] || 0) + amt(e);
     const rows = Object.entries(byC).sort((a, b) => b[1] - a[1]);
     const secE = section('Gastos & ganhos', `Ganhos ${fmtMoney(T.inc)} · gastos ${fmtMoney(T.out)} · saldo ${T.net > 0 && !maskMoney(expCur()) ? '+' : ''}${fmtMoney(T.net)}`
       + (T.inc ? ` (${T.net >= 0 ? `guardou ${fmtPct(T.net / T.inc)}` : 'gastou mais do que ganhou'})` : ''));
@@ -5308,7 +5321,44 @@ const INC_CATS = [
 const isIncome = (e) => e.kind === 'in';
 const expCat = (id) => [...EXP_CATS, ...INC_CATS].find((c) => c[0] === id) || EXP_CATS[EXP_CATS.length - 1];
 const CURRENCIES = ['R$', '€', 'US$', '£'];
+/**
+ * Moeda escolhida: tudo é exibido nela (convertido pela cotação) e os novos lançamentos são feitos nela.
+ * Cada lançamento guarda a moeda em que foi feito em `cur`.
+ */
 const expCur = () => S.settings.currency || 'R$';
+const setExpCur = (c) => { S.settings.currency = c; commit(renderExpenses, renderMonthDetail); };
+const curOf = (e) => e.cur || 'R$';
+
+/*
+ * Câmbio: reais por unidade de cada moeda. Cotação ao vivo da AwesomeAPI (atualiza ao longo do dia);
+ * se falhar, Frankfurter (BCE, diária). Guardada neste aparelho para funcionar offline.
+ */
+const FX_CODE = { 'R$': 'BRL', '€': 'EUR', 'US$': 'USD', '£': 'GBP' };
+let FX = (() => { try { return JSON.parse(localStorage.getItem('evolution-fx')) || null; } catch (e) { return null; } })();
+async function refreshFX() {
+  let next = null;
+  try {
+    const j = await (await fetch('https://economia.awesomeapi.com.br/json/last/EUR-BRL,USD-BRL,GBP-BRL', { cache: 'no-store' })).json();
+    next = { brl: { 'R$': 1, '€': +j.EURBRL.bid, 'US$': +j.USDBRL.bid, '£': +j.GBPBRL.bid }, at: Number(j.EURBRL.timestamp) * 1000, src: 'ao vivo' };
+  } catch (e) {
+    try {
+      const j = await (await fetch('https://api.frankfurter.dev/v1/latest?from=BRL&to=EUR,USD,GBP')).json();
+      next = { brl: { 'R$': 1, '€': 1 / j.rates.EUR, 'US$': 1 / j.rates.USD, '£': 1 / j.rates.GBP }, at: Date.parse(j.date), src: 'BCE, diária' };
+    } catch (e2) { /* sem internet: fica a última cotação guardada */ }
+  }
+  if (!next || !Object.values(next.brl).every((v) => v > 0)) return;
+  FX = next;
+  try { localStorage.setItem('evolution-fx', JSON.stringify(FX)); } catch (e) {}
+  renderExpenses(); renderMonthDetail();
+}
+/** Converte entre moedas; sem cotação, só converte moeda igual (retorna null se não der). */
+function convert(v, from, to) {
+  if (from === to) return v;
+  if (!FX?.brl?.[from] || !FX?.brl?.[to]) return null;
+  return (v * FX.brl[from]) / FX.brl[to];
+}
+/** Valor de um lançamento na moeda de exibição. */
+const amt = (e) => convert(e.amount, curOf(e), expCur()) ?? 0;
 /** "25,50" ou "1.234,5" → número; dinheiro é sempre na moeda escolhida. */
 function parseMoney(t) {
   t = String(t).trim().replace(/[^\d,.\-]/g, '');
@@ -5316,9 +5366,9 @@ function parseMoney(t) {
   const v = Number(t);
   return Number.isFinite(v) ? Math.round(v * 100) / 100 : NaN;
 }
-const fmtMoney = (v) => (maskMoney(expCur()) ? `${expCur()} ****`
-  : `${v < 0 ? '−' : ''}${expCur()} ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v))}`);
-let expMode = 'week', expAnchor = null, expKind = 'out', expCatSel = { out: 'mercado', in: 'salario' }, expShowAll = false;
+const fmtMoney = (v, cur = expCur()) => (maskMoney(cur) ? `${cur} ****`
+  : `${v < 0 ? '−' : ''}${cur} ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v))}`);
+let fxFrom = null, expMode = 'week', expAnchor = null, expKind = 'out', expCatSel = { out: 'mercado', in: 'salario' }, expShowAll = false;
 /** Período exibido: semana (seg→dom) ou mês, deslocado por `expAnchor`. */
 function expPeriod(offset = 0) {
   const base = expAnchor ? new Date(expAnchor) : new Date();
@@ -5331,7 +5381,7 @@ function expPeriod(offset = 0) {
   return { from: keyOf(f), to: keyOf(l), days: l.getDate(), label: cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(f)) };
 }
 const expIn = (from, to) => S.expenses.filter((e) => e.k >= from && e.k <= to);
-const expSum = (list) => list.reduce((a, e) => a + e.amount, 0);
+const expSum = (list) => list.reduce((a, e) => a + amt(e), 0);
 /** Ganhos, gastos e saldo de uma lista de lançamentos. */
 const moneyTotals = (list) => {
   const inc = expSum(list.filter(isIncome)), out = expSum(list.filter((e) => !isIncome(e)));
@@ -5340,7 +5390,7 @@ const moneyTotals = (list) => {
 function addExpense() {
   const amount = parseMoney($('#exp-amount').value);
   if (!(amount > 0)) { $('#exp-err').textContent = 'Informe um valor maior que zero.'; return; }
-  S.expenses.push({ id: uid(), k: selKey, amount, cat: expCatSel[expKind], note: $('#exp-note').value.trim(), ...(expKind === 'in' ? { kind: 'in' } : {}) });
+  S.expenses.push({ id: uid(), k: selKey, amount, cur: expCur(), cat: expCatSel[expKind], note: $('#exp-note').value.trim(), ...(expKind === 'in' ? { kind: 'in' } : {}) });
   $('#exp-amount').value = ''; $('#exp-note').value = ''; $('#exp-err').textContent = '';
   commit(renderExpenses, renderMonthDetail);
   $('#exp-amount').focus();
@@ -5348,6 +5398,8 @@ function addExpense() {
 function removeExpense(id) { S.expenses = S.expenses.filter((e) => e.id !== id); commit(renderExpenses, renderMonthDetail); }
 
 function renderExpenses() {
+  // Lançamentos de antes do câmbio não tinham moeda: eram na moeda escolhida na época
+  if (S.expenses.some((e) => !e.cur)) { for (const e of S.expenses) e.cur ||= expCur(); save(); }
   const P = expPeriod(), prev = expPeriod(-1), tk = todayKey();
   const list = expIn(P.from, P.to), T = moneyTotals(list), PT = moneyTotals(expIn(prev.from, prev.to));
   const outs = list.filter((e) => !isIncome(e)), ins = list.filter(isIncome);
@@ -5370,9 +5422,23 @@ function renderExpenses() {
   const cs = $('#exp-cur');
   if (!cs.options.length) {
     for (const c of CURRENCIES) cs.append(new Option(c, c));
-    cs.onchange = () => { S.settings.currency = cs.value; commit(renderExpenses, renderMonthDetail); };
+    cs.onchange = () => setExpCur(cs.value);
   }
   cs.value = expCur();
+  cs.title = 'Moeda: converte tudo e vale para os novos lançamentos';
+
+  // "Ver em": o mesmo controle, à mão no topo do card
+  seg($('#exp-disp'), [['R$', 'R$'], ['€', '€']], expCur(), setExpCur);
+
+  // Cotação e conversor rápido
+  const rate = convert(1, '€', 'R$');
+  $('#fx-rate').textContent = rate ? `1 € = R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(rate)}` : 'Cotação indisponível (sem internet)';
+  $('#fx-when').textContent = FX ? `${FX.src} · ${new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(FX.at)).replace('.', '')}` : '';
+  fxFrom ||= '€';
+  const fxTo = fxFrom === '€' ? 'R$' : '€';
+  $('#fx-from').textContent = `${fxFrom} =`;
+  const fv = parseMoney($('#fx-amount').value), out = Number.isFinite(fv) ? convert(fv, fxFrom, fxTo) : null;
+  $('#fx-out').textContent = out == null ? '—' : `${fxTo} ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(out)}`;
   const cats = $('#exp-cats');
   cats.replaceChildren();
   for (const [id, ic, name] of expKind === 'in' ? INC_CATS : EXP_CATS) {
@@ -5427,7 +5493,7 @@ function renderExpenses() {
     const h = document.createElement('p'); h.className = 'text-xs font-medium'; h.textContent = title;
     wrap.append(h);
     const by = {};
-    for (const e of items) by[e.cat] = (by[e.cat] || 0) + e.amount;
+    for (const e of items) by[e.cat] = (by[e.cat] || 0) + amt(e);
     const rows = Object.entries(by).sort((a, b) => b[1] - a[1]), tot = expSum(items);
     const box = document.createElement('div'); box.className = 'mt-2 space-y-1.5';
     if (!rows.length) box.append(Object.assign(document.createElement('p'), { className: 'text-xs text-zinc-500', textContent: 'Nada neste período.' }));
@@ -5510,7 +5576,14 @@ function renderExpenses() {
     li.children[0].textContent = ic;
     li.children[1].children[0].textContent = e.note || name;
     li.children[1].children[1].textContent = `${cap(fmtDay.format(parseKey(e.k)).replace(/\./g, ''))} · ${inc ? 'ganho' : 'gasto'}${e.note ? ` · ${name}` : ''}`;
-    li.children[2].textContent = `${inc ? '+' : '−'} ${fmtMoney(e.amount)}`;
+    li.children[2].textContent = `${inc ? '+' : '−'} ${fmtMoney(e.amount, curOf(e))}`;
+    if (curOf(e) !== expCur()) {
+      // Lançado em outra moeda: mostra também o valor convertido
+      const cv = document.createElement('span');
+      cv.className = 'block text-right text-[11px] font-normal text-zinc-500';
+      cv.textContent = `≈ ${fmtMoney(amt(e))}`;
+      li.children[2].append(cv);
+    }
     const rm = document.createElement('button');
     rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar ${e.note || name}`);
     rm.onclick = () => removeExpense(e.id);
@@ -5527,6 +5600,12 @@ function renderExpenses() {
   }
 }
 $('#exp-form').onsubmit = (e) => { e.preventDefault(); addExpense(); };
+$('#fx-amount').addEventListener('input', () => renderExpenses());
+$('#fx-swap').onclick = () => { fxFrom = fxFrom === '€' ? 'R$' : '€'; renderExpenses(); };
+// Cotação: ao abrir, a cada 2 min com a aba visível e ao voltar para a aba
+refreshFX();
+setInterval(() => { if (document.visibilityState === 'visible') refreshFX(); }, 120000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshFX(); });
 $('#exp-prev').onclick = () => { const P = expPeriod(-1); expAnchor = parseKey(P.from); renderExpenses(); };
 $('#exp-next').onclick = () => { const P = expPeriod(1); expAnchor = parseKey(P.from); renderExpenses(); };
 
