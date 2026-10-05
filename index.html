@@ -336,13 +336,29 @@
           </div>
         </section>
 
-        <!-- ============ PRIORIDADES DE MELHORIA ============ -->
-        <section id="prio-card" class="card hidden">
-          <div class="flex items-center justify-between">
-            <p class="eyebrow">Prioridades de melhoria</p>
-            <span class="text-xs text-zinc-500">escolhidas nas suas reflexões</span>
+        <!-- ============ PONTOS A MELHORAR (semana) ============ -->
+        <section id="prio-card" class="card">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-semibold">Pontos a melhorar</h2>
+              <p id="improve-week" class="text-xs text-zinc-500"></p>
+            </div>
           </div>
-          <ol id="prio-list" class="mt-3 space-y-1"></ol>
+          <div id="prio-wrap" class="mt-3">
+            <p class="eyebrow">Prioridades <span class="normal-case tracking-normal text-zinc-400">· até 3, ficam em destaque</span></p>
+            <ol id="prio-list" class="mt-1.5 space-y-1"></ol>
+          </div>
+          <div id="improve-wrap" class="mt-3">
+            <p class="eyebrow">Outros pontos da semana</p>
+            <ul id="improve-list" class="mt-1.5 space-y-0.5"></ul>
+          </div>
+          <form id="improve-form" class="mt-3 flex gap-2">
+            <input id="improve-input" class="field" type="text" maxlength="120" autocomplete="off" placeholder="Um ponto concreto para melhorar…" />
+            <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar ponto">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </form>
+          <p class="mt-2 text-[11px] leading-snug text-zinc-500">Marque ⭐ para virar prioridade. Os pontos ficam na reflexão da semana; a <button id="improve-review" type="button" class="underline decoration-dotted underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300">revisão completa</button> tem sugestões tiradas dos seus dados.</p>
         </section>
 
         <!-- ============ KPIs ============ -->
@@ -3193,7 +3209,7 @@ function reflectionPanel(host, ctx) {
     text = text.trim();
     if (!text) return;
     write().improve.push({ id: uid(), text });
-    commit(ctx.rerender);
+    commit(ctx.rerender, renderPriorities);
   };
   const form = document.createElement('form');
   form.className = 'mt-2 flex gap-2';
@@ -3221,9 +3237,55 @@ function togglePriority(item, src) {
   else if (S.priorities.length < MAX_PRIO) S.priorities.push({ id: item.id, text: item.text, src, since: todayKey() });
   commit(renderPriorities, renderReview, renderMonthReview);
 }
+/* Pontos a melhorar da semana atual: ficam em S.weeks[semana].refl.improve (os mesmos da revisão da semana). */
+const curImproveWeek = () => weekStart(new Date());
+function addImprovePoint(text) {
+  text = text.trim();
+  if (!text) return;
+  const w = week(keyOf(curImproveWeek()));
+  w.refl ||= blankRefl();
+  w.refl.improve.push({ id: uid(), text });
+  commit(renderPriorities, renderReview);
+}
+function removeImprovePoint(id) {
+  const w = S.weeks[keyOf(curImproveWeek())];
+  if (!w?.refl) return;
+  w.refl.improve = w.refl.improve.filter((x) => x.id !== id);
+  S.priorities = S.priorities.filter((p) => p.id !== id);
+  commit(renderPriorities, renderReview);
+}
 function renderPriorities() {
-  const card = $('#prio-card'), ol = $('#prio-list');
-  card.classList.toggle('hidden', !S.priorities.length);
+  const ol = $('#prio-list');
+  const ws = curImproveWeek(), items = (S.weeks[keyOf(ws)]?.refl?.improve || []).map((x) => (typeof x === 'string' ? { id: x, text: x } : x));
+  $('#improve-week').textContent = `Semana de ${fmtRange(ws)}`;
+  $('#prio-wrap').classList.toggle('hidden', !S.priorities.length);
+  // Outros pontos da semana (os que não são prioridade): ⭐ promove, ✕ apaga
+  const rest = items.filter((it) => !S.priorities.some((p) => p.id === it.id));
+  const il = $('#improve-list');
+  il.replaceChildren();
+  if (!rest.length) {
+    const li = document.createElement('li');
+    li.className = 'py-1 text-xs text-zinc-500';
+    li.textContent = items.length ? 'Todos viraram prioridade.' : 'Nenhum ponto ainda. Escreva abaixo o que quer melhorar nesta semana.';
+    il.append(li);
+  }
+  for (const it of rest) {
+    const li = document.createElement('li');
+    li.className = 'group -mx-2 flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+    const star = document.createElement('button');
+    const full = S.priorities.length >= MAX_PRIO;
+    star.className = 'shrink-0 rounded-md p-0.5 text-base leading-none transition ' + (full ? 'cursor-not-allowed opacity-30' : 'opacity-50 hover:opacity-100');
+    star.textContent = '☆';
+    star.title = full ? `Já há ${MAX_PRIO} prioridades — resolva uma para escolher esta` : 'Tornar prioridade';
+    star.setAttribute('aria-label', `Tornar prioridade: ${it.text}`);
+    star.onclick = () => { if (!full) togglePriority(it, `Revisão de ${fmtRange(ws)}`); };
+    const t = document.createElement('span'); t.className = 'min-w-0 flex-1 break-words text-sm'; t.textContent = it.text;
+    const rm = document.createElement('button');
+    rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar ${it.text}`);
+    rm.onclick = () => removeImprovePoint(it.id);
+    li.append(star, t, rm);
+    il.append(li);
+  }
   ol.replaceChildren();
   S.priorities.forEach((p, i) => {
     const li = document.createElement('li');
@@ -3243,6 +3305,7 @@ function renderPriorities() {
     ok.textContent = 'Resolvido ✓';
     ok.title = 'Tirar das prioridades (continua na reflexão)';
     ok.onclick = () => { S.priorities = S.priorities.filter((x) => x.id !== p.id); commit(renderPriorities, renderReview, renderMonthReview); };
+    ok.className += ' whitespace-nowrap';
     li.append(n, body, ok);
     ol.append(li);
   });
@@ -6107,6 +6170,10 @@ $('#review-done').onclick = () => {
   commit(renderReview);
 };
 
+// Pontos a melhorar
+$('#improve-form').onsubmit = (e) => { e.preventDefault(); addImprovePoint($('#improve-input').value); $('#improve-input').value = ''; $('#improve-input').focus(); };
+$('#improve-review').onclick = () => $('#review-open').click();
+
 // Gaveta das revisões: fecha clicando fora ou com Esc
 const closeDrawer = () => {
   if (!$('#review-card').classList.contains('hidden')) $('#review-close').click();
@@ -6116,7 +6183,7 @@ $('#drawer-bd').onclick = closeDrawer;
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !document.querySelector('dialog[open]') && innerWidth >= 1024) closeDrawer(); });
 
 // Cards recolhíveis: ▾ no título; o que fica recolhido é lembrado neste aparelho
-const COLLAPSIBLE = { tasks: '#task-list', pending: '#pending-list', study: '#study-today', goals: '#goal-list',
+const COLLAPSIBLE = { improve: '#improve-list', tasks: '#task-list', pending: '#pending-list', study: '#study-today', goals: '#goal-list',
   heat: '#heatmap', sleep: '#sleep-input', checkin: '#checkin', metrics: '#metric-list', projects: '#project-list',
   money: '#exp-stats', insights: '#insight-list', month: '#month-card' };
 let collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('evolution-collapsed')) || []; } catch (e) { return []; } })());
