@@ -257,6 +257,12 @@
           <ul id="rv-metrics" class="mt-2 space-y-1.5 text-sm"></ul>
         </div>
 
+        <div id="rv-missed-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
+          <p class="eyebrow">Metas não cumpridas</p>
+          <p class="mt-1 text-xs text-zinc-500">Por que não deu? As que ficarem em aberto passam para a próxima semana como atrasadas.</p>
+          <ul id="rv-missed" class="mt-3 space-y-3 text-sm"></ul>
+        </div>
+
         <div class="mt-5 grid gap-5 border-t border-zinc-100 pt-5 sm:grid-cols-2 dark:border-zinc-800">
           <div>
             <p class="eyebrow">Vitórias da semana</p>
@@ -1687,6 +1693,7 @@ const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover
  * opts: { badge, onEdit, editing, off, qty } — `off` = hábito fora do dia (sem checkbox);
  * `qty` = { value, target, unit, onSet } para hábitos com quantidade (mostra 14/20 pág).
  * `partial` = feito em parte → caixa amarela. `dragId`/`dragGroup` = linha arrastável (ver enableDrag).
+ * `tag` = selo âmbar ao lado do nome (ex.: "Atrasada 1 semana"); `sub` = elemento extra embaixo do nome.
  */
 function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   const li = document.createElement('li');
@@ -1715,6 +1722,13 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
       : 'cursor-pointer ' + (on ? 'text-zinc-400 line-through decoration-zinc-400/50 dark:text-zinc-500' : ''));
   if (!opts.off) label.onclick = onToggle;
   textCol.append(label);
+  if (opts.tag) {
+    const tg = document.createElement('span');
+    tg.className = 'mt-0.5 self-start rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400';
+    tg.textContent = opts.tag;
+    textCol.append(tg);
+  }
+  if (opts.sub) textCol.append(opts.sub);
   if (opts.badge) {
     const b = document.createElement('span');
     b.className = 'truncate text-[11px] text-zinc-500';
@@ -2162,13 +2176,66 @@ function renderPending() {
 
 // ---------- Metas da semana ----------
 const week = (wk = weekKey(new Date())) => { const w = (S.weeks[wk] ||= { goals: [] }); w.goals ||= []; return w; };
+const lateLabel = (g) => `Atrasada ${g.late} ${g.late === 1 ? 'semana' : 'semanas'}`;
+/** Meta de origem de uma atrasada (na semana de onde veio): é nela que fica o motivo. */
+const goalOrigin = (g) => S.weeks[g.from]?.goals?.find((x) => x.id === g.id);
+let goalWhyOpen = null;   // id da meta atrasada com o campo de motivo aberto
+
+/**
+ * Metas não cumpridas da última semana com metas passam para a semana atual com selo de atrasada:
+ * `late` = semanas de atraso, `from` = semana de onde veio. A meta antiga continua lá como não cumprida.
+ * Só a semana atual muda; `dropped` guarda as atrasadas apagadas, para não voltarem.
+ */
+function carryGoals() {
+  const wk = weekKey(new Date());
+  const pk = Object.keys(S.weeks).filter((k) => k < wk && (S.weeks[k].goals?.length || S.weeks[k].dropped?.length)).sort().pop();
+  const cur = S.weeks[wk], dropped = cur?.dropped || [];
+  const has = (id) => (cur?.goals || []).some((x) => x.id === id);
+  const pend = (S.weeks[pk]?.goals || []).filter((g) => !g.done && !has(g.id) && !dropped.includes(g.id));
+  if (!pend.length) return;
+  const w = week(wk), late = (g) => (g.late || 0) + Math.round(daysBetween(pk, wk) / 7);
+  for (const g of pend) {
+    // Já recriada à mão nesta semana (mesmo nome): vira a própria atrasada, sem duplicar
+    const same = w.goals.find((x) => !x.from && x.title.trim().toLowerCase() === g.title.trim().toLowerCase());
+    if (same) Object.assign(same, { id: g.id, from: pk }, same.done ? {} : { late: late(g) });
+    else w.goals.push({ id: g.id, title: g.title, done: false, late: late(g), from: pk });
+  }
+  // Semana criada só pelo transporte: carimbo fixo (segunda 0h), igual em todos os aparelhos,
+  // para não passar por cima de uma edição de verdade feita em outro aparelho
+  if (!cur) { w.u = parseKey(wk).getTime(); sigs.set(`weeks:${wk}`, sigOf(w)); }
+}
+
+/** Embaixo de uma meta atrasada: o motivo (clique para editar) ou "Justificar atraso". */
+function goalWhyRow(g) {
+  const why = goalOrigin(g)?.why || '';
+  if (goalWhyOpen === g.id) {
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.maxLength = 160; inp.value = why; inp.autocomplete = 'off';
+    inp.placeholder = 'Por que não foi cumprida?';
+    inp.setAttribute('aria-label', `Motivo do atraso de “${g.title}”`);
+    inp.className = 'mt-1 w-full rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-amber-500 dark:border-zinc-700';
+    inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = why; inp.blur(); } };
+    inp.onblur = () => setTimeout(() => { goalWhyOpen = null; setGoalWhy(g.from, g.id, inp.value); });   // fora do redesenho em curso
+    setTimeout(() => inp.focus());
+    return inp;
+  }
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'mt-0.5 self-start break-words text-left text-[11px] text-zinc-500 underline decoration-dotted underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300';
+  b.textContent = why ? `Motivo: ${why}` : '+ Justificar atraso';
+  b.title = why ? 'Editar motivo' : 'Escreva por que a meta não foi cumprida';
+  b.onclick = () => { goalWhyOpen = g.id; renderGoals(); };
+  return b;
+}
+
 function renderGoals() {
   const now = new Date(), wk = weekKey(now), w = { goals: [], ...S.weeks[wk] };
   const ul = $('#goal-list');
   ul.replaceChildren();
   if (!w.goals.length) ul.append(emptyRow('Defina 2–4 metas maiores para esta semana.'));
   for (const g of w.goals) {
-    ul.append(checkRow(g.title, g.done, () => toggleGoal(g.id), () => removeGoal(g.id), 'goal'));
+    ul.append(checkRow(g.title, g.done, () => toggleGoal(g.id), () => removeGoal(g.id), 'goal',
+      g.late ? { tag: lateLabel(g), sub: goalOrigin(g) ? goalWhyRow(g) : null } : {}));
   }
   const done = w.goals.filter((g) => g.done).length;
   $('#goal-count').textContent = w.goals.length ? `${done}/${w.goals.length}` : '';
@@ -4756,6 +4823,33 @@ function renderReview() {
   }
   $('#rv-metrics-wrap').classList.toggle('hidden', !rvm.children.length);
 
+  // Metas não cumpridas: um motivo para cada (não redesenha enquanto você digita)
+  const missed = (S.weeks[r.wk]?.goals || []).filter((g) => !g.done), rmu = $('#rv-missed');
+  $('#rv-missed-wrap').classList.toggle('hidden', !missed.length);
+  if (!rmu.contains(document.activeElement)) {
+    rmu.replaceChildren();
+    for (const g of missed) {
+      const li = document.createElement('li');
+      const head = document.createElement('p'); head.className = 'flex flex-wrap items-center gap-x-2 gap-y-0.5';
+      const t = document.createElement('span'); t.className = 'break-words'; t.textContent = g.title;
+      head.append(t);
+      if (g.late) {
+        const tg = document.createElement('span');
+        tg.className = 'rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400';
+        tg.textContent = lateLabel(g);
+        head.append(tg);
+      }
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.maxLength = 160; inp.autocomplete = 'off'; inp.value = g.why || '';
+      inp.className = 'field mt-1.5'; inp.placeholder = 'Por que não foi cumprida?';
+      inp.setAttribute('aria-label', `Por que “${g.title}” não foi cumprida`);
+      inp.onchange = () => setGoalWhy(r.wk, g.id, inp.value);
+      inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); };
+      li.append(head, inp);
+      rmu.append(li);
+    }
+  }
+
   list($('#rv-wins'), r.wins, 'win', 'Nenhuma vitória registrada na Reflexão noturna.');
   list($('#rv-improves'), r.improves, 'improve', 'Nada anotado para melhorar.');
 
@@ -5407,7 +5501,7 @@ function renderMonthDetail() {
   const weekItems = [];
   for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
     const g = S.weeks[keyOf(w)]?.goals || [];
-    if (g.length) weekItems.push([`sem. ${fmtShort.format(w).replace('.', '')}`, g.map((x) => `${x.done ? '✓' : '○'} ${x.title}`).join('\n')]);
+    if (g.length) weekItems.push([`sem. ${fmtShort.format(w).replace('.', '')}`, g.map((x) => `${x.done ? '✓' : '○'} ${x.title}${x.late ? ` (${lateLabel(x).toLowerCase()})` : ''}${!x.done && x.why ? ` — motivo: ${x.why}` : ''}`).join('\n')]);
   }
   sec5.append(el('p', 'mt-3 eyebrow', 'Semanais'), list(weekItems, 'Sem metas semanais.'));
 
@@ -5992,13 +6086,23 @@ function addGoal(title) {
 }
 function removeGoal(id) {
   const w = week();
+  if (w.goals.find((x) => x.id === id)?.from) (w.dropped ||= []).push(id);   // atrasada apagada não volta
   w.goals = w.goals.filter((x) => x.id !== id);
   commit(renderGoals, renderMonth, renderStudy);
+}
+/** Motivo de uma meta não ter sido cumprida (fica na meta da semana `wk`). */
+function setGoalWhy(wk, id, text) {
+  const g = S.weeks[wk]?.goals?.find((x) => x.id === id);
+  if (!g) return renderGoals();
+  text = text.trim();
+  if (text) g.why = text; else delete g.why;
+  commit(renderGoals, renderReview);
 }
 function copyLastWeekGoals() {
   const prev = S.weeks[keyOf(addDays(weekStart(new Date()), -7))];
   if (!prev) return;
   week().goals = prev.goals.map((g) => ({ id: uid(), title: g.title, done: false }));
+  carryGoals();   // as não cumpridas entre as copiadas ganham o selo de atrasada
   commit(renderGoals, renderMonth);
 }
 function setEnergy(i) {
@@ -6579,6 +6683,7 @@ function rollDay() {
 function renderAll(openReflection = true) {
   migrateMetrics();
   syncToday();
+  carryGoals();
   save();
   renderHeader(); renderQuote(); renderOne(); renderTasks(); renderGoals(); renderKPIs(); renderHeatmap();
   renderDayNav();
