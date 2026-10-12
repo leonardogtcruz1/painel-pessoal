@@ -259,8 +259,16 @@
 
         <div id="rv-missed-wrap" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800">
           <p class="eyebrow">Metas não cumpridas</p>
-          <p class="mt-1 text-xs text-zinc-500">Por que não deu? As que ficarem em aberto passam para a próxima semana como atrasadas.</p>
-          <ul id="rv-missed" class="mt-3 space-y-3 text-sm"></ul>
+          <p class="mt-1 text-xs text-zinc-500">As que ficarem em aberto passam para a próxima semana como atrasadas.</p>
+          <ul id="rv-missed" class="mt-3 space-y-1.5 text-sm"></ul>
+          <p class="eyebrow mt-4">Justificativa da semana</p>
+          <ul id="rv-why" class="mt-1.5 space-y-0.5"></ul>
+          <form id="rv-why-form" class="mt-2 flex gap-2">
+            <input id="rv-why-input" class="field" type="text" maxlength="160" autocomplete="off" placeholder="Por que não deu? Um tópico por vez…" />
+            <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar tópico">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </form>
         </div>
 
         <div class="mt-5 grid gap-5 border-t border-zinc-100 pt-5 sm:grid-cols-2 dark:border-zinc-800">
@@ -413,6 +421,17 @@
           <div class="track mt-3"><div id="goal-bar" class="h-full rounded-full transition-[width] duration-500" style="width:0;background:var(--c-goal)"></div></div>
           <ul id="goal-list" class="mt-3 space-y-0.5"></ul>
           <button id="copy-goals" class="btn-ghost -mx-2.5 hidden text-xs">↺ Copiar metas da semana passada</button>
+          <div id="goal-why-wrap" class="mt-3 hidden border-t border-zinc-100 pt-3 dark:border-zinc-800">
+            <p class="eyebrow">Justificativa das atrasadas</p>
+            <p id="goal-why-week" class="mt-0.5 text-[11px] text-zinc-500"></p>
+            <ul id="goal-why" class="mt-1.5 space-y-0.5"></ul>
+            <form id="goal-why-form" class="mt-2 flex gap-2">
+              <input id="goal-why-input" class="field" type="text" maxlength="160" autocomplete="off" placeholder="Por que não deu? Um tópico por vez…" />
+              <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar tópico">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </form>
+          </div>
           <form id="goal-form" class="mt-3 flex gap-2">
             <input id="goal-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Meta para esta semana…" />
             <button class="btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800" type="submit" aria-label="Adicionar meta">
@@ -2177,9 +2196,16 @@ function renderPending() {
 // ---------- Metas da semana ----------
 const week = (wk = weekKey(new Date())) => { const w = (S.weeks[wk] ||= { goals: [] }); w.goals ||= []; return w; };
 const lateLabel = (g) => `Atrasada ${g.late} ${g.late === 1 ? 'semana' : 'semanas'}`;
-/** Meta de origem de uma atrasada (na semana de onde veio): é nela que fica o motivo. */
-const goalOrigin = (g) => S.weeks[g.from]?.goals?.find((x) => x.id === g.id);
-let goalWhyOpen = null;   // id da meta atrasada com o campo de motivo aberto
+/**
+ * Justificativa das metas não cumpridas: uma por semana, em tópicos — S.weeks[semana].why = [{ id, text }].
+ * Motivos antigos (um por meta, em `goal.why`) aparecem como tópicos e são convertidos na primeira edição.
+ */
+const weekWhy = (wk) => {
+  const w = S.weeks[wk];
+  return w?.why || (w?.goals || []).filter((g) => g.why).map((g) => ({ id: g.id, text: `${g.title}: ${g.why}` }));
+};
+/** Semana de onde vieram as atrasadas da semana atual (a mais recente, se houver mais de uma). */
+const lateFrom = () => (S.weeks[weekKey(new Date())]?.goals || []).filter((g) => g.late && S.weeks[g.from]).map((g) => g.from).sort().pop();
 
 /**
  * Metas não cumpridas da última semana com metas passam para a semana atual com selo de atrasada:
@@ -2205,27 +2231,27 @@ function carryGoals() {
   if (!cur) { w.u = parseKey(wk).getTime(); sigs.set(`weeks:${wk}`, sigOf(w)); }
 }
 
-/** Embaixo de uma meta atrasada: o motivo (clique para editar) ou "Justificar atraso". */
-function goalWhyRow(g) {
-  const why = goalOrigin(g)?.why || '';
-  if (goalWhyOpen === g.id) {
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.maxLength = 160; inp.value = why; inp.autocomplete = 'off';
-    inp.placeholder = 'Por que não foi cumprida?';
-    inp.setAttribute('aria-label', `Motivo do atraso de “${g.title}”`);
-    inp.className = 'mt-1 w-full rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-amber-500 dark:border-zinc-700';
-    inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = why; inp.blur(); } };
-    inp.onblur = () => setTimeout(() => { goalWhyOpen = null; setGoalWhy(g.from, g.id, inp.value); });   // fora do redesenho em curso
-    setTimeout(() => inp.focus());
-    return inp;
+/** Lista de tópicos da justificativa da semana `wk` (✕ apaga). */
+function renderWhy(ul, wk, empty) {
+  const items = weekWhy(wk);
+  ul.replaceChildren();
+  if (!items.length) {
+    const li = document.createElement('li');
+    li.className = 'py-1 text-xs text-zinc-500';
+    li.textContent = empty;
+    ul.append(li);
   }
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'mt-0.5 self-start break-words text-left text-[11px] text-zinc-500 underline decoration-dotted underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300';
-  b.textContent = why ? `Motivo: ${why}` : '+ Justificar atraso';
-  b.title = why ? 'Editar motivo' : 'Escreva por que a meta não foi cumprida';
-  b.onclick = () => { goalWhyOpen = g.id; renderGoals(); };
-  return b;
+  for (const it of items) {
+    const li = document.createElement('li');
+    li.className = 'group -mx-2 flex items-start gap-2 rounded-lg px-2 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+    const dot = document.createElement('span'); dot.className = 'shrink-0 text-sm text-zinc-400'; dot.textContent = '•';
+    const t = document.createElement('span'); t.className = 'min-w-0 flex-1 break-words text-sm'; t.textContent = it.text;
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = ROW_BTN; rm.innerHTML = ICON_X; rm.setAttribute('aria-label', `Apagar ${it.text}`);
+    rm.onclick = () => removeWeekWhy(wk, it.id);
+    li.append(dot, t, rm);
+    ul.append(li);
+  }
 }
 
 function renderGoals() {
@@ -2235,7 +2261,7 @@ function renderGoals() {
   if (!w.goals.length) ul.append(emptyRow('Defina 2–4 metas maiores para esta semana.'));
   for (const g of w.goals) {
     ul.append(checkRow(g.title, g.done, () => toggleGoal(g.id), () => removeGoal(g.id), 'goal',
-      g.late ? { tag: lateLabel(g), sub: goalOrigin(g) ? goalWhyRow(g) : null } : {}));
+      g.late ? { tag: lateLabel(g) } : {}));
   }
   const done = w.goals.filter((g) => g.done).length;
   $('#goal-count').textContent = w.goals.length ? `${done}/${w.goals.length}` : '';
@@ -2244,6 +2270,13 @@ function renderGoals() {
   $('#week-range').textContent = `${fmt.format(weekStart(now))} – ${fmt.format(addDays(weekStart(now), 6))}`.replace(/\./g, '');
   const prev = S.weeks[keyOf(addDays(weekStart(now), -7))];
   $('#copy-goals').classList.toggle('hidden', !!w.goals.length || !prev?.goals?.length);
+  // Justificativa única da semana de onde vieram as atrasadas
+  const from = lateFrom();
+  $('#goal-why-wrap').classList.toggle('hidden', !from);
+  if (from) {
+    $('#goal-why-week').textContent = `Semana de ${fmtRange(parseKey(from))}`;
+    renderWhy($('#goal-why'), from, 'Nenhum tópico ainda. Escreva abaixo por que as metas não foram cumpridas.');
+  }
   // Foco escrito na revisão da semana passada
   const focus = (prev?.review || '').trim();
   $('#week-focus').classList.toggle('hidden', !focus);
@@ -4823,32 +4856,24 @@ function renderReview() {
   }
   $('#rv-metrics-wrap').classList.toggle('hidden', !rvm.children.length);
 
-  // Metas não cumpridas: um motivo para cada (não redesenha enquanto você digita)
+  // Metas não cumpridas e a justificativa da semana (uma só, em tópicos)
   const missed = (S.weeks[r.wk]?.goals || []).filter((g) => !g.done), rmu = $('#rv-missed');
   $('#rv-missed-wrap').classList.toggle('hidden', !missed.length);
-  if (!rmu.contains(document.activeElement)) {
-    rmu.replaceChildren();
-    for (const g of missed) {
-      const li = document.createElement('li');
-      const head = document.createElement('p'); head.className = 'flex flex-wrap items-center gap-x-2 gap-y-0.5';
-      const t = document.createElement('span'); t.className = 'break-words'; t.textContent = g.title;
-      head.append(t);
-      if (g.late) {
-        const tg = document.createElement('span');
-        tg.className = 'rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400';
-        tg.textContent = lateLabel(g);
-        head.append(tg);
-      }
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.maxLength = 160; inp.autocomplete = 'off'; inp.value = g.why || '';
-      inp.className = 'field mt-1.5'; inp.placeholder = 'Por que não foi cumprida?';
-      inp.setAttribute('aria-label', `Por que “${g.title}” não foi cumprida`);
-      inp.onchange = () => setGoalWhy(r.wk, g.id, inp.value);
-      inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); };
-      li.append(head, inp);
-      rmu.append(li);
+  rmu.replaceChildren();
+  for (const g of missed) {
+    const li = document.createElement('li'); li.className = 'flex flex-wrap items-center gap-x-2 gap-y-0.5';
+    const t = document.createElement('span'); t.className = 'break-words'; t.textContent = `○ ${g.title}`;
+    li.append(t);
+    if (g.late) {
+      const tg = document.createElement('span');
+      tg.className = 'rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400';
+      tg.textContent = lateLabel(g);
+      li.append(tg);
     }
+    rmu.append(li);
   }
+  $('#rv-why-form').dataset.wk = r.wk;
+  renderWhy($('#rv-why'), r.wk, 'Nenhum tópico ainda. Escreva abaixo por que as metas não foram cumpridas.');
 
   list($('#rv-wins'), r.wins, 'win', 'Nenhuma vitória registrada na Reflexão noturna.');
   list($('#rv-improves'), r.improves, 'improve', 'Nada anotado para melhorar.');
@@ -5501,7 +5526,8 @@ function renderMonthDetail() {
   const weekItems = [];
   for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
     const g = S.weeks[keyOf(w)]?.goals || [];
-    if (g.length) weekItems.push([`sem. ${fmtShort.format(w).replace('.', '')}`, g.map((x) => `${x.done ? '✓' : '○'} ${x.title}${x.late ? ` (${lateLabel(x).toLowerCase()})` : ''}${!x.done && x.why ? ` — motivo: ${x.why}` : ''}`).join('\n')]);
+    if (g.length) weekItems.push([`sem. ${fmtShort.format(w).replace('.', '')}`, g.map((x) => `${x.done ? '✓' : '○'} ${x.title}${x.late ? ` (${lateLabel(x).toLowerCase()})` : ''}`)
+      .concat(weekWhy(keyOf(w)).length ? ['Justificativa:', ...weekWhy(keyOf(w)).map((y) => `• ${y.text}`)] : []).join('\n')]);
   }
   sec5.append(el('p', 'mt-3 eyebrow', 'Semanais'), list(weekItems, 'Sem metas semanais.'));
 
@@ -6090,12 +6116,25 @@ function removeGoal(id) {
   w.goals = w.goals.filter((x) => x.id !== id);
   commit(renderGoals, renderMonth, renderStudy);
 }
-/** Motivo de uma meta não ter sido cumprida (fica na meta da semana `wk`). */
-function setGoalWhy(wk, id, text) {
-  const g = S.weeks[wk]?.goals?.find((x) => x.id === id);
-  if (!g) return renderGoals();
+/** Tópicos da justificativa da semana `wk`; converte os motivos antigos (por meta) antes de mexer. */
+function ownWhy(wk) {
+  const w = S.weeks[wk];
+  if (!w) return null;
+  w.why = weekWhy(wk);
+  for (const g of w.goals || []) delete g.why;
+  return w;
+}
+function addWeekWhy(wk, text) {
   text = text.trim();
-  if (text) g.why = text; else delete g.why;
+  const w = text && ownWhy(wk);
+  if (!w) return;
+  w.why.push({ id: uid(), text });
+  commit(renderGoals, renderReview);
+}
+function removeWeekWhy(wk, id) {
+  const w = ownWhy(wk);
+  if (!w) return;
+  w.why = w.why.filter((x) => x.id !== id);
   commit(renderGoals, renderReview);
 }
 function copyLastWeekGoals() {
@@ -6230,6 +6269,8 @@ $('#goal-form').onsubmit = (e) => {
   $('#goal-input').value = '';
 };
 $('#copy-goals').onclick = copyLastWeekGoals;
+$('#goal-why-form').onsubmit = (e) => { e.preventDefault(); addWeekWhy(lateFrom(), $('#goal-why-input').value); $('#goal-why-input').value = ''; $('#goal-why-input').focus(); };
+$('#rv-why-form').onsubmit = (e) => { e.preventDefault(); addWeekWhy(e.currentTarget.dataset.wk, $('#rv-why-input').value); $('#rv-why-input').value = ''; $('#rv-why-input').focus(); };
 
 $('#month-prev').onclick = () => { view.m--; if (view.m < 0) { view.m = 11; view.y--; } renderMonth(); };
 $('#month-next').onclick = () => { view.m++; if (view.m > 11) { view.m = 0; view.y++; } renderMonth(); };
