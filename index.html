@@ -62,7 +62,7 @@
       .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white; }
       .chip { @apply rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 transition hover:border-emerald-500/50 hover:text-emerald-600 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-emerald-400; }
       .track { @apply h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800; }
-      .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out; background-image: linear-gradient(90deg, rgb(var(--acc-500)), var(--c-goal)); }
+      .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out; }
     }
     html { -webkit-font-smoothing: antialiased; }
     /* ---------- Layout da aba Hoje (ver comentário no #today-grid) ---------- */
@@ -157,6 +157,9 @@
       .card:hover { border-color: rgb(var(--acc-500) / 0.35); box-shadow: 0 8px 24px -12px rgb(var(--acc-500) / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.9); }
       html.dark .card:hover { border-color: rgb(var(--acc-400) / 0.3); box-shadow: 0 8px 28px -14px rgb(var(--acc-500) / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.06); }
     }
+    /* Dia 100% concluído: todas as bordas ficam vermelho forte */
+    html.all-done .card, html.all-done .card:hover { border-color: #dc2626; }
+    html.dark.all-done .card, html.dark.all-done .card:hover { border-color: #ef4444; }
     /* Números grandes em fonte de código */
     :is(.text-xl, .text-2xl, .text-3xl, .text-4xl).tabular-nums, .num {
       font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -0.03em; font-feature-settings: "zero" 0;
@@ -214,7 +217,7 @@
     <header class="flex items-start justify-between gap-4 pb-2">
       <div>
         <p id="date-label" class="eyebrow"></p>
-        <h1 id="greeting" class="mt-1 bg-gradient-to-r from-zinc-900 to-zinc-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent sm:text-4xl dark:from-white dark:to-zinc-400"></h1>
+        <h1 id="greeting" class="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl"></h1>
       </div>
       <div class="flex items-center gap-1">
       <button id="sync-btn" class="btn-ghost relative" aria-label="Sincronização entre aparelhos" title="Sincronização">
@@ -425,12 +428,9 @@
         <section id="kpis" class="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5 lg:grid-cols-2">
           <div class="card col-span-2 flex items-center gap-4 sm:col-span-1 lg:col-span-2">
             <svg class="h-16 w-16 shrink-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
-              <defs><linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" style="stop-color: rgb(var(--acc-500))" /><stop offset="1" style="stop-color: var(--c-goal)" />
-              </linearGradient></defs>
               <circle cx="28" cy="28" r="23" fill="none" stroke-width="5" class="stroke-zinc-100 dark:stroke-zinc-800" />
-              <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round" stroke="url(#ring-grad)"
-                style="stroke-dasharray:144.51;stroke-dashoffset:144.51" class="transition-[stroke-dashoffset] duration-700 ease-out" />
+              <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round"
+                style="stroke-dasharray:144.51;stroke-dashoffset:144.51" class="stroke-emerald-500 transition-[stroke-dashoffset] duration-700 ease-out" />
             </svg>
             <div class="min-w-0">
               <p class="eyebrow">Hoje</p>
@@ -520,6 +520,7 @@
             <div class="flex items-baseline gap-2">
               <h2 id="tasks-title" class="text-sm font-semibold">Hábitos de hoje</h2>
               <span id="task-count" class="text-xs tabular-nums text-zinc-500"></span>
+              <span id="task-loose" class="hidden cursor-help items-center gap-1 text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500" tabindex="0"></span>
             </div>
             <button id="reset-day" class="btn-ghost text-xs" title="Desmarca todos os hábitos de hoje">Zerar dia</button>
           </div>
@@ -1601,6 +1602,18 @@ const fmtSleep = (h) => {
 /* =========================================================
    COMPONENTES
    ========================================================= */
+const ICON_INFO = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>';
+/** Aviso discreto: ícone ⓘ (+ texto curto); a explicação aparece ao passar o mouse ou focar. Texto vazio = esconde. */
+function infoHint(el, text, title, detail) {
+  el.classList.toggle('hidden', text === '');
+  el.classList.toggle('inline-flex', text !== '');
+  el.innerHTML = ICON_INFO;
+  if (text) el.append(document.createTextNode(text));
+  el.setAttribute('aria-label', `${title} — ${detail}`);
+  const show = (e) => showTip(e, title, [{ value: '', label: detail }]);
+  el.onpointerenter = show; el.onfocus = show;
+  el.onpointermove = moveTip; el.onpointerleave = hideTip; el.onblur = hideTip;
+}
 const CHECK_SVG = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 const PARTIAL_SVG = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6.5 12h11"/></svg>';
@@ -1813,8 +1826,11 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   label.textContent = title;
   label.title = title;
   label.className = 'select-none break-words text-sm transition ' +
-    (opts.off ? 'text-zinc-400 dark:text-zinc-500'
-      : 'cursor-pointer ' + (on ? 'text-zinc-400 line-through decoration-zinc-400/50 dark:text-zinc-500' : ''));
+    (opts.off ? 'text-zinc-400 dark:text-zinc-500' : 'cursor-pointer ' + (on ? 'text-zinc-600 dark:text-zinc-300' : ''));
+  if (on && !opts.off) {
+    const c = tone === 'goal' ? 'var(--c-goal)' : tone === 'month' ? '#71717a' : 'rgb(var(--acc-500))';
+    li.style.background = `color-mix(in srgb, ${c} 11%, transparent)`;
+  }
   if (!opts.off) label.onclick = onToggle;
   textCol.append(label);
   if (opts.tag) {
@@ -1848,6 +1864,25 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   if (opts.qty && !opts.off) {
     const q = opts.qty, box = document.createElement('span');
     box.className = 'flex shrink-0 items-center gap-1 text-xs tabular-nums text-zinc-500';
+    // Barrinha de progresso embaixo do nome
+    const pr = document.createElement('span');
+    pr.className = 'mt-1 block h-1 w-full max-w-[180px] overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-800';
+    const pf = document.createElement('span');
+    pf.className = 'block h-full rounded-full bg-emerald-500 transition-[width] duration-300';
+    pf.style.width = `${Math.min(100, ((q.value || 0) / q.target) * 100)}%`;
+    pr.append(pf);
+    textCol.append(pr);
+    // − e + com passo proporcional à meta
+    const stepBy = q.target <= 10 ? 1 : q.target <= 60 ? 5 : 10;
+    const stepBtn = (sign) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'flex h-6 w-6 items-center justify-center rounded-md border border-zinc-200 text-sm leading-none text-zinc-500 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-zinc-700 dark:hover:text-emerald-400';
+      b.textContent = sign > 0 ? '+' : '−';
+      b.setAttribute('aria-label', `${sign > 0 ? 'Somar' : 'Tirar'} ${stepBy} em “${title}”`);
+      b.onclick = () => q.onSet(Math.max(0, +((q.value || 0) + sign * stepBy).toFixed(2)));
+      return b;
+    };
     const inp = document.createElement('input');
     inp.type = 'number'; inp.min = '0'; inp.step = 'any'; inp.inputMode = 'decimal';
     inp.value = q.value || '';
@@ -1858,7 +1893,7 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); };
     const of = document.createElement('span');
     of.textContent = `/ ${fmtNum(q.target)}${q.unit ? ' ' + q.unit : ''}`;
-    box.append(inp, of);
+    box.append(stepBtn(-1), inp, of, stepBtn(1));
     if (q.value > q.target) {
       const ex = document.createElement('span');
       ex.className = 'font-medium text-emerald-600 dark:text-emerald-400';
@@ -2154,12 +2189,8 @@ function renderTasks() {
   $('#task-count').textContent = today.length ? `${d.done.length}/${today.length}` : '';
   // Hábito que não move nenhum número é candidato a sair (ou a ganhar uma métrica)
   const loose = S.metrics.length ? habits().filter((t) => !t.metricId && !t.projectId && !t.study && !t.sleep && !t.checkin).length : 0;
-  if (loose) {
-    const li = document.createElement('li');
-    li.className = 'pt-2 text-xs text-zinc-500';
-    li.textContent = `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica, projeto ou estudo — ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço.`;
-    ul.append(li);
-  }
+  infoHint($('#task-loose'), loose ? String(loose) : '', `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica, projeto ou estudo`,
+    `ligue em ⚙ ou pense se ${loose === 1 ? 'ele vale' : 'eles valem'} o esforço`);
   enableDrag(ul, reorderTasks);
 }
 
@@ -2402,6 +2433,7 @@ function renderKPIs() {
   ring.style.strokeDashoffset = C * (1 - (today || 0));
   countTo($('#kpi-today'), today == null ? '—' : fmtPct(today));
   paintTab(today);
+  document.documentElement.classList.toggle('all-done', today === 1);
   $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
     : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
 
@@ -2971,7 +3003,12 @@ function renderMetrics() {
         return a == null ? name : `${name} ${fmtPct(a)}`;
       }).join(' · ') + ' (7 dias)';
     } else {
-      lk.textContent = 'Nenhum hábito ligado — no ⚙ de um hábito, escolha “Move a métrica”.';
+      lk.className = 'mt-2 flex';
+      const hint = document.createElement('span');
+      hint.className = 'cursor-help items-center gap-1 text-[11px] text-zinc-400 dark:text-zinc-500';
+      hint.tabIndex = 0;
+      infoHint(hint, 'sem hábito ligado', 'Nenhum hábito move esta métrica', 'no ⚙ de um hábito, escolha “Move a métrica”');
+      lk.append(hint);
     }
     card.append(lk);
 
@@ -5730,7 +5767,7 @@ function renderMonthDetail() {
     const secE = section('Gastos & ganhos', `Ganhos ${fmtMoney(T.inc)} · gastos ${fmtMoney(T.out)} · saldo ${T.net > 0 && !maskMoney(expCur(), 'exp') ? '+' : ''}${fmtMoney(T.net)}`
       + (T.inc ? ` (${T.net >= 0 ? `guardou ${fmtPct(T.net / T.inc)}` : 'gastou mais do que ganhou'})` : ''));
     const gw = el('div', 'mt-2 space-y-1.5');
-    for (const [id, v] of rows) gw.append(bar(`${expCat(id)[1]} ${expCat(id)[2]}`, v, rows[0][1], `${fmtMoney(v)} · ${fmtPct(v / T.out)}`, 'var(--c-goal)'));
+    for (const [id, v] of rows) gw.append(bar(expCat(id)[2], v, rows[0][1], `${fmtMoney(v)} · ${fmtPct(v / T.out)}`, 'var(--c-goal)'));
     secE.append(gw);
   }
 
@@ -5821,6 +5858,26 @@ const INC_CATS = [
 ];
 const isIncome = (e) => e.kind === 'in';
 const expCat = (id) => [...EXP_CATS, ...INC_CATS].find((c) => c[0] === id) || EXP_CATS[EXP_CATS.length - 1];
+/** Ícone de traço da categoria (no lugar do emoji). */
+const CAT_ICONS = {
+  'mercado': '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2 2h2l2.7 12.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L22 7H5.1"/>',
+  'comida': '<path d="M3 2v7a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6a2 2 0 0 0 2 2h3Zm0 0v7"/>',
+  'transporte': '<path d="M8 6v6M15 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8a4 4 0 0 0 0-2.4l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3M9 18h5"/><circle cx="7" cy="18" r="2"/><circle cx="16" cy="18" r="2"/>',
+  'moradia': '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  'contas': '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6M10 22h4"/>',
+  'lazer': '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2ZM13 5v2M13 17v2M13 11v2"/>',
+  'saude': '<path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/>',
+  'educacao': '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+  'compras': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0"/>',
+  'outros': '<path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7ZM3.3 7 12 12l8.7-5M12 22V12"/>',
+  'salario': '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  'freela': '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/>',
+  'vendas': '<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1"/>',
+  'invest': '<path d="m22 7-8.5 8.5-5-5L2 17M16 7h6v6"/>',
+  'presente': '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  'outros-in': '<circle cx="8" cy="8" r="6"/><path d="M18.1 10.4A6 6 0 1 1 10.3 18M7 6h1v4"/>',
+};
+const catIcon = (id, cls = 'h-3.5 w-3.5') => `<svg class="${cls} shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CAT_ICONS[expCat(id)[0]] || CAT_ICONS.outros}</svg>`;
 const CURRENCIES = ['R$', '€', 'US$', '£'];
 /**
  * Moeda escolhida: tudo é exibido nela (convertido pela cotação) e os novos lançamentos são feitos nela.
@@ -5946,10 +6003,11 @@ function renderExpenses() {
     const b = document.createElement('button');
     b.type = 'button';
     const on = expCatSel[expKind] === id;
-    b.className = 'rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
+    b.className = 'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
       ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900'
       : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 dark:border-zinc-800 dark:text-zinc-400');
-    b.textContent = `${ic} ${name}`;
+    b.innerHTML = catIcon(id);
+    b.append(name);
     b.setAttribute('aria-pressed', String(on));
     b.onclick = () => { expCatSel[expKind] = id; renderExpenses(); $('#exp-amount').focus(); };
     cats.append(b);
@@ -6002,7 +6060,7 @@ function renderExpenses() {
       const [, ic, name] = expCat(id), n = items.filter((e) => e.cat === id).length;
       const row = document.createElement('div');
       row.className = 'group flex items-center gap-2 text-xs';
-      const lbl = document.createElement('span'); lbl.className = 'w-24 shrink-0 truncate text-zinc-600 sm:w-28 dark:text-zinc-400'; lbl.textContent = `${ic} ${name}`;
+      const lbl = document.createElement('span'); lbl.className = 'flex w-24 shrink-0 items-center gap-1.5 truncate text-zinc-600 sm:w-28 dark:text-zinc-400'; lbl.innerHTML = catIcon(id); lbl.append(name);
       const track = document.createElement('div'); track.className = 'h-3 flex-1';
       const bar = document.createElement('div');
       bar.className = 'h-full rounded-r-[4px] transition group-hover:opacity-80';
@@ -6011,7 +6069,7 @@ function renderExpenses() {
       const val = document.createElement('span'); val.className = 'shrink-0 text-right tabular-nums text-zinc-700 dark:text-zinc-300';
       val.textContent = `${fmtMoney(v)} · ${fmtPct(v / tot)}`;
       row.append(lbl, track, val);
-      row.addEventListener('pointerenter', (e) => showTip(e, `${ic} ${name}`, [
+      row.addEventListener('pointerenter', (e) => showTip(e, name, [
         { value: fmtMoney(v), label: `${fmtPct(v / tot)} do total`, color, box: true },
         { value: String(n), label: n === 1 ? 'lançamento' : 'lançamentos' }]));
       row.addEventListener('pointermove', moveTip);
@@ -6073,8 +6131,8 @@ function renderExpenses() {
     const [, ic, name] = expCat(e.cat), inc = isIncome(e);
     const li = document.createElement('li');
     li.className = 'group flex items-center gap-3 py-2 text-sm';
-    li.innerHTML = '<span class="w-6 text-center"></span><span class="min-w-0 flex-1"><span class="block truncate"></span><span class="block text-[11px] text-zinc-500"></span></span><span class="tabular-nums font-medium"></span>';
-    li.children[0].textContent = ic;
+    li.innerHTML = '<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"></span><span class="min-w-0 flex-1"><span class="block truncate"></span><span class="block text-[11px] text-zinc-500"></span></span><span class="tabular-nums font-medium"></span>';
+    li.children[0].innerHTML = catIcon(e.cat, 'h-4 w-4');
     li.children[1].children[0].textContent = e.note || name;
     li.children[1].children[1].textContent = `${cap(fmtDay.format(parseKey(e.k)).replace(/\./g, ''))} · ${inc ? 'ganho' : 'gasto'}${e.note ? ` · ${name}` : ''}`;
     li.children[2].textContent = `${inc ? '+' : '−'} ${fmtMoney(e.amount, curOf(e))}`;
@@ -6126,7 +6184,7 @@ function renderTabs() {
     const on = b.dataset.tab === tab;
     b.setAttribute('aria-selected', String(on));
     b.className = 'rounded-md px-4 py-1.5 transition ' +
-      (on ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200');
+      (on ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/20' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200');
   });
   if (tab === 'meses') renderYear();
   else renderCharts();   // gráficos da aba Hoje precisam da largura visível
