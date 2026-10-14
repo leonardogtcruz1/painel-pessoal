@@ -1347,14 +1347,32 @@ function resync() {
  * Dia sem registro com hábitos previstos conta 0 — você não abriu o painel.
  */
 function completion(k) {
-  if (weekendOff(parseKey(k))) return null;
+  if (dayOff(parseKey(k))) return null;
   const d = peek(k);
   if (d) return dayScore(d);
   return tasksFor(parseKey(k)).length ? 0 : null;
 }
-/** Sábado e domingo são opcionais: só entram na média se tiverem ao menos uma tarefa pontual. */
+/** Sábado, domingo e feriados são opcionais: só entram na média se tiverem ao menos uma tarefa pontual. */
 const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
-const weekendOff = (date) => isWeekend(date) && !S.tasks.some((t) => t.once === keyOf(date));
+const dayOff = (date) => (isWeekend(date) || !!holidayName(date)) && !S.tasks.some((t) => t.once === keyOf(date));
+/** Feriados nacionais (inclui Carnaval e Corpus Christi), calculados por ano a partir da Páscoa. */
+const holidayCache = {};
+function holidays(y) {
+  if (holidayCache[y]) return holidayCache[y];
+  // Páscoa (algoritmo de Meeus/Jones/Butcher)
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const easter = new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1);
+  const map = {
+    [`${y}-01-01`]: 'Confraternização Universal', [`${y}-04-21`]: 'Tiradentes', [`${y}-05-01`]: 'Dia do Trabalho',
+    [`${y}-09-07`]: 'Independência', [`${y}-10-12`]: 'Nossa Senhora Aparecida', [`${y}-11-02`]: 'Finados',
+    [`${y}-11-15`]: 'Proclamação da República', [`${y}-11-20`]: 'Consciência Negra', [`${y}-12-25`]: 'Natal',
+  };
+  for (const [off, name] of [[-48, 'Carnaval'], [-47, 'Carnaval'], [-2, 'Sexta-feira Santa'], [60, 'Corpus Christi']]) map[keyOf(addDays(easter, off))] = name;
+  return (holidayCache[y] = map);
+}
+const holidayName = (date) => holidays(date.getFullYear())[keyOf(date)] || null;
 /** Hábitos completos valem 1; hábitos com quantidade valem a fração feita (14/20 pág = 0,7). */
 function dayScore(d) {
   if (!d.total) return null;
@@ -1488,7 +1506,7 @@ function monthStats(y, m) {
     const date = new Date(y, m, i), k = keyOf(date), rec = peek(k);
     const future = k > tk, tracked = !future && k >= start;
     const p = tracked ? completion(k) : null;
-    const free = future ? !tasksFor(date).length || weekendOff(date) : tracked && p == null;
+    const free = future ? !tasksFor(date).length || dayOff(date) : tracked && p == null;
     if (k >= start && !free) { possible++; if (!future) possibleElapsed++; }
     if (p != null) habitSum += p;
     if (p === 1) perfect++;
@@ -2314,7 +2332,7 @@ function renderKPIs() {
   ring.style.strokeDashoffset = C * (1 - (today || 0));
   $('#kpi-today').textContent = today == null ? '—' : fmtPct(today);
   paintTab(today);
-  $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? (weekendOff(now) ? 'fim de semana · opcional' : 'dia livre')
+  $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
     : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
 
   const week = averageBetween(addDays(now, -6), now);
@@ -2698,26 +2716,50 @@ function adherence(tasks, fromK, toK) {
   return vals.length ? avg(vals) : null;
 }
 
-/** Linha da métrica ao longo do tempo, com a meta tracejada. */
+/** Evolução da métrica: linha dos registros, meta tracejada e rótulos de início/agora. */
 function metricSpark(m, st) {
+  const box = document.createElement('div');
+  box.className = 'mt-3';
+  if (st.e.length < 2) {
+    const p = document.createElement('p');
+    p.className = 'text-xs text-zinc-500';
+    p.textContent = 'Registre de novo em outro dia para ver a linha de evolução.';
+    box.append(p);
+    return box;
+  }
   const pts = st.e.map(([k, v]) => [daysBetween(st.e[0][0], k), v]);
   const vs = pts.map((p) => p[1]).concat(m.target != null ? [m.target] : []);
   const lo = Math.min(...vs), hi = Math.max(...vs), pad = (hi - lo) * 0.12 || 1;
   const X = Math.max(1, pts[pts.length - 1][0]);
-  const x = (d) => (pts.length === 1 ? 50 : (d / X) * 100), y = (v) => 36 - ((v - lo + pad) / (hi - lo + 2 * pad)) * 32;
-  const svg = svgEl('svg', { viewBox: '0 0 100 40', preserveAspectRatio: 'none', class: 'mt-3 block h-10 w-full', 'aria-hidden': 'true' });
+  const x = (d) => (d / X) * 100, y = (v) => 52 - ((v - lo + pad) / (hi - lo + 2 * pad)) * 48;
+  const plot = document.createElement('div');
+  plot.className = 'relative h-14';
+  const svg = svgEl('svg', { viewBox: '0 0 100 56', preserveAspectRatio: 'none', class: 'absolute inset-0 h-full w-full', 'aria-hidden': 'true' });
   if (m.target != null) {
     svg.append(svgEl('line', { x1: 0, x2: 100, y1: y(m.target), y2: y(m.target), stroke: 'var(--c-axis)', 'stroke-width': 1,
       'stroke-dasharray': '3 3', 'vector-effect': 'non-scaling-stroke', opacity: 0.6 }));
+    const tl = document.createElement('span');
+    tl.className = 'absolute left-0 -translate-y-1/2 rounded bg-white px-1 text-[10px] leading-4 text-zinc-500 dark:bg-zinc-900';
+    tl.style.top = `${(y(m.target) / 56) * 100}%`;
+    tl.textContent = `meta ${fmtVal(m, m.target)}`;
+    plot.append(tl);
   }
-  if (pts.length > 1) {
-    svg.append(svgEl('path', { d: 'M' + pts.map(([d, v]) => `${x(d)},${y(v)}`).join('L'), fill: 'none', stroke: 'var(--c-goal)',
-      'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' }));
-  }
-  const [ld, lv] = pts[pts.length - 1];
-  svg.append(svgEl('line', { x1: x(ld), x2: x(ld), y1: y(lv), y2: y(lv), stroke: 'var(--c-goal)', 'stroke-width': 6,
-    'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' }));
-  return svg;
+  svg.append(svgEl('path', { d: 'M' + pts.map(([d, v]) => `${x(d)},${y(v)}`).join('L'), fill: 'none', stroke: 'var(--c-goal)',
+    'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' }));
+  // Um ponto por registro (o último maior)
+  pts.forEach(([d, v], i) => svg.append(svgEl('line', { x1: x(d), x2: x(d), y1: y(v), y2: y(v), stroke: 'var(--c-goal)',
+    'stroke-width': i === pts.length - 1 ? 7 : 4, 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' })));
+  plot.prepend(svg);
+  const lab = document.createElement('div');
+  lab.className = 'mt-1 flex justify-between gap-2 text-[10px] tabular-nums text-zinc-500';
+  const when = (k) => (k === todayKey() ? 'hoje' : fmtShort.format(parseKey(k)).replace('.', ''));
+  const [k0, v0] = st.e[0], [k1, v1] = st.e[st.e.length - 1];
+  const a = document.createElement('span'), b = document.createElement('span');
+  a.textContent = `${when(k0)} · ${fmtVal(m, v0)}`;
+  b.textContent = `${when(k1)} · ${fmtVal(m, v1)} · ${st.e.length} registros`;
+  lab.append(a, b);
+  box.append(plot, lab);
+  return box;
 }
 
 let editingMetric = null, metricFlash = null;
