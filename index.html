@@ -7,7 +7,7 @@
   <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2309090b'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2327272a' stroke-width='4'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 
   <!-- Aplica o tema antes da pintura para evitar "flash" -->
   <script>
@@ -29,7 +29,7 @@
     tailwind.config = {
       darkMode: 'class',
       theme: { extend: {
-        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'] },
         colors: {
           // "emerald" é a cor de destaque escolhida nas configurações (variáveis --acc-*)
           emerald: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((n) => [n, `rgb(var(--acc-${n}) / <alpha-value>)`])),
@@ -1009,7 +1009,7 @@
   </main>
 
   <!-- Tooltip compartilhado dos gráficos -->
-  <div id="tip" role="tooltip" class="pointer-events-none fixed z-50 hidden min-w-[140px] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs shadow-lg shadow-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900"></div>
+  <div id="tip" role="tooltip" class="pointer-events-none fixed z-50 hidden min-w-[140px] rounded-lg border border-emerald-500/60 bg-white px-3 py-2 font-mono text-[11px] shadow-lg shadow-emerald-900/10 dark:border-emerald-400/50 dark:bg-zinc-900"></div>
 
   <!-- Diário das reflexões -->
   <dialog id="settings" class="m-auto w-[min(480px,calc(100%-32px))] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
@@ -2750,6 +2750,23 @@ function metricSpark(m, st) {
   pts.forEach(([d, v], i) => svg.append(svgEl('line', { x1: x(d), x2: x(d), y1: y(v), y2: y(v), stroke: 'var(--c-goal)',
     'stroke-width': i === pts.length - 1 ? 7 : 4, 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' })));
   plot.prepend(svg);
+  // Alvos invisíveis sobre cada ponto (o SVG é esticado, então ficam em HTML)
+  const fmtDayLong = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' });
+  pts.forEach(([d, v], i) => {
+    const hit = document.createElement('button');
+    hit.type = 'button';
+    hit.className = 'absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500';
+    hit.style.left = `${x(d)}%`;
+    hit.style.top = `${(y(v) / 56) * 100}%`;
+    const k = st.e[i][0], rows = [{ value: fmtVal(m, v), label: m.name, color: 'var(--c-goal)', box: true }];
+    if (i > 0) rows.push({ value: signed(m, v - st.e[i - 1][1]), label: 'vs registro anterior' });
+    if (m.target != null) rows.push({ value: fmtVal(m, Math.abs(m.target - v)), label: (m.target >= st.e[0][1] ? v >= m.target : v <= m.target) ? 'além da meta' : 'até a meta' });
+    hit.setAttribute('aria-label', `${fmtDayLong.format(parseKey(k))}: ${fmtVal(m, v)}`);
+    const show = (e) => showTip(e, fmtDayLong.format(parseKey(k)).replace(/\./g, ''), rows);
+    hit.onmouseenter = show; hit.onfocus = show;
+    hit.onmousemove = moveTip; hit.onmouseleave = hideTip; hit.onblur = hideTip;
+    plot.append(hit);
+  });
   const lab = document.createElement('div');
   lab.className = 'mt-1 flex justify-between gap-2 text-[10px] tabular-nums text-zinc-500';
   const when = (k) => (k === todayKey() ? 'hoje' : fmtShort.format(parseKey(k)).replace('.', ''));
@@ -5165,7 +5182,7 @@ const tipEl = $('#tip');
 function showTip(e, title, rows) {
   tipEl.replaceChildren();
   const t = document.createElement('p');
-  t.className = 'mb-1.5 text-zinc-500';
+  t.className = 'mb-1.5 text-emerald-700/80 dark:text-emerald-300/80';
   t.textContent = title[0].toUpperCase() + title.slice(1);
   tipEl.append(t);
   for (const r of rows) {
@@ -5178,7 +5195,7 @@ function showTip(e, title, rows) {
       row.append(key);
     }
     const v = document.createElement('span');
-    v.className = 'font-semibold tabular-nums text-zinc-900 dark:text-zinc-100';
+    v.className = 'font-semibold tabular-nums text-emerald-600 dark:text-emerald-400';
     v.textContent = r.value;
     const l = document.createElement('span');
     l.className = 'text-zinc-500';
