@@ -134,10 +134,10 @@
     [data-accent="vermelho"] { --acc-50: 254 242 242; --acc-100: 254 226 226; --acc-200: 254 202 202; --acc-300: 252 165 165; --acc-400: 248 113 113; --acc-500: 239 68 68; --acc-600: 220 38 38; --acc-700: 185 28 28; --acc-800: 153 27 27; --acc-900: 127 29 29; --acc-950: 69 10 10; }
     [data-accent="laranja"] { --acc-50: 255 247 237; --acc-100: 255 237 213; --acc-200: 254 215 170; --acc-300: 253 186 116; --acc-400: 251 146 60; --acc-500: 249 115 22; --acc-600: 234 88 12; --acc-700: 194 65 12; --acc-800: 154 52 18; --acc-900: 124 45 18; --acc-950: 67 20 7; }
 
-    /* Cores dos gráficos (pares validados para daltonismo nos dois temas) */
+    /* Cores dos gráficos */
     :root {
       --c-habit: rgb(var(--acc-600));  /* hábitos diários = cor de destaque */
-      --c-goal: #2a78d6;   /* metas semanais */
+      --c-goal: #65a30d;   /* metas semanais = tom vizinho do destaque (verde → lima) */
       --c-avg: #18181b;    /* linha de média */
       --c-grid: #f0f0f1;
       --c-axis: #71717a;
@@ -146,15 +146,20 @@
     }
     html.dark {
       --c-habit: rgb(var(--acc-600));
-      --c-goal: #3987e5;
+      --c-goal: #a3e635;
       --c-avg: #e4e4e7;
       --c-grid: #232326;
       --c-axis: #71717a;
       --c-surface: #111113;
       --c-hover: rgba(255, 255, 255, 0.04);
     }
-    /* Destaque azul/ciano/roxo: a 2ª série (metas, gastos) vira laranja para não confundir */
-    html[data-accent="azul"], html[data-accent="ciano"], html[data-accent="roxo"] { --c-goal: #ea580c; }
+    /* A 2ª série (metas, gastos) usa um tom vizinho do destaque, mais claro, para não destoar */
+    html[data-accent="azul"] { --c-goal: #06b6d4; }      html.dark[data-accent="azul"] { --c-goal: #22d3ee; }
+    html[data-accent="ciano"] { --c-goal: #3b82f6; }     html.dark[data-accent="ciano"] { --c-goal: #60a5fa; }
+    html[data-accent="roxo"] { --c-goal: #d946ef; }      html.dark[data-accent="roxo"] { --c-goal: #e879f9; }
+    html[data-accent="rosa"] { --c-goal: #a855f7; }      html.dark[data-accent="rosa"] { --c-goal: #c084fc; }
+    html[data-accent="vermelho"] { --c-goal: #f97316; }  html.dark[data-accent="vermelho"] { --c-goal: #fb923c; }
+    html[data-accent="laranja"] { --c-goal: #eab308; }   html.dark[data-accent="laranja"] { --c-goal: #facc15; }
     details > summary::-webkit-details-marker { display: none; }
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
     input[type=number] { -moz-appearance: textfield; }
@@ -1342,10 +1347,14 @@ function resync() {
  * Dia sem registro com hábitos previstos conta 0 — você não abriu o painel.
  */
 function completion(k) {
+  if (weekendOff(parseKey(k))) return null;
   const d = peek(k);
   if (d) return dayScore(d);
   return tasksFor(parseKey(k)).length ? 0 : null;
 }
+/** Sábado e domingo são opcionais: só entram na média se tiverem ao menos uma tarefa pontual. */
+const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
+const weekendOff = (date) => isWeekend(date) && !S.tasks.some((t) => t.once === keyOf(date));
 /** Hábitos completos valem 1; hábitos com quantidade valem a fração feita (14/20 pág = 0,7). */
 function dayScore(d) {
   if (!d.total) return null;
@@ -1479,7 +1488,7 @@ function monthStats(y, m) {
     const date = new Date(y, m, i), k = keyOf(date), rec = peek(k);
     const future = k > tk, tracked = !future && k >= start;
     const p = tracked ? completion(k) : null;
-    const free = future ? !tasksFor(date).length : tracked && p == null;
+    const free = future ? !tasksFor(date).length || weekendOff(date) : tracked && p == null;
     if (k >= start && !free) { possible++; if (!future) possibleElapsed++; }
     if (p != null) habitSum += p;
     if (p === 1) perfect++;
@@ -2305,7 +2314,7 @@ function renderKPIs() {
   ring.style.strokeDashoffset = C * (1 - (today || 0));
   $('#kpi-today').textContent = today == null ? '—' : fmtPct(today);
   paintTab(today);
-  $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? 'dia livre'
+  $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? (weekendOff(now) ? 'fim de semana · opcional' : 'dia livre')
     : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
 
   const week = averageBetween(addDays(now, -6), now);
