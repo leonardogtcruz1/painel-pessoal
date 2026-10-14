@@ -55,14 +55,14 @@
 
   <style type="text/tailwindcss">
     @layer components {
-      .card { @apply rounded-2xl border border-zinc-200/80 bg-white p-5 sm:p-6 dark:border-zinc-800 dark:bg-zinc-900/50; }
+      .card { @apply rounded-2xl border border-zinc-200/80 bg-white/80 p-5 backdrop-blur-xl transition-[border-color,box-shadow] duration-300 sm:p-6 dark:border-zinc-800/80 dark:bg-zinc-900/55; }
       .eyebrow { @apply text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500; }
       .field { @apply w-full rounded-lg border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none transition placeholder:text-zinc-400 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/15 dark:border-zinc-800 dark:placeholder:text-zinc-600; }
       .btn-ghost { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100; }
       .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white; }
       .chip { @apply rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 transition hover:border-emerald-500/50 hover:text-emerald-600 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-emerald-400; }
       .track { @apply h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800; }
-      .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-500; }
+      .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out; background-image: linear-gradient(90deg, rgb(var(--acc-500)), var(--c-goal)); }
     }
     html { -webkit-font-smoothing: antialiased; }
     /* ---------- Layout da aba Hoje (ver comentário no #today-grid) ---------- */
@@ -135,8 +135,36 @@
         linear-gradient(to top left, transparent calc(50% - 0.75px), var(--c-axis) calc(50% - 0.75px), var(--c-axis) calc(50% + 0.75px), transparent calc(50% + 0.75px));
       opacity: 0.45;
     }
-    body { background: #fafafa; }
-    html.dark body { background: #09090b; }
+    /* Fundo: brilho suave da cor de destaque e do tom vizinho no topo da página */
+    body {
+      background:
+        radial-gradient(900px 420px at 12% -120px, rgb(var(--acc-500) / 0.13), transparent 70%),
+        radial-gradient(700px 360px at 92% -80px, color-mix(in srgb, var(--c-goal) 11%, transparent), transparent 70%),
+        #fafafa;
+      background-repeat: no-repeat;
+    }
+    html.dark body {
+      background:
+        radial-gradient(900px 420px at 12% -120px, rgb(var(--acc-500) / 0.16), transparent 70%),
+        radial-gradient(700px 360px at 92% -80px, color-mix(in srgb, var(--c-goal) 12%, transparent), transparent 70%),
+        #09090b;
+      background-repeat: no-repeat;
+    }
+    /* Cards: relevo (luz na borda de cima) e borda que acende na cor de destaque */
+    .card { box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), inset 0 1px 0 rgb(255 255 255 / 0.9); }
+    html.dark .card { box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.05); }
+    @media (hover: hover) {
+      .card:hover { border-color: rgb(var(--acc-500) / 0.35); box-shadow: 0 8px 24px -12px rgb(var(--acc-500) / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.9); }
+      html.dark .card:hover { border-color: rgb(var(--acc-400) / 0.3); box-shadow: 0 8px 28px -14px rgb(var(--acc-500) / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.06); }
+    }
+    /* Números grandes em fonte de código */
+    :is(.text-xl, .text-2xl, .text-3xl, .text-4xl).tabular-nums, .num {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -0.03em; font-feature-settings: "zero" 0;
+    }
+    /* Marcar hábito: o quadradinho dá um pulo */
+    @keyframes check-pop { 0% { transform: scale(1); } 40% { transform: scale(1.28); box-shadow: 0 0 0 6px rgb(var(--acc-500) / 0.18); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgb(var(--acc-500) / 0); } }
+    .check-pop { animation: check-pop 0.35s ease-out; }
+    @media (prefers-reduced-motion: reduce) { .check-pop { animation: none; } .fill, #ring { transition: none !important; } }
 
     /* Paletas de destaque (Configurações → Cor de destaque): degraus 50–950 em RGB */
     :root, [data-accent="verde"] { --acc-50: 236 253 245; --acc-100: 209 250 229; --acc-200: 167 243 208; --acc-300: 110 231 183; --acc-400: 52 211 153; --acc-500: 16 185 129; --acc-600: 5 150 105; --acc-700: 4 120 87; --acc-800: 6 95 70; --acc-900: 6 78 59; --acc-950: 2 44 34; }
@@ -186,7 +214,7 @@
     <header class="flex items-start justify-between gap-4 pb-2">
       <div>
         <p id="date-label" class="eyebrow"></p>
-        <h1 id="greeting" class="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl"></h1>
+        <h1 id="greeting" class="mt-1 bg-gradient-to-r from-zinc-900 to-zinc-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent sm:text-4xl dark:from-white dark:to-zinc-400"></h1>
       </div>
       <div class="flex items-center gap-1">
       <button id="sync-btn" class="btn-ghost relative" aria-label="Sincronização entre aparelhos" title="Sincronização">
@@ -396,33 +424,36 @@
         <!-- ============ KPIs ============ -->
         <section id="kpis" class="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-5 lg:grid-cols-2">
           <div class="card col-span-2 flex items-center gap-4 sm:col-span-1 lg:col-span-2">
-            <svg class="h-14 w-14 shrink-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
+            <svg class="h-16 w-16 shrink-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
+              <defs><linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" style="stop-color: rgb(var(--acc-500))" /><stop offset="1" style="stop-color: var(--c-goal)" />
+              </linearGradient></defs>
               <circle cx="28" cy="28" r="23" fill="none" stroke-width="5" class="stroke-zinc-100 dark:stroke-zinc-800" />
-              <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round"
-                class="stroke-emerald-500 transition-[stroke-dashoffset] duration-500" />
+              <circle id="ring" cx="28" cy="28" r="23" fill="none" stroke-width="5" stroke-linecap="round" stroke="url(#ring-grad)"
+                style="stroke-dasharray:144.51;stroke-dashoffset:144.51" class="transition-[stroke-dashoffset] duration-700 ease-out" />
             </svg>
             <div class="min-w-0">
               <p class="eyebrow">Hoje</p>
-              <p id="kpi-today" class="text-2xl font-semibold tabular-nums tracking-tight">0%</p>
-              <p id="kpi-today-sub" class="truncate text-xs text-zinc-500"></p>
+              <p id="kpi-today" class="text-3xl font-semibold tabular-nums tracking-tight">0%</p>
+              <p id="kpi-today-sub" class="truncate text-xs text-zinc-500 dark:text-zinc-500/80"></p>
             </div>
           </div>
           <div class="card">
             <p class="eyebrow">Semana</p>
-            <p id="kpi-week" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
+            <p id="kpi-week" class="mt-1 text-3xl font-semibold tabular-nums tracking-tight">—</p>
             <div class="track mt-2"><div id="kpi-week-bar" class="fill" style="width:0"></div></div>
-            <p id="kpi-week-sub" class="mt-1.5 text-xs text-zinc-500">média · 7 dias</p>
+            <p id="kpi-week-sub" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-500/80">média · 7 dias</p>
           </div>
           <div class="card">
             <p id="kpi-month-label" class="eyebrow">Mês</p>
-            <p id="kpi-month" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight">—</p>
+            <p id="kpi-month" class="mt-1 text-3xl font-semibold tabular-nums tracking-tight">—</p>
             <div class="track mt-2"><div id="kpi-month-bar" class="fill" style="width:0"></div></div>
-            <p id="kpi-month-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+            <p id="kpi-month-sub" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-500/80"></p>
           </div>
           <div class="card col-span-2 sm:col-span-1 lg:col-span-2">
             <p class="eyebrow">Ofensiva de estudo</p>
-            <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight"><span id="kpi-streak">0</span> <span id="kpi-streak-unit" class="text-base font-medium text-zinc-500">dias</span></p>
-            <p id="kpi-streak-sub" class="mt-1.5 text-xs text-zinc-500"></p>
+            <p class="mt-1 text-3xl font-semibold tabular-nums tracking-tight"><span id="kpi-streak">0</span> <span id="kpi-streak-unit" class="text-base font-medium text-zinc-500">dias</span></p>
+            <p id="kpi-streak-sub" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-500/80"></p>
           </div>
         </section>
 
@@ -1755,7 +1786,10 @@ const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover
  * `partial` = feito em parte → caixa amarela. `dragId`/`dragGroup` = linha arrastável (ver enableDrag).
  * `tag` = selo âmbar ao lado do nome (ex.: "Atrasada 1 semana"); `sub` = elemento extra embaixo do nome.
  */
+let popKey = null;   // linha recém-clicada: o quadradinho anima ao ser redesenhado
 function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
+  const tog = onToggle;
+  onToggle = (e) => { popKey = `${tone}|${title}`; tog(e); setTimeout(() => { popKey = null; }, 0); };
   const li = document.createElement('li');
   li.className = 'group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
 
@@ -1769,6 +1803,7 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     paintCheck(check, on, tone, opts.partial);
     check.setAttribute('aria-label', title);
     check.onclick = onToggle;
+    if (popKey === `${tone}|${title}` && (on || opts.partial)) { check.classList.add('check-pop'); popKey = null; }
   }
 
   // Nome em cima (tem prioridade de espaço); vínculos e frequência numa linha menor embaixo
@@ -2337,32 +2372,53 @@ function paintTab(p) {
     `<circle cx='16' cy='16' r='9' fill='none' stroke='#27272a' stroke-width='4'/>${arc}${check}</svg>`;
   $('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(svg);
 }
+/** Anima o número dentro do texto (0% → 72%), do valor anterior até o novo. */
+const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function countTo(el, text) {
+  const num = (t) => { const m = /-?\d+(?:[.,]\d+)?/.exec(t); return m ? { m, v: parseFloat(m[0].replace(',', '.')) } : null; };
+  const to = num(text), from = num(el.textContent);
+  cancelAnimationFrame(el.__raf);
+  if (!to || REDUCED_MOTION || text === el.textContent) { el.textContent = text; return; }
+  const start = from && el.textContent.replace(from.m[0], '') === text.replace(to.m[0], '') ? from.v : 0;
+  if (start === to.v) { el.textContent = text; return; }
+  const dec = (to.m[0].split(/[.,]/)[1] || '').length, sep = to.m[0].includes(',') ? ',' : '.';
+  const t0 = performance.now(), dur = 700;
+  const step = (now) => {
+    const f = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - f, 3);
+    el.textContent = f < 1 ? text.replace(to.m[0], (start + (to.v - start) * e).toFixed(dec).replace('.', sep)) : text;
+    if (f < 1) el.__raf = requestAnimationFrame(step);
+  };
+  el.__raf = requestAnimationFrame(step);
+}
+let kpisPainted = false;
 function renderKPIs() {
+  // 1ª pintura: garante que anel e barras partem do zero e enchem animados
+  if (!kpisPainted) { kpisPainted = true; void document.body.offsetWidth; }
   const d = day(), now = new Date(), k = todayKey();
   const today = completion(k), n = tasksFor(now).length;
   const C = 2 * Math.PI * 23;
   const ring = $('#ring');
   ring.style.strokeDasharray = C;
   ring.style.strokeDashoffset = C * (1 - (today || 0));
-  $('#kpi-today').textContent = today == null ? '—' : fmtPct(today);
+  countTo($('#kpi-today'), today == null ? '—' : fmtPct(today));
   paintTab(today);
   $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
     : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
 
   const week = averageBetween(addDays(now, -6), now);
-  $('#kpi-week').textContent = week ? fmtPct(week.value) : '—';
+  countTo($('#kpi-week'), week ? fmtPct(week.value) : '—');
   $('#kpi-week-bar').style.width = week ? fmtPct(week.value) : '0';
   $('#kpi-week-sub').textContent = week ? `média · ${week.days} ${week.days === 1 ? 'dia' : 'dias'}` : 'média · 7 dias';
 
   const month = averageBetween(new Date(now.getFullYear(), now.getMonth(), 1), now);
   const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(now);
   $('#kpi-month-label').textContent = monthName;
-  $('#kpi-month').textContent = month ? fmtPct(month.value) : '—';
+  countTo($('#kpi-month'), month ? fmtPct(month.value) : '—');
   $('#kpi-month-bar').style.width = month ? fmtPct(month.value) : '0';
   $('#kpi-month-sub').textContent = month ? `média · ${month.days} ${month.days === 1 ? 'dia' : 'dias'}` : '';
 
   const streak = studyStreak(), best = bestStreak();
-  $('#kpi-streak').textContent = streak;
+  countTo($('#kpi-streak'), String(streak));
   $('#kpi-streak-unit').textContent = streak === 1 ? 'dia' : 'dias';
   const studiedToday = studyOf(d) > 0;
   $('#kpi-streak-sub').textContent = streak && !studiedToday ? 'estude hoje para manter' : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
