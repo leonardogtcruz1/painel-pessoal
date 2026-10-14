@@ -9,6 +9,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 
+  <!-- Só abre no Mac: em outro sistema mostra um aviso e o painel nem carrega -->
+  <script>
+    window.__notMac = !/Mac/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '') &&
+      !/Macintosh/.test(navigator.userAgent);
+    if (window.__notMac) {
+      document.addEventListener('DOMContentLoaded', function () {
+        document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;' +
+          'font:15px/1.5 system-ui,sans-serif;text-align:center;background:#09090b;color:#a1a1aa">' +
+          '<p><strong style="color:#f4f4f5">Este painel só abre no Mac.</strong></p></div>';
+      });
+    }
+  </script>
+
   <!-- Aplica o tema antes da pintura para evitar "flash" -->
   <script>
     (function () {
@@ -1124,6 +1137,7 @@
   </dialog>
 
 <script>
+if (window.__notMac) throw new Error('Painel bloqueado fora do Mac');
 /* =========================================================
    STORE — estado + persistência (localStorage)
    ========================================================= */
