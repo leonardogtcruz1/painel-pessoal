@@ -52,6 +52,8 @@
       .fill { @apply h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out; }
     }
     html { -webkit-font-smoothing: antialiased; }
+    h1, h2, h3 { text-wrap: balance; }
+    #quote-text, #month-detail dd, #month-detail li, #journal-list dd { text-wrap: pretty; }
     /* ---------- Layout da aba Hoje (ver comentário no #today-grid) ---------- */
     /* minmax(0, 1fr): a coluna nunca passa da largura da tela, mesmo com conteúdo comprido */
     #today-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
@@ -3674,7 +3676,7 @@ function renderMonthReview() {
     label: 'do mês', src,
     get: () => S.months[mk], rec: () => monthRec(mk),
     hints: reflectionHints(cur, prev, goals, (S.settings.studyGoalH || 10) * 60 * weeksIn, weeksIn),
-    rerender: renderMonthReview,
+    rerender: () => { renderMonthReview(); renderMonthDetail(); },
   });
   $('#mr-done').textContent = S.months[mk]?.reflDone ? 'Reflexão concluída ✓' : 'Concluir reflexão do mês';
 }
@@ -5170,23 +5172,35 @@ function barPath(x, y, w, h, r) {
 }
 
 /**
- * Gráfico de colunas 0–100% com 1–2 séries agrupadas e linha opcional.
- * cfg: { n, series:[{values,color}], line?:{values,color}, xLabel(i), showX(i), tip(i) → {title, rows} }
+ * Gráfico de colunas (0–max, padrão 0–100%) com 1–2 séries agrupadas, linha de referência e linha opcional.
+ * cfg: { n, max?, ticks?, yFmt?, padL?, series:[{values,color,colorOf?,opacityOf?}], refLine?:{value,color?},
+ *        line?:{values,color,max?,dots?,fmt?,showLast?}, xLabel(i), showX(i), tip(i) → {title, rows} }
  */
 function columnChart(host, cfg) {
+  if (!host) return;
   host.replaceChildren();
   const W = host.clientWidth, H = host.clientHeight;
-  if (!W) return;
-  const m = { l: 34, r: cfg.line ? 36 : 4, t: 8, b: 22 };
+  if (!W || !H) return;
+  const max = cfg.max || 100;
+  const ticks = cfg.ticks || [0, max / 2, max];
+  const yFmt = cfg.yFmt || ((v) => `${v}%`);
+  const showLast = cfg.line && cfg.line.showLast !== false;
+  const m = { l: cfg.padL ?? 34, r: showLast ? 36 : 6, t: 8, b: 22 };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
-  const y = (v) => m.t + ph - (v / 100) * ph;
+  const y = (v) => m.t + ph - (Math.min(max, Math.max(0, v)) / max) * ph;
   const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'block overflow-visible' });
 
-  for (const v of [0, 50, 100]) {
+  for (const v of ticks) {
     svg.append(svgEl('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: 'var(--c-grid)', 'stroke-width': 1, 'shape-rendering': 'crispEdges' }));
     const t = svgEl('text', { x: m.l - 8, y: y(v) + 3.5, 'text-anchor': 'end', 'font-size': 10, fill: 'var(--c-axis)', class: 'tabular-nums' });
-    t.textContent = `${v}%`;
+    t.textContent = yFmt(v);
     svg.append(t);
+  }
+
+  if (cfg.refLine && cfg.refLine.value > 0 && cfg.refLine.value <= max) {
+    const ry = y(cfg.refLine.value);
+    svg.append(svgEl('line', { x1: m.l, x2: W - m.r, y1: ry, y2: ry, stroke: cfg.refLine.color || 'var(--c-axis)', 'stroke-width': 1,
+      'stroke-dasharray': '3 3', 'shape-rendering': 'crispEdges', opacity: 0.75 }));
   }
 
   const band = pw / cfg.n, k = cfg.series.length, gap = 2;
@@ -5201,8 +5215,10 @@ function columnChart(host, cfg) {
       const v = s.values[i];
       if (v == null) return;
       const x = cx(i) - groupW / 2 + j * (bw + gap);
-      const h = v > 0 ? Math.max(2, (v / 100) * ph) : 2;
-      svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: s.color, opacity: v > 0 ? 1 : 0.35 }));
+      const h = v > 0 ? Math.max(2, (Math.min(max, v) / max) * ph) : 2;
+      const col = s.colorOf ? s.colorOf(v, i) : s.color;
+      const op = v > 0 ? (s.opacityOf ? s.opacityOf(v, i) : 1) : 0.35;
+      svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: col, opacity: op }));
     });
     if (cfg.showX(i)) {
       const t = svgEl('text', { x: cx(i), y: H - 5, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--c-axis)', class: 'tabular-nums' });
@@ -5212,18 +5228,26 @@ function columnChart(host, cfg) {
   }
 
   if (cfg.line) {
-    const pts = cfg.line.values.map((v, i) => (v == null ? null : [cx(i), y(v)])).filter(Boolean);
+    const lMax = cfg.line.max || max;
+    const ly = (v) => m.t + ph - (Math.min(lMax, Math.max(0, v)) / lMax) * ph;
+    const pts = cfg.line.values.map((v, i) => (v == null ? null : [cx(i), ly(v), v])).filter(Boolean);
     if (pts.length) {
       if (pts.length > 1) {
-        svg.append(svgEl('path', { d: 'M' + pts.map((p) => p.join(',')).join('L'), fill: 'none', stroke: cfg.line.color,
+        svg.append(svgEl('path', { d: 'M' + pts.map((p) => `${p[0]},${p[1]}`).join('L'), fill: 'none', stroke: cfg.line.color,
           'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
       }
-      const [ex, ey] = pts[pts.length - 1];
+      if (cfg.line.dots) {
+        for (const [px, py] of pts) {
+          svg.append(svgEl('circle', { cx: px, cy: py, r: 2.75, fill: cfg.line.color, stroke: 'var(--c-surface)', 'stroke-width': 1.5 }));
+        }
+      }
+      const [ex, ey, lastV] = pts[pts.length - 1];
       svg.append(svgEl('circle', { cx: ex, cy: ey, r: 4, fill: cfg.line.color, stroke: 'var(--c-surface)', 'stroke-width': 2 }));
-      const lastV = cfg.line.values.filter((v) => v != null).pop();
-      const t = svgEl('text', { x: ex + 8, y: ey + 3.5, 'font-size': 11, 'font-weight': 600, class: 'fill-zinc-700 dark:fill-zinc-300' });
-      t.textContent = `${Math.round(lastV)}%`;
-      svg.append(t);
+      if (showLast) {
+        const t = svgEl('text', { x: ex + 8, y: ey + 3.5, 'font-size': 11, 'font-weight': 600, class: 'fill-zinc-700 dark:fill-zinc-300' });
+        t.textContent = cfg.line.fmt ? cfg.line.fmt(lastV) : `${Math.round(lastV)}%`;
+        svg.append(t);
+      }
     }
   }
 
@@ -5307,7 +5331,7 @@ new ResizeObserver(() => { cancelAnimationFrame(resizeRaf); resizeRaf = requestA
 let resizeRafYear;
 new ResizeObserver(() => {
   cancelAnimationFrame(resizeRafYear);
-  resizeRafYear = requestAnimationFrame(() => { if (currentTab() === 'meses') { renderYearGrid(viewYear); renderYearChart(); } });
+  resizeRafYear = requestAnimationFrame(() => { if (currentTab() === 'meses') { renderYearGrid(viewYear); renderYearChart(); if (monthOpen && mdChartRender) mdChartRender(); } });
 }).observe($('#chart-year'));
 
 // ---------- Tooltip ----------
@@ -5583,252 +5607,725 @@ function renderMonthCards(ys) {
 }
 
 // ---------- Detalhe do mês: tudo o que foi registrado ----------
-let monthOpen = null;
+let monthOpen = null, mdDiaryAll = false, mdChartRender = null;
 function openMonthDetail(y, m) {
-  monthOpen = monthOpen && monthOpen.y === y && monthOpen.m === m ? null : { y, m };
+  const same = monthOpen && monthOpen.y === y && monthOpen.m === m;
+  monthOpen = same ? null : { y, m };
+  mdDiaryAll = false;
   renderMonthDetail();
   if (yearCache) renderMonthCards(yearCache);
   if (monthOpen) $('#month-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function shiftMonthDetail(delta) {
+  if (!monthOpen) return;
+  let { y, m } = monthOpen;
+  m += delta;
+  if (m < 0) { m = 11; y--; }
+  if (m > 11) { m = 0; y++; }
+  monthOpen = { y, m };
+  mdDiaryAll = false;
+  if (y !== viewYear) { viewYear = y; renderYear(); }
+  else { renderMonthDetail(); if (yearCache) renderMonthCards(yearCache); }
 }
 function renderMonthDetail() {
   const box = $('#month-detail');
   box.replaceChildren();
   box.classList.toggle('hidden', !monthOpen);
+  mdChartRender = null;
   if (!monthOpen) return;
   const { y, m } = monthOpen, mk = monthKey(y, m);
   const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0)), tk = todayKey();
   const from = first < S.startDate ? S.startDate : first, to = last > tk ? tk : last;
+  const pm = m ? [y, m - 1] : [y - 1, 11];
   const st = periodStats(first, last);
+  const prevSt = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
+  const ms = monthStats(y, m);
   const dayKeys = [];
   for (let d = parseKey(from); keyOf(d) <= to; d = addDays(d, 1)) dayKeys.push(keyOf(d));
   const recs = dayKeys.map((k) => [k, peek(k)]).filter(([, r]) => r);
+
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const dayLbl = (k) => fmtDay.format(parseKey(k)).replace(/\./g, '');
-  const section = (title, sub) => {
-    const sec = el('div', 'border-t border-zinc-100 pt-4 dark:border-zinc-800');
-    const h = el('p', 'text-sm font-semibold', title);
-    sec.append(h);
-    if (sub) sec.append(el('p', 'text-xs text-zinc-500', sub));
-    box.append(sec);
+
+  // Card interno para organizar os blocos em grade sem esticar linhas por 1200px
+  const panel = (title, sub, rightEl) => {
+    const sec = el('div', 'flex flex-col rounded-xl border border-zinc-200/70 bg-zinc-50/40 p-4 sm:p-5 dark:border-zinc-800/80 dark:bg-zinc-800/20');
+    const hd = el('div', 'flex flex-wrap items-start justify-between gap-2');
+    const left = el('div');
+    left.append(el('h3', 'text-sm font-semibold text-zinc-900 dark:text-zinc-100', title));
+    if (sub) left.append(el('p', 'mt-0.5 text-xs text-zinc-500', sub));
+    hd.append(left);
+    if (rightEl) hd.append(rightEl);
+    sec.append(hd);
     return sec;
   };
-  const list = (items, empty) => {
-    const ul = el('ul', 'mt-2 space-y-1 text-sm');
-    if (!items.length) ul.append(el('li', 'text-xs text-zinc-500', empty));
-    for (const it of items) {
-      const li = el('li', 'flex gap-2');
-      if (Array.isArray(it)) { li.append(el('span', 'w-28 shrink-0 text-xs tabular-nums text-zinc-500 pt-0.5', it[0]), el('span', 'min-w-0 whitespace-pre-wrap break-words', it[1])); }
-      else li.append(el('span', 'min-w-0 whitespace-pre-wrap break-words', it));
-      ul.append(li);
-    }
-    return ul;
-  };
-  const stat = (label, value, hint) => {
-    const d = el('div', 'rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40');
-    d.append(el('p', 'text-[11px] text-zinc-500', label), el('p', 'text-base font-semibold tabular-nums', value), el('p', 'text-[11px] text-zinc-500', hint || ''));
-    return d;
-  };
-  const bar = (label, v, max, text, color = 'var(--c-habit)') => {
-    const row = el('div', 'flex items-center gap-2 text-xs');
-    const t = el('div', 'track flex-1');
-    const f = el('div', 'h-full rounded-full'); f.style.width = `${max ? (v / max) * 100 : 0}%`; f.style.background = color;
+
+  // Barra empilhada: rótulo completo na esquerda + valor na direita, barra logo abaixo (sem truncar nomes)
+  const meterRow = (label, v, max, rightText, subText = '', color = 'var(--c-habit)', iconHtml = '') => {
+    const wrap = el('div', 'space-y-1');
+    const top = el('div', 'flex items-baseline justify-between gap-3 text-xs');
+    const lbl = el('span', 'flex min-w-0 items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-300');
+    if (iconHtml) { const ic = el('span', 'shrink-0 text-zinc-500'); ic.innerHTML = iconHtml; lbl.append(ic); }
+    lbl.append(el('span', 'truncate', label));
+    const rt = el('span', 'shrink-0 tabular-nums text-right');
+    rt.append(el('span', 'font-mono font-semibold text-zinc-800 dark:text-zinc-200', rightText));
+    if (subText) rt.append(el('span', 'ml-1.5 text-[11px] text-zinc-500', subText));
+    top.append(lbl, rt);
+    const t = el('div', 'h-2 w-full overflow-hidden rounded-full bg-zinc-200/70 dark:bg-zinc-800');
+    const pct = max > 0 ? Math.min(100, Math.max(0, (v / max) * 100)) : 0;
+    const f = el('div', 'h-full rounded-full transition-[width] duration-500');
+    f.style.width = `${pct ? Math.max(2, pct) : 0}%`;
+    f.style.background = color;
     t.append(f);
-    row.append(el('span', 'w-32 shrink-0 truncate text-zinc-600 dark:text-zinc-400', label), t, el('span', 'w-36 shrink-0 text-right tabular-nums text-zinc-500', text));
-    return row;
+    wrap.append(top, t);
+    return wrap;
   };
 
-  // Cabeçalho
-  const head = el('div', 'flex flex-wrap items-start justify-between gap-2');
+  const statCard = (label, value, hint, tone = '') => {
+    const d = el('div', 'rounded-xl border border-zinc-200/70 bg-zinc-50/70 px-3.5 py-3 dark:border-zinc-800/80 dark:bg-zinc-800/35');
+    const vEl = el('p', 'mt-1 text-xl font-semibold tabular-nums num ' + tone, value);
+    d.append(el('p', 'eyebrow', label), vEl, el('p', 'mt-0.5 text-[11px] text-zinc-500', hint || ''));
+    return d;
+  };
+
+  // ---------- 1. Cabeçalho + navegação entre meses ----------
+  const head = el('div', 'flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200/70 pb-4 dark:border-zinc-800');
   const ttl = el('div');
-  ttl.append(el('p', 'eyebrow', 'Tudo do mês'), el('h2', 'mt-1 text-lg font-semibold tracking-tight',
-    cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)))));
-  if (first < S.startDate) ttl.append(el('p', 'text-xs text-zinc-500', `Painel em uso desde ${fmtShort.format(parseKey(S.startDate)).replace('.', '')} — dias anteriores não contam.`));
-  const act = el('div', 'flex items-center gap-1');
+  ttl.append(el('p', 'eyebrow', 'Tudo do mês'));
+  const titleRow = el('div', 'mt-1 flex flex-wrap items-center gap-2.5');
+  titleRow.append(
+    el('h2', 'text-xl font-semibold tracking-tight sm:text-2xl', cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)))),
+    el('span', 'rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-300', `${fmtPct(ms.fill)} preenchido`)
+  );
+  ttl.append(titleRow);
+  if (first < S.startDate) ttl.append(el('p', 'mt-1 text-xs text-zinc-500', `Painel em uso desde ${fmtShort.format(parseKey(S.startDate)).replace('.', '')} — dias anteriores não contam.`));
+
+  const act = el('div', 'flex flex-wrap items-center gap-1');
+  const now = new Date();
+  const prevBtn = el('button', 'btn-ghost h-8 w-8 p-0');
+  prevBtn.innerHTML = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>';
+  prevBtn.setAttribute('aria-label', 'Mês anterior');
+  prevBtn.title = 'Mês anterior';
+  prevBtn.disabled = keyOf(new Date(y, m, 0)) < S.startDate;
+  prevBtn.onclick = () => shiftMonthDetail(-1);
+
+  const nextBtn = el('button', 'btn-ghost h-8 w-8 p-0');
+  nextBtn.innerHTML = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>';
+  nextBtn.setAttribute('aria-label', 'Próximo mês');
+  nextBtn.title = 'Próximo mês';
+  nextBtn.disabled = y > now.getFullYear() || (y === now.getFullYear() && m >= now.getMonth());
+  nextBtn.onclick = () => shiftMonthDetail(1);
+
   const go = el('button', 'btn-ghost text-xs', 'Abrir no calendário');
   go.onclick = () => { view = { y, m }; setTab('hoje'); renderMonth(); $('#month-card').scrollIntoView({ behavior: 'smooth' }); };
-  const close = el('button', 'btn-ghost h-7 w-7 p-0'); close.innerHTML = ICON_X; close.setAttribute('aria-label', 'Fechar');
+  const close = el('button', 'btn-ghost h-8 w-8 p-0'); close.innerHTML = ICON_X; close.setAttribute('aria-label', 'Fechar');
   close.onclick = () => openMonthDetail(y, m);
-  act.append(go, close);
+  act.append(prevBtn, nextBtn, go, close);
   head.append(ttl, act);
   box.append(head);
   box.classList.add('space-y-5');
 
-  // Números
+  // ---------- 2. KPIs de resumo do mês ----------
   const one = recs.filter(([, r]) => r.oneThing).length, oneDone = recs.filter(([, r]) => r.oneDone).length;
-  const grid = el('div', 'grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6');
-  grid.append(
-    stat('Hábitos', st.habitAvg == null ? '—' : fmtPct(st.habitAvg), `média em ${st.days} ${st.days === 1 ? 'dia' : 'dias'}`),
-    stat('Dias 100%', String(st.perfect), `${st.zero} com 0%`),
-    stat('Estudo', fmtMin(st.study), `${st.learned} ${st.learned === 1 ? 'tópico aprendido' : 'tópicos aprendidos'}`),
-    stat('Sono médio', st.sleepAvg == null ? '—' : fmtSleep(st.sleepAvg), `${recs.filter(([, r]) => r.sleep != null).length} noites registradas`),
-    stat('Energia', st.energyAvg == null ? '—' : `${fmtNum(+st.energyAvg.toFixed(1))}/5`, 'média'),
-    stat('One Thing', one ? `${oneDone}/${one}` : '—', 'cumprido / definido'),
-  );
-  box.append(grid);
-
-  // Sono
   const sleeps = recs.filter(([, r]) => r.sleep != null).map(([, r]) => r.sleep);
-  const sec1 = section('Sono', sleeps.length ? `${sleeps.length} noites registradas` : '');
-  if (!sleeps.length) sec1.append(el('p', 'mt-1 text-xs text-zinc-500', 'Nenhuma noite registrada neste mês.'));
-  else {
-    const goalH = sleepHabit()?.target || 7.5;
-    const bins = [['menos de 6h', (v) => v < 6], ['6h a 7h', (v) => v >= 6 && v < 7], ['7h a 8h', (v) => v >= 7 && v < 8], ['8h ou mais', (v) => v >= 8]];
-    const wrap = el('div', 'mt-2 space-y-1.5');
-    for (const [l, f] of bins) { const n = sleeps.filter(f).length; wrap.append(bar(l, n, sleeps.length, `${n} ${n === 1 ? 'noite' : 'noites'}`, 'var(--c-goal)')); }
-    const hit = sleeps.filter((v) => v >= goalH).length;
-    wrap.append(el('p', 'pt-1 text-xs text-zinc-500', `Na meta de ${fmtSleep(goalH)}: ${hit} de ${sleeps.length} (${fmtPct(hit / sleeps.length)}) · menor ${fmtSleep(Math.min(...sleeps))} · maior ${fmtSleep(Math.max(...sleeps))}`));
-    sec1.append(wrap);
-  }
+  const dh = st.habitAvg != null && prevSt.habitAvg != null ? Math.round((st.habitAvg - prevSt.habitAvg) * 100) : null;
+  const kpiGrid = el('div', 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6');
+  kpiGrid.append(
+    statCard('Hábitos (média)', st.habitAvg == null ? '—' : fmtPct(st.habitAvg),
+      dh != null ? `${dh > 0 ? '+' : ''}${dh} pts vs mês anterior` : `em ${st.days} ${st.days === 1 ? 'dia' : 'dias'}`),
+    statCard('Dias 100%', String(st.perfect), `de ${st.days} ${st.days === 1 ? 'dia' : 'dias'} · ${st.zero} com 0%`),
+    statCard('Metas', ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—',
+      ms.mTotal && ms.goalsTotal ? `do mês · ${ms.goalsDone}/${ms.goalsTotal} semanais` : ms.mTotal ? 'metas do mês' : ms.goalsTotal ? 'metas semanais' : 'sem metas'),
+    statCard('Estudo total', fmtMin(st.study), `${st.learned} ${st.learned === 1 ? 'tópico aprendido' : 'tópicos aprendidos'}`),
+    statCard('Sono & energia', st.sleepAvg == null ? '—' : fmtSleep(st.sleepAvg),
+      `${sleeps.length} ${sleeps.length === 1 ? 'noite' : 'noites'}${st.energyAvg != null ? ` · energia ${fmtNum(+st.energyAvg.toFixed(1))}/5` : ''}`),
+    statCard('One Thing', one ? `${oneDone}/${one}` : '—', one ? `${fmtPct(oneDone / one)} cumprido` : 'nenhum definido'),
+  );
+  box.append(kpiGrid);
 
-  // Check-in
-  const sec2 = section('Check-in');
-  const qWrap = el('div', 'mt-2 space-y-1.5');
+  // ---------- 3. Gráfico principal: Ritmo diário no mês (Hábitos % + Média acumulada) ----------
+  const dailyLegend = el('div', 'flex flex-wrap items-center gap-3 text-xs text-zinc-500');
+  dailyLegend.innerHTML =
+    '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Conclusão do dia</span>' +
+    '<span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>';
+  const dailyPanel = panel('Ritmo diário no mês', 'Conclusão diária de hábitos e evolução da média ao longo dos dias', dailyLegend);
+  const dailyChartHost = el('div', 'relative mt-3 h-44 w-full');
+  dailyPanel.append(dailyChartHost);
+  box.append(dailyPanel);
+
+  // ---------- 4. Linha 2: Hábitos (adesão) + Sono & Energia (gráfico diário + distribuição) ----------
+  const row2 = el('div', 'grid gap-4 lg:grid-cols-2');
+
+  // 4A. Hábitos do mês
+  const hs = [...st.habits].sort((a, b) => b.a - a.a);
+  const habBadge = hs.length ? el('span', 'rounded-md bg-zinc-200/60 px-2 py-0.5 font-mono text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400', `${hs.length} ${hs.length === 1 ? 'hábito' : 'hábitos'}`) : null;
+  const habPanel = panel('Hábitos do mês', 'Taxa de cumprimento de cada hábito nos dias previstos', habBadge);
+  const hw = el('div', 'mt-3 space-y-2.5');
+  if (!hs.length) hw.append(el('p', 'text-xs text-zinc-500', 'Sem hábitos previstos neste mês.'));
+  for (const x of hs) {
+    const sub = isWeekly(x.t) ? `meta ${x.t.weekly}×/sem` : '';
+    const col = x.a >= 0.8 ? 'var(--c-habit)' : x.a >= 0.5 ? 'var(--c-goal)' : '#a1a1aa';
+    hw.append(meterRow(x.t.title, x.a, 1, fmtPct(x.a), sub, col));
+  }
+  if (hs.length >= 2) {
+    const bestH = hs[0], worstH = hs[hs.length - 1];
+    if (bestH.a !== worstH.a) {
+      hw.append(el('p', 'pt-1 text-xs text-zinc-500', `Mais firme: ${bestH.t.title} (${fmtPct(bestH.a)}) · Mais difícil: ${worstH.t.title} (${fmtPct(worstH.a)})`));
+    }
+  }
+  habPanel.append(hw);
+  row2.append(habPanel);
+
+  // 4B. Sono & Energia
+  const goalH = sleepHabit()?.target || 7.5;
+  const energies = recs.filter(([, r]) => r.energy > 0).map(([, r]) => r.energy);
+  const sleepLegend = el('div', 'flex flex-wrap items-center gap-3 text-xs text-zinc-500');
+  sleepLegend.innerHTML =
+    '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-goal)"></span>Sono (h)</span>' +
+    '<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:var(--c-habit)"></span>Energia (1–5)</span>';
+  const sleepPanel = panel('Sono & energia', sleeps.length ? `${sleeps.length} noites registradas · meta de ${fmtSleep(goalH)}` : 'Registro diário de horas dormidas e disposição', sleeps.length || energies.length ? sleepLegend : null);
+  let sleepChartHost = null;
+  if (!sleeps.length && !energies.length) {
+    sleepPanel.append(el('p', 'mt-3 text-xs text-zinc-500', 'Nenhuma noite ou nível de energia registrado neste mês.'));
+  } else {
+    sleepChartHost = el('div', 'relative mt-3 h-40 w-full');
+    sleepPanel.append(sleepChartHost);
+    if (sleeps.length) {
+      const bins = [['Menos de 6h', (v) => v < 6], ['6h a 7h', (v) => v >= 6 && v < 7], ['7h a 8h', (v) => v >= 7 && v < 8], ['8h ou mais', (v) => v >= 8]];
+      const bGrid = el('div', 'mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+      for (const [l, f] of bins) {
+        const n = sleeps.filter(f).length;
+        bGrid.append(meterRow(l, n, sleeps.length, `${n}d`, fmtPct(n / sleeps.length), 'var(--c-goal)'));
+      }
+      sleepPanel.append(bGrid);
+      const hit = sleeps.filter((v) => v >= goalH).length;
+      sleepPanel.append(el('p', 'mt-2.5 text-xs text-zinc-500',
+        `Na meta (${fmtSleep(goalH)}): ${hit} de ${sleeps.length} (${fmtPct(hit / sleeps.length)}) · menor ${fmtSleep(Math.min(...sleeps))} · maior ${fmtSleep(Math.max(...sleeps))}`));
+    }
+  }
+  row2.append(sleepPanel);
+  box.append(row2);
+
+  // ---------- 5. Linha 3: Estudos & aprendizados + Metas (do mês e semanais) ----------
+  const row3 = el('div', 'grid gap-4 lg:grid-cols-2');
+
+  // 5A. Estudos & aprendizados
+  const studyRight = st.study ? el('span', 'rounded-md bg-zinc-200/60 px-2 py-0.5 font-mono text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300', fmtMin(st.study)) : null;
+  const studyPanel = panel('Estudos & aprendizados', st.retention.n ? `Retenção nas revisões: ${st.retention.ok}/${st.retention.n} (${fmtPct(st.retention.rate)})` : 'Tempo dedicado por dia, matérias e tópicos registrados', studyRight);
+  let studyChartHost = null;
+  if (st.study > 0) {
+    studyChartHost = el('div', 'relative mt-3 h-36 w-full');
+    studyPanel.append(studyChartHost);
+  }
+  const subs = Object.entries(st.bySubject).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (subs.length) {
+    const sw = el('div', 'mt-4 space-y-2 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+    sw.append(el('p', 'eyebrow', 'Por matéria'));
+    const mx = Math.max(...subs.map(([, v]) => v));
+    for (const [id, v] of subs) {
+      sw.append(meterRow(id ? subjectName(id) : 'Sem matéria', v, mx, fmtMin(v), st.study ? fmtPct(v / st.study) : '', 'var(--c-goal)'));
+    }
+    studyPanel.append(sw);
+  }
+  const topics = S.topics.filter((t) => t.created >= first && t.created <= last).sort((a, b) => (a.created < b.created ? -1 : 1));
+  const topWrap = el('div', 'mt-4 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+  topWrap.append(el('p', 'eyebrow', `O que aprendi (${topics.length})`));
+  if (!topics.length) {
+    topWrap.append(el('p', 'mt-1.5 text-xs text-zinc-500', 'Nenhum tópico registrado neste mês.'));
+  } else {
+    const ul = el('ul', 'mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-1 text-xs');
+    for (const t of topics) {
+      const li = el('li', 'flex items-start justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-2.5 py-2 dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      const left = el('div', 'min-w-0 flex-1');
+      left.append(el('p', 'font-medium text-zinc-800 dark:text-zinc-200 break-words', t.title));
+      left.append(el('p', 'mt-0.5 text-[11px] text-zinc-500', `${dayLbl(t.created)} · ${subjectName(t.subjectId)}`));
+      li.append(left);
+      if (t.mastered) li.append(el('span', 'shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300', 'dominado ✓'));
+      ul.append(li);
+    }
+    topWrap.append(ul);
+  }
+  studyPanel.append(topWrap);
+  row3.append(studyPanel);
+
+  // 5B. Metas (do mês + semanais)
+  const mg = S.months[mk]?.goals || [];
+  const goalsPanel = panel('Metas do mês & semanais', 'Objetivos mensais e entregas de cada semana');
+  const mgWrap = el('div', 'mt-3 space-y-2');
+  const mgHead = el('div', 'flex items-center justify-between');
+  mgHead.append(el('p', 'eyebrow', 'Metas do mês'));
+  if (mg.length) mgHead.append(el('span', 'font-mono text-xs font-semibold text-zinc-600 dark:text-zinc-400', `${ms.mDone}/${ms.mTotal} (${fmtPct(ms.mDone / ms.mTotal)})`));
+  mgWrap.append(mgHead);
+  if (!mg.length) {
+    mgWrap.append(el('p', 'text-xs text-zinc-500', 'Sem metas do mês.'));
+  } else {
+    const mList = el('ul', 'space-y-1.5');
+    for (const g of mg) {
+      const li = el('li', 'flex items-center justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-3 py-2 text-xs dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      const left = el('div', 'flex min-w-0 items-center gap-2');
+      left.append(el('span', g.done ? 'flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-400' : 'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[10px] text-zinc-400 dark:border-zinc-700', g.done ? '✓' : ''));
+      left.append(el('span', 'break-words ' + (g.done ? 'font-medium text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'), g.title));
+      li.append(left);
+      if (g.rating) li.append(el('span', 'shrink-0 rounded-md bg-zinc-200/70 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300', `nota ${g.rating}/5`));
+      mList.append(li);
+    }
+    mgWrap.append(mList);
+  }
+  goalsPanel.append(mgWrap);
+
+  const wgWrap = el('div', 'mt-4 space-y-2.5 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+  const wgHead = el('div', 'flex items-center justify-between');
+  wgHead.append(el('p', 'eyebrow', 'Metas semanais'));
+  if (ms.goalsTotal) wgHead.append(el('span', 'font-mono text-xs font-semibold text-zinc-600 dark:text-zinc-400', `${ms.goalsDone}/${ms.goalsTotal} (${fmtPct(ms.goalsDone / ms.goalsTotal)})`));
+  wgWrap.append(wgHead);
+  let hasWeekGoals = false;
+  const wCards = el('div', 'space-y-2');
+  for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
+    const wk = keyOf(w), g = S.weeks[wk]?.goals || [], why = weekWhy(wk);
+    if (!g.length && !why.length) continue;
+    hasWeekGoals = true;
+    const doneN = g.filter((x) => x.done).length;
+    const wc = el('div', 'rounded-lg border border-zinc-200/60 bg-white/60 p-3 dark:border-zinc-800/70 dark:bg-zinc-900/40');
+    const wTop = el('div', 'flex items-center justify-between gap-2 text-xs');
+    wTop.append(
+      el('span', 'font-semibold text-zinc-800 dark:text-zinc-200', `Semana de ${fmtShort.format(w).replace('.', '')}`),
+      el('span', 'font-mono text-[11px] font-semibold text-zinc-500', `${doneN}/${g.length}`)
+    );
+    wc.append(wTop);
+    const ul = el('ul', 'mt-2 space-y-1 text-xs');
+    for (const x of g) {
+      const li = el('li', 'flex flex-wrap items-center gap-1.5');
+      li.append(el('span', x.done ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-zinc-400', x.done ? '✓' : '○'));
+      li.append(el('span', 'break-words ' + (x.done ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-500'), x.title));
+      if (x.late) li.append(el('span', 'rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400', lateLabel(x).toLowerCase()));
+      ul.append(li);
+    }
+    wc.append(ul);
+    if (why.length) {
+      const whyBox = el('div', 'mt-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300');
+      whyBox.append(el('p', 'font-semibold', 'Justificativa:'));
+      for (const yItem of why) whyBox.append(el('p', 'mt-0.5 break-words', `• ${yItem.text}`));
+      wc.append(whyBox);
+    }
+    wCards.append(wc);
+  }
+  if (!hasWeekGoals) wgWrap.append(el('p', 'text-xs text-zinc-500', 'Sem metas semanais neste mês.'));
+  else wgWrap.append(wCards);
+  goalsPanel.append(wgWrap);
+  row3.append(goalsPanel);
+  box.append(row3);
+
+  // ---------- 6. Linha 4: Resultados & Projetos + Check-in, Tarefas pontuais & Tags ----------
+  const row4 = el('div', 'grid gap-4 lg:grid-cols-2');
+
+  // 6A. Resultados (métricas) & Projetos
+  const resPanel = panel('Resultados & projetos', 'Evolução dos indicadores e avanço nos projetos do mês');
+  const metWrap = el('div', 'mt-3 space-y-2');
+  metWrap.append(el('p', 'eyebrow', 'Métricas'));
+  if (!st.metrics.length) {
+    metWrap.append(el('p', 'text-xs text-zinc-500', 'Nenhuma métrica registrada.'));
+  } else {
+    const mGrid = el('div', 'space-y-1.5');
+    for (const { m: mt, before, after, st: mst } of st.metrics) {
+      const row = el('div', 'flex items-center justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-3 py-2 text-xs dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      const nameWrap = el('span', 'inline-flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-300', mt.name);
+      if (isMoneyUnit(mt.unit)) nameWrap.append(moneyEye(mkey(mt)));
+      const valWrap = el('div', 'flex items-center gap-2 font-mono tabular-nums');
+      if (before == null || before === after) {
+        valWrap.append(el('span', 'font-semibold text-zinc-800 dark:text-zinc-200', fmtVal(mt, after)));
+      } else {
+        valWrap.append(el('span', 'text-zinc-500', `${fmtAmt(mt.unit, before, mkey(mt))} →`), el('span', 'font-semibold text-zinc-900 dark:text-zinc-100', fmtVal(mt, after)));
+        if (!maskMoney(mt.unit, mkey(mt))) {
+          const good = mst.good(after - before);
+          valWrap.append(el('span', 'rounded px-1.5 py-0.5 text-[10px] font-semibold ' + (good ? 'bg-ok-600/15 text-ok-600 dark:text-ok-400' : 'bg-rose-500/15 text-rose-500'), signed(mt, after - before)));
+        }
+      }
+      row.append(nameWrap, valWrap);
+      mGrid.append(row);
+    }
+    metWrap.append(mGrid);
+  }
+  resPanel.append(metWrap);
+
+  const projItems = S.projects.map((p) => {
+    const daily = projectDaily(p);
+    const ks = Object.keys(daily).filter((k) => k >= first && k <= last);
+    const min = ks.reduce((a, k) => a + daily[k].min, 0), msCnt = ks.reduce((a, k) => a + daily[k].ms, 0);
+    return ks.length ? { name: p.name, days: ks.length, min, ms: msCnt } : null;
+  }).filter(Boolean);
+  const prWrap = el('div', 'mt-4 space-y-2 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+  prWrap.append(el('p', 'eyebrow', 'Projetos'));
+  if (!projItems.length) {
+    prWrap.append(el('p', 'text-xs text-zinc-500', 'Nenhum avanço em projetos neste mês.'));
+  } else {
+    const pGrid = el('div', 'space-y-1.5');
+    for (const p of projItems) {
+      const row = el('div', 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-3 py-2 text-xs dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      row.append(el('span', 'font-medium text-zinc-800 dark:text-zinc-200', p.name));
+      const badges = el('div', 'flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-zinc-500');
+      badges.append(el('span', '', `${p.days} ${p.days === 1 ? 'dia' : 'dias'}`));
+      if (p.min) badges.append(el('span', 'rounded bg-zinc-200/60 px-1.5 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300', fmtMin(p.min)));
+      if (p.ms) badges.append(el('span', 'rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300', `${p.ms} ${p.ms === 1 ? 'marco' : 'marcos'}`));
+      row.append(badges);
+      pGrid.append(row);
+    }
+    prWrap.append(pGrid);
+  }
+  resPanel.append(prWrap);
+  row4.append(resPanel);
+
+  // 6B. Check-in, Tarefas pontuais & Tags
+  const chkPanel = panel('Check-in, pontuais & tags', 'Perguntas diárias, tarefas com data marcada e temas do mês');
+  const qWrap = el('div', 'mt-3 space-y-2.5');
+  qWrap.append(el('p', 'eyebrow', 'Check-in diário'));
   let anyQ = false;
   for (const q of S.questions) {
     if (q.type === 'text') continue;
     const vals = recs.map(([, r]) => r.answers?.[q.id]).filter((v) => typeof v === 'number');
     if (!vals.length) continue;
     anyQ = true;
-    if (q.type === 'scale') qWrap.append(bar(q.text, avg(vals), 5, `${fmtNum(+avg(vals).toFixed(1))}/5 · ${vals.length}d`));
-    else { const sum = vals.reduce((a, b) => a + b, 0); qWrap.append(bar(q.text, 1, 1, `${fmtAmt(q.unit, +sum.toFixed(2), `q:${q.id}`)}${q.unit ? ' ' + q.unit : ''}`, 'var(--c-goal)')); }
+    if (q.type === 'scale') {
+      qWrap.append(meterRow(q.text, avg(vals), 5, `${fmtNum(+avg(vals).toFixed(1))}/5`, `${vals.length}d`, 'var(--c-habit)'));
+    } else {
+      const sum = vals.reduce((a, b) => a + b, 0);
+      const row = el('div', 'flex items-center justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-3 py-2 text-xs dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      row.append(el('span', 'font-medium text-zinc-700 dark:text-zinc-300', q.text),
+        el('span', 'font-mono font-semibold text-zinc-800 dark:text-zinc-200', `${fmtAmt(q.unit, +sum.toFixed(2), `q:${q.id}`)}${q.unit ? ' ' + q.unit : ''} (${vals.length}d)`));
+      qWrap.append(row);
+    }
   }
   const ch = checkinHabit();
-  if (ch) { const n = recs.filter(([, r]) => habitDone(r, ch.id) >= 1).length; qWrap.append(el('p', 'pt-1 text-xs text-zinc-500', `Check-in completo em ${n} de ${dayKeys.length} dias`)); anyQ = true; }
-  if (!anyQ) qWrap.append(el('p', 'text-xs text-zinc-500', 'Nenhuma resposta neste mês.'));
-  sec2.append(qWrap);
-
-  // Hábitos
-  const sec3 = section('Hábitos', 'quanto de cada hábito você cumpriu no mês');
-  const hw = el('div', 'mt-2 space-y-1.5');
-  const hs = [...st.habits].sort((a, b) => b.a - a.a);
-  if (!hs.length) hw.append(el('p', 'text-xs text-zinc-500', 'Sem hábitos previstos neste mês.'));
-  for (const x of hs) hw.append(bar(x.t.title, x.a, 1, fmtPct(x.a)));
-  sec3.append(hw);
-
-  // Estudos + aprendizados
-  const sec4 = section('Estudos & aprendizados');
-  const subs = Object.entries(st.bySubject).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-  if (subs.length) {
-    const sw = el('div', 'mt-2 space-y-1.5');
-    const mx = Math.max(...subs.map(([, v]) => v));
-    for (const [id, v] of subs) sw.append(bar(id ? subjectName(id) : 'Sem matéria', v, mx, fmtMin(v), 'var(--c-goal)'));
-    sec4.append(sw);
+  if (ch) {
+    const n = recs.filter(([, r]) => habitDone(r, ch.id) >= 1).length;
+    qWrap.append(el('p', 'text-xs text-zinc-500', `Check-in completo em ${n} de ${dayKeys.length} dias (${dayKeys.length ? fmtPct(n / dayKeys.length) : '0%'})`));
+    anyQ = true;
   }
-  const topics = S.topics.filter((t) => t.created >= first && t.created <= last).sort((a, b) => (a.created < b.created ? -1 : 1));
-  sec4.append(el('p', 'mt-3 eyebrow', `O que aprendi (${topics.length})`),
-    list(topics.map((t) => [dayLbl(t.created), `${t.title} · ${subjectName(t.subjectId)}${t.mastered ? ' · dominado ✓' : ''}`]), 'Nenhum tópico registrado neste mês.'));
-  if (st.retention.n) sec4.append(el('p', 'mt-1 text-xs text-zinc-500', `Revisões: ${st.retention.ok} de ${st.retention.n} lembradas (${fmtPct(st.retention.rate)})`));
+  if (!anyQ) qWrap.append(el('p', 'text-xs text-zinc-500', 'Nenhuma resposta numérica neste mês.'));
+  chkPanel.append(qWrap);
 
-  // Metas
-  const sec5 = section('Metas');
-  const mg = S.months[mk]?.goals || [];
-  sec5.append(el('p', 'mt-2 eyebrow', 'Do mês'),
-    list(mg.map((g) => `${g.done ? '✓' : '○'} ${g.title}${g.rating ? ` · nota ${g.rating}/5` : ''}`), 'Sem metas do mês.'));
-  const weekItems = [];
-  for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
-    const g = S.weeks[keyOf(w)]?.goals || [];
-    if (g.length) weekItems.push([`sem. ${fmtShort.format(w).replace('.', '')}`, g.map((x) => `${x.done ? '✓' : '○'} ${x.title}${x.late ? ` (${lateLabel(x).toLowerCase()})` : ''}`)
-      .concat(weekWhy(keyOf(w)).length ? ['Justificativa:', ...weekWhy(keyOf(w)).map((y) => `• ${y.text}`)] : []).join('\n')]);
-  }
-  sec5.append(el('p', 'mt-3 eyebrow', 'Semanais'), list(weekItems, 'Sem metas semanais.'));
-
-  // Métricas e projetos
-  const sec6 = section('Resultados & projetos');
-  sec6.append(list(st.metrics.map(({ m: mt, before, after }) => [mt.name,
-    before == null || before === after ? fmtVal(mt, after) : `${fmtAmt(mt.unit, before, mkey(mt))} → ${fmtVal(mt, after)} (${signed(mt, after - before)})`]), 'Nenhuma métrica.'));
-  const projItems = S.projects.map((p) => {
-    const daily = projectDaily(p);
-    const ks = Object.keys(daily).filter((k) => k >= first && k <= last);
-    const min = ks.reduce((a, k) => a + daily[k].min, 0), ms = ks.reduce((a, k) => a + daily[k].ms, 0);
-    return ks.length ? [p.name, [`${ks.length} ${ks.length === 1 ? 'dia' : 'dias'} com avanço`, min ? fmtMin(min) : '', ms ? `${ms} ${ms === 1 ? 'marco' : 'marcos'}` : ''].filter(Boolean).join(' · ')] : null;
-  }).filter(Boolean);
-  sec6.append(el('p', 'mt-3 eyebrow', 'Projetos'), list(projItems, 'Nenhum avanço em projetos.'));
-
-  // Dinheiro do mês: ganhos, gastos e saldo
-  const ex = expIn(first, last);
-  if (ex.length) {
-    const T = moneyTotals(ex), outs = ex.filter((e) => !isIncome(e)), byC = {};
-    for (const e of outs) byC[e.cat] = (byC[e.cat] || 0) + amt(e);
-    const rows = Object.entries(byC).sort((a, b) => b[1] - a[1]);
-    const secE = section('Gastos & ganhos', `Ganhos ${fmtMoney(T.inc)} · gastos ${fmtMoney(T.out)} · saldo ${T.net > 0 && !maskMoney(expCur(), 'exp') ? '+' : ''}${fmtMoney(T.net)}`
-      + (T.inc ? ` (${T.net >= 0 ? `guardou ${fmtPct(T.net / T.inc)}` : 'gastou mais do que ganhou'})` : ''));
-    const gw = el('div', 'mt-2 space-y-1.5');
-    for (const [id, v] of rows) gw.append(bar(expCat(id)[2], v, rows[0][1], `${fmtMoney(v)} · ${fmtPct(v / T.out)}`, 'var(--c-goal)'));
-    secE.append(gw);
-  }
-
-  // Pontuais / pendentes
   const pont = S.tasks.filter((t) => t.once && t.once >= first && t.once <= last);
   if (pont.length) {
     const sent = pont.filter((t) => wentPending(t)), onDay = pont.filter((t) => t.once < tk && !wentPending(t));
-    const sec7 = section('Tarefas pontuais', `${pont.length} no mês · ${onDay.length} feitas no dia · ${sent.length} foram para Pendentes · ${sent.filter((t) => t.lateK).length} concluídas depois`);
-    sec7.append(list(pont.sort((a, b) => (a.once < b.once ? -1 : 1)).map((t) => [dayLbl(t.once),
-      `${t.title} — ${t.once >= tk && !wentPending(t) ? (peek(t.once)?.done?.includes(t.id) ? 'feita' : 'hoje') : !wentPending(t) ? 'feita no dia' : t.lateK ? `concluída ${daysBetween(t.once, t.lateK)} d depois` : t.dropK ? 'descartada' : 'pendente'}`]), ''));
-  }
-
-  // Bloco com título e partes rotuladas; parte com lista (array) vira tópicos
-  const entryCard = (title, parts) => {
-    const card = el('div', 'rounded-lg border border-zinc-100 px-3 py-2.5 dark:border-zinc-800');
-    if (title) card.append(el('p', 'mb-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300', title));
-    const dl = el('dl', 'space-y-2.5');
-    for (const [label, text] of parts) {
-      const row = el('div');
-      row.append(el('dt', 'text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500', label));
-      if (Array.isArray(text)) {
-        const ul = el('ul', 'mt-0.5 list-disc space-y-0.5 pl-4 text-sm leading-relaxed marker:text-zinc-400');
-        for (const t of text) ul.append(el('li', 'whitespace-pre-wrap break-words', t));
-        row.append(ul);
-      } else row.append(el('dd', 'mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed', text));
-      dl.append(row);
+    const pWrap = el('div', 'mt-4 space-y-2 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+    pWrap.append(el('p', 'eyebrow', `Tarefas pontuais (${pont.length})`),
+      el('p', 'text-xs text-zinc-500', `${onDay.length} feitas no dia · ${sent.length} foram para Pendentes · ${sent.filter((t) => t.lateK).length} concluídas depois`));
+    const pUl = el('ul', 'max-h-44 space-y-1.5 overflow-y-auto pr-1 text-xs');
+    for (const t of [...pont].sort((a, b) => (a.once < b.once ? -1 : 1))) {
+      const li = el('li', 'flex items-center justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-2.5 py-1.5 dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      const left = el('div', 'min-w-0 flex-1');
+      left.append(el('span', 'mr-2 font-mono text-[11px] text-zinc-500', dayLbl(t.once)), el('span', 'break-words font-medium text-zinc-800 dark:text-zinc-200', t.title));
+      const status = t.once >= tk && !wentPending(t) ? (peek(t.once)?.done?.includes(t.id) ? ['feita', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'] : ['hoje', 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'])
+        : !wentPending(t) ? ['feita no dia', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300']
+        : t.lateK ? [`+${daysBetween(t.once, t.lateK)}d`, 'bg-amber-500/15 text-amber-700 dark:text-amber-400']
+        : t.dropK ? ['descartada', 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800']
+        : ['pendente', 'bg-rose-500/15 text-rose-500'];
+      li.append(left, el('span', `shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${status[1]}`, status[0]));
+      pUl.append(li);
     }
-    card.append(dl);
-    return card;
-  };
-
-  // Reflexões
-  const sec8 = section('Reflexões');
-  const R = S.months[mk]?.refl;
-  const reflParts = (r) => [r?.wins?.trim() && ['Conquistas', r.wins.trim()], r?.sins?.trim() && ['Onde pequei', r.sins.trim()],
-    r?.better?.trim() && ['Onde melhorei', r.better.trim()],
-    r?.improve?.length && ['Melhorar', r.improve.map((x) => (typeof x === 'string' ? x : x.text)).filter(Boolean)]].filter(Boolean);
-  sec8.append(el('p', 'mt-2 eyebrow', 'Do mês'));
-  const mParts = reflParts(R);
-  sec8.append(mParts.length ? el('div', 'mt-2') : el('p', 'mt-1 text-xs text-zinc-500', 'Reflexão do mês ainda não escrita.'));
-  if (mParts.length) sec8.lastChild.append(entryCard('', mParts));
-  sec8.append(el('p', 'mt-4 eyebrow', 'Das semanas'));
-  const ww = el('div', 'mt-2 space-y-3');
-  for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
-    const W = S.weeks[keyOf(w)];
-    const parts = [...reflParts(W?.refl), W?.review?.trim() && ['Foco da próxima semana', W.review.trim()]].filter(Boolean);
-    if (parts.length) ww.append(entryCard(`Semana de ${fmtShort.format(w).replace('.', '')} a ${fmtShort.format(addDays(w, 6)).replace('.', '')}`, parts));
+    pWrap.append(pUl);
+    chkPanel.append(pWrap);
   }
-  if (!ww.children.length) ww.append(el('p', 'text-xs text-zinc-500', 'Nenhuma revisão semanal escrita.'));
-  sec8.append(ww);
 
-  // Diário: tudo que foi escrito em cada dia (um bloco por dia, mais recente primeiro)
-  const textQs = S.questions.filter((q) => q.type === 'text');
-  const diary = recs.map(([k, r]) => {
-    const parts = [r.oneThing && ['One Thing', `${r.oneThing}${r.oneDone ? ' ✓' : ''}`], r.win && ['Vitória', r.win], r.improve && ['Melhorar', r.improve],
-      ...textQs.map((q) => r.answers?.[q.id] && [q.text, r.answers[q.id]]),
-      (r.tags || []).length && ['Tags', r.tags.map((t) => '#' + normTag(t)).join(' ')]].filter(Boolean);
-    return parts.length ? [k, parts] : null;
-  }).filter(Boolean).reverse();
-  const sec9 = section('Diário', 'One Thing, reflexão noturna, respostas escritas e tags de cada dia · mais recente primeiro');
-  const dw = el('div', 'mt-3 space-y-3');
-  if (!diary.length) dw.append(el('p', 'text-xs text-zinc-500', 'Nada escrito nos dias deste mês.'));
-  for (const [k, parts] of diary) dw.append(entryCard(cap(dayLbl(k)), parts));
-  sec9.append(dw);
-
-  // Tags
   const tagCount = {};
   for (const [, r] of recs) for (const t of dayTags(r)) tagCount[t] = (tagCount[t] || 0) + 1;
   const tags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
   if (tags.length) {
-    const sec10 = section('Tags do mês');
-    const tw = el('div', 'mt-2 flex flex-wrap gap-1.5');
-    for (const [t, n] of tags) tw.append(el('span', 'rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400', `#${t} · ${n}`));
-    sec10.append(tw);
+    const tWrap = el('div', 'mt-4 space-y-2 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+    tWrap.append(el('p', 'eyebrow', 'Tags do mês'));
+    const tw = el('div', 'flex flex-wrap gap-1.5');
+    for (const [t, n] of tags) tw.append(el('span', 'rounded-md bg-emerald-500/10 px-2 py-1 font-mono text-xs font-medium text-emerald-700 dark:text-emerald-400', `#${t} · ${n}`));
+    tWrap.append(tw);
+    chkPanel.append(tWrap);
   }
+  row4.append(chkPanel);
+  box.append(row4);
+
+  // ---------- 7. Dinheiro do mês: ganhos, gastos, categorias e fluxo por semana ----------
+  const ex = expIn(first, last);
+  let expChartHost = null, expWeeks = [];
+  if (ex.length) {
+    const T = moneyTotals(ex), outs = ex.filter((e) => !isIncome(e)), ins = ex.filter(isIncome);
+    const hidden = maskMoney(expCur(), 'exp');
+    const expPanel = panel('Gastos & ganhos do mês',
+      `${ex.length} ${ex.length === 1 ? 'lançamento' : 'lançamentos'} no período`,
+      moneyEye('exp'));
+
+    const eStats = el('div', 'mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3');
+    eStats.append(
+      statCard('Ganhos', fmtMoney(T.inc), `${ins.length} ${ins.length === 1 ? 'entrada' : 'entradas'}`),
+      statCard('Gastos', fmtMoney(T.out), `${fmtMoney(T.out / Math.max(1, dayKeys.length))}/dia`),
+      statCard('Saldo do mês', `${T.net > 0 && !hidden ? '+' : ''}${fmtMoney(T.net)}`,
+        T.inc ? (T.net >= 0 ? `guardou ${fmtPct(T.net / T.inc)}` : 'gastou mais do que ganhou') : 'sem ganhos registrados',
+        !hidden ? (T.net > 0 ? 'text-ok-600 dark:text-ok-400' : T.net < 0 ? 'text-rose-500' : '') : '')
+    );
+    expPanel.append(eStats);
+
+    const eBody = el('div', 'mt-4 grid gap-4 lg:grid-cols-2');
+    const catCol = el('div', 'space-y-3');
+    if (outs.length) {
+      const byC = {};
+      for (const e of outs) byC[e.cat] = (byC[e.cat] || 0) + amt(e);
+      const rows = Object.entries(byC).sort((a, b) => b[1] - a[1]);
+      catCol.append(el('p', 'eyebrow', 'Gastos por categoria'));
+      const gw = el('div', 'space-y-2');
+      for (const [id, v] of rows) {
+        gw.append(meterRow(expCat(id)[2], v, rows[0][1], fmtMoney(v), fmtPct(v / T.out), 'var(--c-goal)', catIcon(id)));
+      }
+      catCol.append(gw);
+    }
+    if (ins.length) {
+      const byI = {};
+      for (const e of ins) byI[e.cat] = (byI[e.cat] || 0) + amt(e);
+      const rowsI = Object.entries(byI).sort((a, b) => b[1] - a[1]);
+      catCol.append(el('p', 'eyebrow pt-1', 'Ganhos por fonte'));
+      const iw = el('div', 'space-y-2');
+      for (const [id, v] of rowsI) {
+        iw.append(meterRow(expCat(id)[2], v, rowsI[0][1], fmtMoney(v), fmtPct(v / T.inc), 'var(--c-habit)', catIcon(id)));
+      }
+      catCol.append(iw);
+    }
+    eBody.append(catCol);
+
+    const flowCol = el('div', 'space-y-2');
+    const flowHead = el('div', 'flex items-center justify-between gap-2');
+    flowHead.append(el('p', 'eyebrow', 'Fluxo por semana do mês'));
+    const fLeg = el('div', 'flex items-center gap-2.5 text-[11px] text-zinc-500');
+    fLeg.innerHTML =
+      '<span class="flex items-center gap-1"><span class="h-2 w-2 rounded-sm" style="background:var(--c-habit)"></span>Ganhos</span>' +
+      '<span class="flex items-center gap-1"><span class="h-2 w-2 rounded-sm" style="background:var(--c-goal)"></span>Gastos</span>';
+    flowHead.append(fLeg);
+    flowCol.append(flowHead);
+    expChartHost = el('div', 'relative h-36 w-full');
+    flowCol.append(expChartHost);
+
+    for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
+      const wf = keyOf(w) < first ? first : keyOf(w);
+      const wt = keyOf(addDays(w, 6)) > last ? last : keyOf(addDays(w, 6));
+      expWeeks.push({ start: w, label: `Semana de ${fmtShort.format(w).replace('.', '')}`, ...moneyTotals(expIn(wf, wt)) });
+    }
+    eBody.append(flowCol);
+    expPanel.append(eBody);
+    box.append(expPanel);
+  }
+
+  // ---------- 8. Reflexões (do mês e das semanas) ----------
+  const R = S.months[mk]?.refl;
+  const reflParts = (r) => [
+    r?.wins?.trim() && ['Conquistas', r.wins.trim()],
+    r?.sins?.trim() && ['Onde pequei', r.sins.trim()],
+    r?.better?.trim() && ['Onde melhorei', r.better.trim()],
+    r?.improve?.length && ['Melhorar', r.improve.map((x) => (typeof x === 'string' ? x : x.text)).filter(Boolean)],
+  ].filter(Boolean);
+  const mParts = reflParts(R);
+  const openReflBtn = el('button', 'btn-ghost text-xs', mParts.length ? 'Editar reflexão do mês' : 'Escrever reflexão do mês');
+  openReflBtn.onclick = () => { mreviewManual = true; mreview = { y, m }; renderMonthReview(); $('#mreview-card').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+
+  const reflPanel = panel('Reflexões do período', 'Síntese mensal e revisões de cada semana', openReflBtn);
+  const mReflWrap = el('div', 'mt-3');
+  mReflWrap.append(el('p', 'eyebrow', 'Reflexão do mês'));
+  if (!mParts.length) {
+    mReflWrap.append(el('p', 'mt-1.5 text-xs text-zinc-500', 'Reflexão do mês ainda não escrita.'));
+  } else {
+    const rGrid = el('div', 'mt-2 grid gap-2.5 sm:grid-cols-2');
+    for (const [label, text] of mParts) {
+      const c = el('div', 'rounded-lg border border-zinc-200/60 bg-white/60 p-3 dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      c.append(el('p', 'text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400', label));
+      if (Array.isArray(text)) {
+        const ul = el('ul', 'mt-1 list-disc space-y-0.5 pl-4 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300');
+        for (const t of text) ul.append(el('li', 'break-words', t));
+        c.append(ul);
+      } else {
+        c.append(el('p', 'mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-700 dark:text-zinc-300', text));
+      }
+      rGrid.append(c);
+    }
+    mReflWrap.append(rGrid);
+  }
+  reflPanel.append(mReflWrap);
+
+  const wReflWrap = el('div', 'mt-4 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/70');
+  wReflWrap.append(el('p', 'eyebrow', 'Revisões das semanas'));
+  const ww = el('div', 'mt-2 grid gap-3 sm:grid-cols-2');
+  for (let w = weekStart(parseKey(first)); keyOf(w) <= last; w = addDays(w, 7)) {
+    const W = S.weeks[keyOf(w)];
+    const parts = [...reflParts(W?.refl), W?.review?.trim() && ['Foco da próxima semana', W.review.trim()]].filter(Boolean);
+    if (!parts.length) continue;
+    const card = el('div', 'rounded-lg border border-zinc-200/60 bg-white/60 p-3 dark:border-zinc-800/70 dark:bg-zinc-900/40');
+    card.append(el('p', 'mb-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200', `Semana de ${fmtShort.format(w).replace('.', '')} a ${fmtShort.format(addDays(w, 6)).replace('.', '')}`));
+    const dl = el('dl', 'space-y-2');
+    for (const [label, text] of parts) {
+      const row = el('div');
+      row.append(el('dt', 'text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500', label));
+      if (Array.isArray(text)) {
+        const ul = el('ul', 'mt-0.5 list-disc space-y-0.5 pl-4 text-xs leading-relaxed marker:text-zinc-400');
+        for (const t of text) ul.append(el('li', 'whitespace-pre-wrap break-words', t));
+        row.append(ul);
+      } else row.append(el('dd', 'mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-700 dark:text-zinc-300', text));
+      dl.append(row);
+    }
+    card.append(dl);
+    ww.append(card);
+  }
+  if (!ww.children.length) wReflWrap.append(el('p', 'mt-1.5 text-xs text-zinc-500', 'Nenhuma revisão semanal escrita neste mês.'));
+  else wReflWrap.append(ww);
+  reflPanel.append(wReflWrap);
+  box.append(reflPanel);
+
+  // ---------- 9. Diário: tudo que foi escrito nos dias (grade de 2 colunas + expansão) ----------
+  const textQs = S.questions.filter((q) => q.type === 'text');
+  const diary = recs.map(([k, r]) => {
+    const parts = [
+      r.oneThing && ['One Thing', `${r.oneThing}${r.oneDone ? ' ✓' : ''}`],
+      r.win && ['Vitória', r.win],
+      r.improve && ['Melhorar', r.improve],
+      ...textQs.map((q) => r.answers?.[q.id] && [q.text, r.answers[q.id]]),
+      (r.tags || []).length && ['Tags', r.tags.map((t) => '#' + normTag(t)).join(' ')],
+    ].filter(Boolean);
+    return parts.length ? [k, r, parts] : null;
+  }).filter(Boolean).reverse();
+
+  const diaryToggle = diary.length > 6 ? el('button', 'btn-ghost text-xs', mdDiaryAll ? 'Mostrar menos' : `Ver todos (${diary.length} dias)`) : null;
+  if (diaryToggle) diaryToggle.onclick = () => { mdDiaryAll = !mdDiaryAll; renderMonthDetail(); };
+  const diaryPanel = panel(`Diário do mês (${diary.length})`, 'One Thing, reflexão noturna, respostas abertas e tags · mais recente primeiro', diaryToggle);
+  if (!diary.length) {
+    diaryPanel.append(el('p', 'mt-3 text-xs text-zinc-500', 'Nada escrito nos dias deste mês.'));
+  } else {
+    const dw = el('div', 'mt-3 grid gap-3 sm:grid-cols-2');
+    const shown = mdDiaryAll ? diary : diary.slice(0, 6);
+    for (const [k, r, parts] of shown) {
+      const card = el('div', 'flex flex-col rounded-lg border border-zinc-200/60 bg-white/60 p-3 dark:border-zinc-800/70 dark:bg-zinc-900/40');
+      const cHead = el('div', 'mb-2 flex flex-wrap items-center justify-between gap-1.5 border-b border-zinc-100 pb-1.5 dark:border-zinc-800/80');
+      cHead.append(el('span', 'text-xs font-semibold text-zinc-800 dark:text-zinc-200', cap(dayLbl(k))));
+      const pills = el('div', 'flex items-center gap-1 font-mono text-[10px] text-zinc-500');
+      const p = completion(k);
+      if (p != null) pills.append(el('span', 'rounded bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300', fmtPct(p)));
+      if (r.sleep != null) pills.append(el('span', 'rounded bg-zinc-200/60 px-1.5 py-0.5 dark:bg-zinc-800', fmtSleep(r.sleep)));
+      if (r.energy > 0) pills.append(el('span', 'rounded bg-zinc-200/60 px-1.5 py-0.5 dark:bg-zinc-800', `⚡ ${r.energy}/5`));
+      cHead.append(pills);
+      card.append(cHead);
+      const dl = el('dl', 'space-y-2');
+      for (const [label, text] of parts) {
+        const row = el('div');
+        row.append(el('dt', 'text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500', label));
+        row.append(el('dd', 'mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-700 dark:text-zinc-300', text));
+        dl.append(row);
+      }
+      card.append(dl);
+      dw.append(card);
+    }
+    diaryPanel.append(dw);
+  }
+  box.append(diaryPanel);
+
+  // ---------- Renderização dos gráficos SVG (chamada agora e no resize) ----------
+  const showXDay = (i) => i === 0 || i === ms.daysIn - 1 || ((i + 1) % 5 === 0 && ms.daysIn - (i + 1) >= 3);
+  mdChartRender = () => {
+    // 1. Gráfico de hábitos diários + média acumulada
+    const daily = ms.days.map((d) => (d.p == null ? null : d.p * 100));
+    let sum = 0, cnt = 0;
+    const running = daily.map((v) => (v == null ? null : ((sum += v), ++cnt, sum / cnt)));
+    columnChart(dailyChartHost, {
+      n: ms.daysIn,
+      series: [{ values: daily, color: 'var(--c-habit)' }],
+      line: { values: running, color: 'var(--c-avg)' },
+      xLabel: (i) => String(i + 1),
+      showX: showXDay,
+      tip: (i) => {
+        const d = ms.days[i], r = d.rec;
+        if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+        const rows = [
+          { value: fmtPct(d.p), label: 'hábitos do dia', color: 'var(--c-habit)', box: true },
+          { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
+        ];
+        if (r?.oneThing) rows.push({ value: r.oneDone ? '✓' : '○', label: 'One Thing' });
+        if (studyOf(r)) rows.push({ value: fmtMin(studyOf(r)), label: 'estudo' });
+        if (r?.sleep != null) rows.push({ value: fmtSleep(r.sleep), label: 'sono' });
+        return { title: fmtDay.format(d.date), rows };
+      },
+    });
+
+    // 2. Gráfico diário de Sono (colunas) + Energia (linha 1–5)
+    if (sleepChartHost) {
+      const sMax = Math.max(10, Math.ceil(Math.max(0, ...sleeps)));
+      const dailySleep = ms.days.map((d) => (d.future || d.k < S.startDate ? null : d.rec?.sleep ?? null));
+      const dailyEnergy = ms.days.map((d) => (d.future || d.k < S.startDate ? null : d.rec?.energy > 0 ? d.rec.energy : null));
+      columnChart(sleepChartHost, {
+        n: ms.daysIn,
+        max: sMax,
+        ticks: [0, sMax / 2, sMax],
+        yFmt: (v) => `${v}h`,
+        refLine: { value: goalH, color: 'var(--c-axis)' },
+        series: [{ values: dailySleep, color: 'var(--c-goal)', opacityOf: (v) => (v >= goalH ? 1 : 0.45) }],
+        line: energies.length ? { values: dailyEnergy, max: 5, color: 'var(--c-habit)', dots: true, showLast: false } : null,
+        xLabel: (i) => String(i + 1),
+        showX: showXDay,
+        tip: (i) => {
+          const d = ms.days[i], r = d.rec, rows = [];
+          if (r?.sleep != null) rows.push({ value: fmtSleep(r.sleep), label: r.sleep >= goalH ? 'sono (na meta ✓)' : `sono (meta ${fmtSleep(goalH)})`, color: 'var(--c-goal)', box: true });
+          if (r?.energy > 0) rows.push({ value: `${r.energy}/5`, label: 'energia', color: 'var(--c-habit)' });
+          if (!rows.length) rows.push({ value: d.future ? 'ainda não chegou' : 'sem registro', label: '' });
+          return { title: fmtDay.format(d.date), rows };
+        },
+      });
+    }
+
+    // 3. Gráfico diário de Estudo (minutos por dia)
+    if (studyChartHost) {
+      const dailyStudy = ms.days.map((d) => (d.future || d.k < S.startDate ? null : studyOf(d.rec)));
+      const goalMinDay = Math.round(((S.settings.studyGoalH || 10) * 60) / 7);
+      const maxMin = Math.max(60, Math.ceil(Math.max(...dailyStudy.filter(Boolean), goalMinDay) / 60) * 60);
+      columnChart(studyChartHost, {
+        n: ms.daysIn,
+        max: maxMin,
+        ticks: [0, maxMin / 2, maxMin],
+        yFmt: (v) => (v === 0 ? '0' : v % 60 === 0 ? `${v / 60}h` : fmtMin(v)),
+        padL: 38,
+        refLine: { value: goalMinDay, color: 'var(--c-axis)' },
+        series: [{ values: dailyStudy, color: 'var(--c-goal)', opacityOf: (v) => (v >= goalMinDay ? 1 : 0.65) }],
+        xLabel: (i) => String(i + 1),
+        showX: showXDay,
+        tip: (i) => {
+          const d = ms.days[i], mTot = studyOf(d.rec);
+          if (d.future || d.k < S.startDate || !mTot) {
+            return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : '0 min', label: 'sem estudo' }] };
+          }
+          const rows = [{ value: fmtMin(mTot), label: 'total do dia', color: 'var(--c-goal)', box: true }];
+          for (const [sid, mv] of Object.entries(d.rec?.studyBy || {})) {
+            if (mv > 0) rows.push({ value: fmtMin(mv), label: sid ? subjectName(sid) : 'Sem matéria' });
+          }
+          return { title: fmtDay.format(d.date), rows };
+        },
+      });
+    }
+
+    // 4. Gráfico semanal de Ganhos × Gastos no mês
+    if (expChartHost && expWeeks.length) {
+      const maxE = Math.max(100, ...expWeeks.map((w) => Math.max(w.inc, w.out)));
+      const hidden = maskMoney(expCur(), 'exp');
+      columnChart(expChartHost, {
+        n: expWeeks.length,
+        max: maxE,
+        ticks: [0, Math.round(maxE / 2), Math.round(maxE)],
+        yFmt: (v) => (hidden ? '***' : v === 0 ? '0' : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.0', '')}k` : String(Math.round(v))),
+        padL: 38,
+        series: [
+          { values: expWeeks.map((w) => w.inc), color: 'var(--c-habit)' },
+          { values: expWeeks.map((w) => w.out), color: 'var(--c-goal)' },
+        ],
+        xLabel: (i) => `${expWeeks[i].start.getDate()}/${expWeeks[i].start.getMonth() + 1}`,
+        showX: () => true,
+        tip: (i) => {
+          const w = expWeeks[i];
+          return { title: w.label, rows: [
+            { value: fmtMoney(w.inc), label: 'ganhos', color: 'var(--c-habit)', box: true },
+            { value: fmtMoney(w.out), label: 'gastos', color: 'var(--c-goal)', box: true },
+            { value: `${w.net > 0 && !hidden ? '+' : ''}${fmtMoney(w.net)}`, label: 'saldo' },
+          ] };
+        },
+      });
+    }
+  };
+  mdChartRender();
 }
 
 // ---------- Gastos & ganhos ----------
@@ -6657,11 +7154,12 @@ $('#mr-close').onclick = () => {
   mreviewManual = false; mreview = null;
   save();
   $('#mreview-card').classList.add('hidden');
+  renderMonthDetail();
 };
 $('#mr-done').onclick = () => {
   monthRec(monthKey(mreview.y, mreview.m)).reflDone = true;
   mreviewManual = false; mreview = null;
-  commit(renderMonthReview);
+  commit(renderMonthReview, renderMonthDetail);
 };
 
 // Dia em edição
