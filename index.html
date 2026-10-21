@@ -124,6 +124,12 @@
         linear-gradient(to top left, transparent calc(50% - 0.75px), var(--c-axis) calc(50% - 0.75px), var(--c-axis) calc(50% + 0.75px), transparent calc(50% + 0.75px));
       opacity: 0.45;
     }
+    /* Dia anulado (viagem, feriado, imprevisto): traço diagonal + borda tracejada, fora das métricas */
+    .day-off {
+      border: 1px dashed var(--c-axis);
+      background: linear-gradient(to top right, transparent calc(50% - 0.75px), var(--c-axis) calc(50% - 0.75px), var(--c-axis) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+      opacity: 0.55;
+    }
     /* Fundo: brilho suave da cor de destaque e do tom vizinho no topo da página */
     body {
       background:
@@ -239,8 +245,8 @@
         <button role="tab" data-tab="hoje" class="rounded-md px-4 py-1.5 transition">Hoje</button>
         <button role="tab" data-tab="meses" class="rounded-md px-4 py-1.5 transition">Meses</button>
       </nav>
-      <!-- Dia em edição: volta até 7 dias para registrar o que esqueceu -->
-      <div id="daynav" class="flex items-center gap-1 text-sm" title="Esqueceu de marcar? Volte até 7 dias">
+      <!-- Dia em edição: volta até 30 dias para registrar o que esqueceu -->
+      <div id="daynav" class="flex flex-wrap items-center gap-1 text-sm" title="Esqueceu de marcar? Volte até 30 dias">
         <button id="day-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Dia anterior">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
         </button>
@@ -248,6 +254,7 @@
         <button id="day-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo dia">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
         </button>
+        <button id="day-skip-top" type="button" class="ml-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:text-white" title="Anula este dia (viagem, férias ou feriado) para não contar nas métricas">Anular dia</button>
       </div>
     </div>
 
@@ -256,6 +263,12 @@
       <div class="flex flex-wrap items-center justify-between gap-2">
         <span id="past-text"></span>
         <button id="past-back" class="font-medium underline decoration-dotted underline-offset-2">Voltar para hoje</button>
+      </div>
+    </div>
+    <div id="skip-banner" class="hidden rounded-xl border border-zinc-300/80 bg-zinc-100/90 px-4 py-2.5 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span id="skip-banner-text"></span>
+        <button id="skip-banner-undo" type="button" class="font-medium underline decoration-dotted underline-offset-2 hover:text-zinc-900 dark:hover:text-white">Reativar dia</button>
       </div>
     </div>
 
@@ -505,14 +518,18 @@
       <div id="col-b" class="space-y-4 sm:space-y-5">
         <!-- Tarefas -->
         <section class="card">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between gap-2">
             <div class="flex items-baseline gap-2">
               <h2 id="tasks-title" class="text-sm font-semibold">Hábitos de hoje</h2>
               <span id="task-count" class="text-xs tabular-nums text-zinc-500"></span>
               <span id="task-loose" class="hidden cursor-help items-center gap-1 text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500" tabindex="0"></span>
             </div>
-            <button id="reset-day" class="btn-ghost text-xs" title="Desmarca todos os hábitos de hoje">Zerar dia</button>
+            <div class="flex items-center gap-1">
+              <button id="skip-day" type="button" class="btn-ghost text-xs" title="Anula este dia (viagem, feriado, imprevisto) para não contar nas métricas gerais">Anular dia</button>
+              <button id="reset-day" class="btn-ghost text-xs" title="Desmarca todos os hábitos de hoje">Zerar dia</button>
+            </div>
           </div>
+          <div id="skip-week-bar" class="mt-2.5 flex flex-wrap items-center gap-1 border-b border-zinc-100 pb-2.5 text-[11px] text-zinc-500 dark:border-zinc-800/80"></div>
           <ul id="task-list" class="mt-3 space-y-0.5"></ul>
           <form id="task-form" class="mt-3 flex gap-2">
             <input id="task-input" class="field" type="text" maxlength="80" autocomplete="off" placeholder="Nova tarefa (pontual; vira hábito no ⚙)…" />
@@ -1276,9 +1293,11 @@ function day(k = todayKey()) {
 const peek = (k) => S.days[k];
 
 /* Dia em edição: hoje por padrão; dá para voltar até MAX_BACK dias e registrar o que faltou. */
-const MAX_BACK = 7;
+const MAX_BACK = 30;
 let selKey = todayKey();
 const isToday = () => selKey === todayKey();
+/** Dia anulado pelo usuário (viagem, feriado, imprevisto): fica fora das médias e métricas gerais. */
+const isAnulado = (k) => !!peek(k)?.off;
 /** Leitura do dia em edição — não cria registro para dias passados só por olhar. */
 const rday = () => (isToday() ? day() : { ...blankDay(), ...peek(selKey) });
 /** Escrita no dia em edição. Registrar um dia antes do 1º uso passa a contá-lo no histórico. */
@@ -1304,7 +1323,7 @@ const scheduledOn = (t, date) => t.once ? keyOf(date) === t.once : !isWeekly(t) 
  * Não feita → vai para Pendentes; concluir depois grava `t.lateK`, descartar grava `t.dropK`.
  */
 const habits = () => S.tasks.filter((t) => !t.once);
-const wentPending = (t, tk = todayKey()) => !!t.once && t.once < tk && !peek(t.once)?.done?.includes(t.id);
+const wentPending = (t, tk = todayKey()) => !!t.once && t.once < tk && !isAnulado(t.once) && !peek(t.once)?.done?.includes(t.id);
 const pendingTasks = () => S.tasks.filter((t) => wentPending(t) && !t.lateK && !t.dropK).sort((a, b) => (a.once < b.once ? -1 : 1));
 const tasksFor = (date) => S.tasks.filter((t) => scheduledOn(t, date));
 const weeklyTasks = () => S.tasks.filter(isWeekly);
@@ -1377,7 +1396,7 @@ function resync() {
    MÉTRICAS
    ========================================================= */
 /**
- * Conclusão de um dia (0–1), ou null quando é "dia livre" (nenhum hábito previsto).
+ * Conclusão de um dia (0–1), ou null quando é "dia livre" ou anulado.
  * Dia sem registro com hábitos previstos conta 0 — você não abriu o painel.
  */
 function completion(k) {
@@ -1386,9 +1405,10 @@ function completion(k) {
   if (d) return dayScore(d);
   return tasksFor(parseKey(k)).length ? 0 : null;
 }
-/** Sábado, domingo e feriados são opcionais: só entram na média se tiverem ao menos uma tarefa pontual. */
+/** Sábado, domingo e feriados são opcionais (a menos que tenham tarefa pontual); dias anulados ficam sempre fora. */
 const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
-const dayOff = (date) => (isWeekend(date) || !!holidayName(date)) && !S.tasks.some((t) => t.once === keyOf(date));
+const autoDayOff = (date) => (isWeekend(date) || !!holidayName(date)) && !S.tasks.some((t) => t.once === keyOf(date));
+const dayOff = (date) => isAnulado(keyOf(date)) || autoDayOff(date);
 /** Feriados nacionais (inclui Carnaval e Corpus Christi), calculados por ano a partir da Páscoa. */
 const holidayCache = {};
 function holidays(y) {
@@ -1465,10 +1485,13 @@ function averageBetween(from, to) {
   return vals.length ? { value: avg(vals), days: vals.length } : null;
 }
 
-/** Minutos estudados na semana que começa em `ws`. */
+/** Minutos estudados na semana que começa em `ws` (ignora dias anulados). */
 function weekStudyMin(ws) {
   let m = 0;
-  for (let i = 0; i < 7; i++) m += studyOf(peek(keyOf(addDays(ws, i))));
+  for (let i = 0; i < 7; i++) {
+    const k = keyOf(addDays(ws, i));
+    if (!isAnulado(k)) m += studyOf(peek(k));
+  }
   return m;
 }
 
@@ -1478,11 +1501,12 @@ function weekSummary(ws) {
   for (let i = 0; i < 7; i++) {
     const date = addDays(ws, i), k = keyOf(date);
     if (k > tk || k < S.startDate) continue;
-    days.push({ date, k, p: completion(k), rec: peek(k) });
+    days.push({ date, k, p: completion(k), rec: peek(k), off: isAnulado(k) });
   }
-  const scored = days.filter((d) => d.p != null);
+  const active = days.filter((d) => !d.off);
+  const scored = active.filter((d) => d.p != null);
   const g = S.weeks[wk]?.goals || [];
-  const sleeps = days.map((d) => d.rec?.sleep).filter((v) => v != null);
+  const sleeps = active.map((d) => d.rec?.sleep).filter((v) => v != null);
   const sorted = [...scored].sort((a, b) => b.p - a.p);
   return {
     wk, days, habit: scored.length ? avg(scored.map((d) => d.p)) : null,
@@ -1498,15 +1522,24 @@ function studyStreak() {
   let d = new Date();
   if (!(studyOf(peek(keyOf(d))) > 0)) d = addDays(d, -1); // hoje ainda conta se estudou ontem
   let n = 0;
-  while (studyOf(peek(keyOf(d))) > 0) { n++; d = addDays(d, -1); }
+  while (keyOf(d) >= S.startDate) {
+    const k = keyOf(d);
+    if (studyOf(peek(k)) > 0) { n++; d = addDays(d, -1); }
+    else if (isAnulado(k)) { d = addDays(d, -1); } // dia anulado não quebra a ofensiva
+    else break;
+  }
   return n;
 }
 
 function bestStreak() {
-  const keys = Object.keys(S.days).filter((k) => studyOf(S.days[k]) > 0).sort();
+  const keys = Object.keys(S.days).filter((k) => !isAnulado(k) && studyOf(S.days[k]) > 0).sort();
   let best = 0, run = 0, prev = null;
+  const onlyOffBetween = (a, b) => {
+    for (let d = addDays(parseKey(a), 1); keyOf(d) < b; d = addDays(d, 1)) if (!isAnulado(keyOf(d))) return false;
+    return true;
+  };
   for (const k of keys) {
-    run = prev && keyOf(addDays(parseKey(prev), 1)) === k ? run + 1 : 1;
+    run = prev && onlyOffBetween(prev, k) ? run + 1 : 1;
     best = Math.max(best, run);
     prev = k;
   }
@@ -1529,7 +1562,7 @@ const MONTH_WEIGHTS = { habits: 0.6, weekly: 0.25, monthly: 0.15 };
  *  - Metas semanais:  soma da conclusão de cada semana ÷ semanas do mês
  *  - Metas do mês:    metas concluídas ÷ metas do mês
  * Pesos 60/25/15, redistribuídos entre as partes que existem no mês.
- * Dias e semanas futuros contam zero; dias livres e anteriores ao 1º uso ficam de fora.
+ * Dias e semanas futuros contam zero; dias livres, anulados e anteriores ao 1º uso ficam de fora.
  */
 function monthStats(y, m) {
   const first = new Date(y, m, 1), daysIn = new Date(y, m + 1, 0).getDate();
@@ -1537,17 +1570,17 @@ function monthStats(y, m) {
   const days = [];
   let habitSum = 0, possible = 0, possibleElapsed = 0, perfect = 0, one = 0, study = 0; const sleeps = [];
   for (let i = 1; i <= daysIn; i++) {
-    const date = new Date(y, m, i), k = keyOf(date), rec = peek(k);
+    const date = new Date(y, m, i), k = keyOf(date), rec = peek(k), off = isAnulado(k);
     const future = k > tk, tracked = !future && k >= start;
     const p = tracked ? completion(k) : null;
-    const free = future ? !tasksFor(date).length || dayOff(date) : tracked && p == null;
+    const free = off || (future ? !tasksFor(date).length || dayOff(date) : tracked && p == null);
     if (k >= start && !free) { possible++; if (!future) possibleElapsed++; }
     if (p != null) habitSum += p;
     if (p === 1) perfect++;
-    if (rec?.oneDone) one++;
-    study += studyOf(rec);
-    if (rec && rec.sleep != null) sleeps.push(rec.sleep);
-    days.push({ date, k, p, rec, future, free });
+    if (!off && rec?.oneDone) one++;
+    if (!off) study += studyOf(rec);
+    if (!off && rec && rec.sleep != null) sleeps.push(rec.sleep);
+    days.push({ date, k, p, rec, future, free, off });
   }
   // Semanas (seg→dom) que tocam o mês
   const weeks = [];
@@ -1792,7 +1825,7 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   const tog = onToggle;
   onToggle = (e) => { popKey = `${tone}|${title}`; tog(e); setTimeout(() => { popKey = null; }, 0); };
   const li = document.createElement('li');
-  li.className = 'group -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40';
+  li.className = 'group -mx-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-2 transition hover:bg-zinc-50 sm:flex-nowrap sm:gap-x-3 dark:hover:bg-zinc-800/40';
 
   let check;
   if (opts.off) {
@@ -1851,7 +1884,8 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
 
   if (opts.qty && !opts.off) {
     const q = opts.qty, box = document.createElement('span');
-    box.className = 'flex shrink-0 items-center gap-1 text-xs tabular-nums text-zinc-500';
+    const plClass = opts.dragId ? 'pl-8 sm:pl-0' : 'pl-7 sm:pl-0';
+    box.className = `order-last flex w-full basis-full shrink-0 items-center gap-1 text-xs tabular-nums text-zinc-500 ${plClass} pt-0.5 sm:order-none sm:w-auto sm:basis-auto sm:pt-0`;
     // Barrinha de progresso embaixo do nome
     const pr = document.createElement('span');
     pr.className = 'mt-1 block h-1 w-full max-w-[180px] overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-800';
@@ -1892,6 +1926,9 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     li.append(box);
   }
 
+  const actions = document.createElement('span');
+  actions.className = 'flex shrink-0 items-center gap-0.5 sm:order-last';
+
   if (opts.onEdit) {
     const ed = document.createElement('button');
     ed.className = ROW_BTN + (opts.editing ? ' !opacity-100 text-zinc-700 dark:text-zinc-200' : '');
@@ -1899,14 +1936,15 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     ed.title = 'Dias, quantidade e métrica';
     ed.innerHTML = ICON_CAL;
     ed.onclick = opts.onEdit;
-    li.append(ed);
+    actions.append(ed);
   }
   const rm = document.createElement('button');
   rm.className = ROW_BTN;
   rm.setAttribute('aria-label', `Remover “${title}”`);
   rm.innerHTML = ICON_X;
   rm.onclick = onRemove;
-  li.append(rm);
+  actions.append(rm);
+  li.append(actions);
   return li;
 }
 function emptyRow(text) {
@@ -2120,14 +2158,81 @@ function scheduleEditor(t) {
 }
 
 let editingTask = null, showOffTasks = false;
+function renderSkipBar(now) {
+  const voided = isAnulado(selKey);
+  const skipBtn = $('#skip-day');
+  skipBtn.textContent = voided ? 'Dia anulado ✓' : 'Anular dia';
+  skipBtn.setAttribute('aria-pressed', String(voided));
+  skipBtn.title = voided ? 'Reativar este dia nas métricas gerais' : 'Anula este dia (viagem, feriado, imprevisto) para não contar nas métricas gerais';
+  skipBtn.className = 'inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ' +
+    (voided ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100');
+
+  const bar = $('#skip-week-bar');
+  bar.replaceChildren();
+  const lbl = document.createElement('span');
+  lbl.className = 'mr-0.5 text-zinc-400 dark:text-zinc-500';
+  lbl.textContent = 'Anular na semana:';
+  bar.append(lbl);
+
+  const ws = weekStart(now);
+  const mkChip = (text, on, title, onclick, extra = '') => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rounded-md border px-1.5 py-0.5 text-[11px] font-medium transition ' + (on
+      ? 'border-amber-500/50 bg-amber-500/15 text-amber-800 line-through decoration-amber-600/70 dark:border-amber-400/40 dark:text-amber-300'
+      : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200') + (extra ? ' ' + extra : '');
+    b.textContent = text;
+    b.title = title;
+    b.setAttribute('aria-pressed', String(on));
+    b.onclick = onclick;
+    return b;
+  };
+
+  const wkKeys = [];
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(ws, i), k = keyOf(d), off = isAnulado(k);
+    wkKeys.push(k);
+    const isSel = k === selKey;
+    bar.append(mkChip(WD[d.getDay()], off,
+      `${fmtDay.format(d).replace(/\./g, '')} — ${off ? 'anulado (clique para reativar)' : 'clique para anular'}`,
+      () => toggleDayOff(k),
+      isSel && !off ? 'ring-1 ring-zinc-400/60 dark:ring-zinc-500/60' : ''));
+  }
+  const sep = document.createElement('span');
+  sep.className = 'mx-0.5 text-zinc-300 dark:text-zinc-700';
+  sep.textContent = '·';
+  const wdKeys = wkKeys.slice(0, 5), weKeys = wkKeys.slice(5, 7);
+  const wdAllOff = wdKeys.every(isAnulado), weAllOff = weKeys.every(isAnulado);
+  bar.append(
+    sep,
+    mkChip('seg–sex', wdAllOff, wdAllOff ? 'Reativar segunda a sexta' : 'Anular segunda a sexta desta semana', () => toggleDaysOff(wdKeys, !wdAllOff)),
+    mkChip('fim de semana', weAllOff, weAllOff ? 'Reativar sábado e domingo' : 'Anular sábado e domingo desta semana', () => toggleDaysOff(weKeys, !weAllOff)),
+  );
+}
+
 function renderTasks() {
-  const d = rday(), now = parseKey(selKey);
+  const d = rday(), now = parseKey(selKey), voided = isAnulado(selKey);
   $('#tasks-title').textContent = isToday() ? 'Hábitos de hoje' : `Hábitos · ${fmtDay.format(now).replace(/\./g, '')}`;
+  renderSkipBar(now);
   const ul = $('#task-list');
   ul.replaceChildren();
+  ul.classList.toggle('opacity-60', voided);
   const today = tasksFor(now), off = habits().filter((t) => !isWeekly(t) && !scheduledOn(t, now)), weekly = weeklyTasks();
+  if (voided) {
+    const notice = document.createElement('li');
+    notice.className = 'mb-1.5 flex items-center justify-between gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300';
+    const sp = document.createElement('span');
+    sp.textContent = 'Dia anulado — fora das médias da semana, do mês, do ano e das métricas gerais.';
+    const un = document.createElement('button');
+    un.type = 'button';
+    un.className = 'shrink-0 font-semibold underline decoration-dotted underline-offset-2';
+    un.textContent = 'Reativar';
+    un.onclick = () => toggleDayOff(selKey);
+    notice.append(sp, un);
+    ul.append(notice);
+  }
   if (!S.tasks.length) ul.append(emptyRow('Nenhum hábito ainda. Adicione o primeiro abaixo.'));
-  else if (!today.length && !weekly.length) ul.append(emptyRow(`Nenhum hábito previsto para ${isToday() ? 'hoje' : 'este dia'} — dia livre.`));
+  else if (!today.length && !weekly.length && !voided) ul.append(emptyRow(`Nenhum hábito previsto para ${isToday() ? 'hoje' : 'este dia'} — dia livre.`));
 
   const metricName = (t) => S.metrics.find((m) => m.id === t.metricId)?.name;
   const projectName = (t) => S.projects.find((p) => p.id === t.projectId)?.name;
@@ -2174,7 +2279,7 @@ function renderTasks() {
     ul.append(li);
     if (showOffTasks) off.forEach((t) => row(t, true));
   }
-  $('#task-count').textContent = today.length ? `${d.done.length}/${today.length}` : '';
+  $('#task-count').textContent = voided ? 'anulado' : today.length ? `${d.done.length}/${today.length}` : '';
   // Hábito que não move nenhum número é candidato a sair (ou a ganhar uma métrica)
   const loose = S.metrics.length ? habits().filter((t) => !t.metricId && !t.projectId && !t.study && !t.sleep && !t.checkin).length : 0;
   infoHint($('#task-loose'), loose ? String(loose) : '', `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica, projeto ou estudo`,
@@ -2422,7 +2527,7 @@ function renderKPIs() {
   countTo($('#kpi-today'), today == null ? '—' : fmtPct(today));
   paintTab(today);
   document.documentElement.classList.toggle('all-done', today === 1);
-  $('#kpi-today-sub').textContent = !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
+  $('#kpi-today-sub').textContent = isAnulado(k) ? 'dia anulado · não conta' : !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
     : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
 
   const week = averageBetween(addDays(now, -6), now);
@@ -2441,7 +2546,7 @@ function renderKPIs() {
   countTo($('#kpi-streak'), String(streak));
   $('#kpi-streak-unit').textContent = streak === 1 ? 'dia' : 'dias';
   const studiedToday = studyOf(d) > 0;
-  $('#kpi-streak-sub').textContent = streak && !studiedToday ? 'estude hoje para manter' : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
+  $('#kpi-streak-sub').textContent = streak && !studiedToday && !isAnulado(k) ? 'estude hoje para manter' : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
 }
 
 // ---------- Heatmap semanal ----------
@@ -2458,27 +2563,31 @@ function renderHeatmap() {
   wrap.replaceChildren();
   const now = new Date(), tk = todayKey();
   const fmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric' });
-  let consistent = 0;
+  let consistent = 0, voidedCount = 0;
   for (let i = 6; i >= 0; i--) {
     const date = addDays(now, -i), k = keyOf(date);
-    const p = completion(k), rec = peek(k);
+    const off = isAnulado(k), p = completion(k), rec = peek(k);
+    if (off) voidedCount++;
     if (p != null && p >= 0.5) consistent++;
     const lvl = p == null ? 0 : heatLevel(p);
     const col = document.createElement('div');
     col.className = 'flex flex-col items-center gap-1.5';
-    const sq = document.createElement('div');
-    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${k < S.startDate ? 'day-x' : HEAT[lvl]} ` +
-      (k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
-    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    const sq = document.createElement('button');
+    sq.type = 'button';
+    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${k < S.startDate ? 'day-x cursor-default' : off ? 'day-off cursor-pointer' : HEAT[lvl] + ' cursor-pointer'} ` +
+      (k === selKey ? 'ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900' : k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
+    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${off ? 'dia anulado (não conta)' : p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    if (k >= S.startDate) sq.onclick = () => setSelDay(k);
     const lbl = document.createElement('span');
     lbl.className = 'text-[10px] font-medium uppercase ' + (k === tk ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
     lbl.textContent = 'DSTQQSS'[date.getDay()];
     const dot = document.createElement('span');
-    dot.className = 'h-1 w-1 rounded-full ' + (rec?.oneDone ? 'bg-emerald-500' : 'bg-transparent');
+    dot.className = 'h-1 w-1 rounded-full ' + (rec?.oneDone && !off ? 'bg-emerald-500' : 'bg-transparent');
     col.append(sq, lbl, dot);
     wrap.append(col);
   }
-  $('#heat-sub').textContent = `${consistent}/7 dias ≥ 50%`;
+  const denom = Math.max(1, 7 - voidedCount);
+  $('#heat-sub').textContent = voidedCount ? `${consistent}/${denom} dias ≥ 50% (${voidedCount} ${voidedCount === 1 ? 'anulado' : 'anulados'})` : `${consistent}/7 dias ≥ 50%`;
 }
 
 // ---------- Sono & energia ----------
@@ -2503,7 +2612,7 @@ function renderSleep() {
 
   // Média semanal
   const now = new Date(), vals = [];
-  for (let i = 0; i < 7; i++) { const r = peek(keyOf(addDays(now, -i))); if (r && r.sleep != null) vals.push(r.sleep); }
+  for (let i = 0; i < 7; i++) { const k = keyOf(addDays(now, -i)), r = peek(k); if (!isAnulado(k) && r && r.sleep != null) vals.push(r.sleep); }
   $('#sleep-avg').textContent = vals.length ? fmtSleep(avg(vals)) : '—';
   const sh = sleepHabit(), goalEl = $('#sleep-goal');
   goalEl.replaceChildren();
@@ -2512,7 +2621,7 @@ function renderSleep() {
     let hit = 0, logged = 0;
     for (let i = 0; i < 7; i++) {
       const k = keyOf(addDays(ws, i)), r = peek(k);
-      if (k > todayKey() || r?.sleep == null) continue;
+      if (k > todayKey() || isAnulado(k) || r?.sleep == null) continue;
       logged++;
       if (r.sleep >= sh.target) hit++;
     }
@@ -2532,9 +2641,9 @@ function renderSleep() {
 function sleepInsight() {
   const hi = [], lo = [], now = new Date();
   for (let i = 1; i <= 30; i++) {
-    const k = keyOf(addDays(now, -i)), r = peek(k);
-    if (!r || r.sleep == null || !r.total) continue;
-    (r.sleep >= 7.5 ? hi : lo).push(completion(k));
+    const k = keyOf(addDays(now, -i)), r = peek(k), p = completion(k);
+    if (!r || r.sleep == null || p == null) continue;
+    (r.sleep >= 7.5 ? hi : lo).push(p);
   }
   if (hi.length >= 2 && lo.length >= 2) {
     const a = avg(hi), b = avg(lo), diff = Math.round((a - b) * 100);
@@ -2567,9 +2676,13 @@ function renderStudy() {
   $('#sg-value').textContent = fmtMin(doneMin);
   const sg = $('#sg-input');
   if (document.activeElement !== sg) sg.value = S.settings.studyGoalH || 10;
-  const left = goalMin - doneMin, daysLeft = 7 - ((new Date().getDay() + 6) % 7);
+  const startIdx = (new Date().getDay() + 6) % 7;
+  let activeLeft = 0;
+  for (let i = startIdx; i < 7; i++) if (!isAnulado(keyOf(addDays(ws, i)))) activeLeft++;
+  const left = goalMin - doneMin, daysLeft = Math.max(1, activeLeft);
   $('#sg-sub').textContent = left <= 0 ? 'meta da semana batida ✓'
-    : daysLeft === 1 ? `faltam ${fmtMin(left)} — último dia da semana`
+    : activeLeft === 0 ? `faltam ${fmtMin(left)} · restante da semana anulado`
+    : daysLeft === 1 ? `faltam ${fmtMin(left)} — último dia ativo da semana`
     : `faltam ${fmtMin(left)} · ≈ ${fmtMin(Math.ceil(left / daysLeft))}/dia até domingo`;
 }
 
@@ -2778,14 +2891,14 @@ function adherence(tasks, fromK, toK) {
   if (!tasks.length) return null;
   const vals = [], tk = todayKey();
   if (toK > tk) toK = tk;
-  // Hábitos semanais: vezes feitas ÷ meta proporcional aos dias da semana dentro do período
+  // Hábitos semanais: vezes feitas ÷ meta proporcional aos dias ativos da semana dentro do período
   for (const t of tasks.filter(isWeekly)) {
     for (let ws = weekStart(parseKey(fromK)); keyOf(ws) <= toK; ws = addDays(ws, 7)) {
       let n = 0, days = 0;
       for (let i = 0; i < 7; i++) {
         const k = keyOf(addDays(ws, i));
         if (k < fromK || k > toK || k < S.startDate) continue;
-        days++;
+        if (!isAnulado(k)) days++;
         if (peek(k)?.wk?.includes(t.id)) n++;
       }
       if (days) vals.push(Math.min(1, n / Math.max(1, (t.weekly * days) / 7)));
@@ -2794,12 +2907,13 @@ function adherence(tasks, fromK, toK) {
   tasks = tasks.filter((t) => !isWeekly(t));
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
     const k = keyOf(d);
-    if (k < S.startDate) continue;
+    if (k < S.startDate || isAnulado(k)) continue;
     const rec = peek(k);
     for (const t of tasks) {
       if (!scheduledOn(t, d)) continue;
       const v = habitDone(rec, t.id);
-      if (k === tk && v < 1) continue;   // hoje só conta se já foi feito
+      if (autoDayOff(d) && v === 0) continue;   // dia opcional (só se fizer): não derruba a aderência quando fica em branco
+      if (k === tk && v < 1) continue;          // hoje só conta se já foi feito
       vals.push(v);
     }
   }
@@ -3143,6 +3257,7 @@ function computeInsights() {
   for (let i = 1; i <= 60; i++) {
     const date = addDays(now, -i), k = keyOf(date);
     if (k < S.startDate) break;
+    if (isAnulado(k)) continue;
     rows.push({ date, k, r: peek(k), p: completion(k) });
   }
   const rec = rows.filter((x) => x.r);
@@ -3287,7 +3402,9 @@ function periodStats(fromK, toK) {
   if (fromK > toK) return res;
   const ps = [], sleeps = [], energies = [];
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
-    const k = keyOf(d), p = completion(k), r = peek(k);
+    const k = keyOf(d);
+    if (isAnulado(k)) continue;
+    const p = completion(k), r = peek(k);
     if (k === tk && (p == null || p < 1)) { res.study += studyOf(r); continue; }   // hoje ainda está em andamento
     if (p != null) { ps.push(p); if (p === 1) res.perfect++; if (p === 0) res.zero++; }
     res.study += studyOf(r);
@@ -3728,6 +3845,7 @@ function renderCheckinSummary() {
     for (let i = 0; i < 7; i++) {
       const k = keyOf(addDays(from, i));
       if (k > tk) break;
+      if (isAnulado(k)) continue;
       const v = peek(k)?.answers?.[q.id];
       if (typeof v === 'number') out.push(v);
     }
@@ -3749,7 +3867,7 @@ function renderCheckinSummary() {
   if (h) {
     const p = document.createElement('p');
     let n = 0, days = 0;
-    for (let i = 0; i < 7; i++) { const k = keyOf(addDays(ws, i)); if (k > tk) break; days++; if (habitDone(peek(k), h.id) >= 1) n++; }
+    for (let i = 0; i < 7; i++) { const k = keyOf(addDays(ws, i)); if (k > tk) break; if (isAnulado(k)) continue; days++; if (habitDone(peek(k), h.id) >= 1) n++; }
     p.textContent = `Check-in completo em ${n} de ${days} ${days === 1 ? 'dia' : 'dias'} nesta semana · conta no % do dia como “${h.title}”.`;
     box.append(p);
   } else if (checkinQs().length) {
@@ -3936,10 +4054,12 @@ function tagAnalysis(days = 90) {
   for (let i = 1; i <= days; i++) {
     const date = addDays(now, -i), k = keyOf(date);
     if (k < S.startDate) break;
+    if (isAnulado(k)) continue;
     const r = peek(k);
     if (!r) continue;
-    const next = peek(keyOf(addDays(date, 1)));
-    rows.push({ k, r, tags: dayTags(r), p: completion(k), next, pNext: next ? completion(keyOf(addDays(date, 1))) : null });
+    const nextK = keyOf(addDays(date, 1));
+    const next = isAnulado(nextK) ? null : peek(nextK);
+    rows.push({ k, r, tags: dayTags(r), p: completion(k), next, pNext: next ? completion(nextK) : null });
   }
   const outcomes = [
     { name: 'Hábitos', get: (x) => x.p, fmt: (v) => fmtPct(v), min: 0.1, scale: 1 },
@@ -4489,6 +4609,19 @@ function renderDayNav() {
   $('#past-banner').classList.toggle('hidden', back === 0);
   $('#past-text').textContent = back === 0 ? '' :
     `Editando ${new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date)}: foco, hábitos, sono, estudo manual, reflexão e métricas vão para esse dia.`;
+  const off = isAnulado(selKey);
+  const topBtn = $('#day-skip-top');
+  if (topBtn) {
+    topBtn.textContent = off ? 'Dia anulado · reativar' : 'Anular dia';
+    topBtn.setAttribute('aria-pressed', String(off));
+    topBtn.className = 'ml-1 rounded-md border px-2.5 py-1 text-xs font-medium transition ' + (off
+      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+      : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:text-white');
+  }
+  $('#skip-banner').classList.toggle('hidden', !off);
+  $('#skip-banner-text').textContent = off
+    ? `${back === 0 ? 'Hoje' : cap(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' }).format(date).replace(/\./g, ''))} está anulado (férias, viagem ou feriado) — não entra nas médias, metas semanais, ofensiva nem pendentes.`
+    : '';
 }
 function setSelDay(k) {
   selKey = k;
@@ -4923,26 +5056,34 @@ function renderContrib(ms) {
       if (date.getMonth() !== view.m) { cell.className = 'h-8 w-8'; grid.append(cell); continue; }
       const info = ms.days[date.getDate() - 1];
       const k = info.k;
-      let cls = 'h-8 w-8 rounded-md outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-emerald-500 ';
-      if (info.future) cls += 'border border-dashed border-zinc-200 dark:border-zinc-800';
+      const canToggle = k >= S.startDate;
+      let cls = 'h-8 w-8 rounded-md outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-emerald-500 ' + (canToggle ? 'cursor-pointer ' : '');
+      if (info.off) cls += 'day-off';
+      else if (info.future) cls += 'border border-dashed border-zinc-200 dark:border-zinc-800';
       else if (k < S.startDate) cls += 'day-x';
       else if (info.free) cls += 'border border-zinc-200 dark:border-zinc-800';
       else cls += HEAT[info.p == null ? 0 : heatLevel(info.p)];
       if (k === tk) cls += ' ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900';
       cell.className = cls;
       cell.tabIndex = 0;
-      cell.setAttribute('aria-label', `${fmtDay.format(date)}: ${info.free ? 'dia livre' : info.p == null ? 'sem registro' : fmtPct(info.p)}`);
+      cell.setAttribute('aria-label', `${fmtDay.format(date)}: ${info.off ? 'dia anulado' : info.free ? 'dia livre' : info.p == null ? 'sem registro' : fmtPct(info.p)}`);
+      if (canToggle) {
+        cell.onclick = () => { hideTip(); toggleDayOff(k); };
+        cell.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hideTip(); toggleDayOff(k); } };
+      }
       const show = (e) => {
         const rec = info.rec, rows = [];
-        if (info.future) rows.push({ value: 'ainda não chegou', label: '' });
+        if (info.off) rows.push({ value: 'dia anulado', label: 'clique para reativar' });
+        else if (info.future) rows.push({ value: 'ainda não chegou', label: canToggle ? 'clique para anular' : '' });
         else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: 'não conta' });
-        else if (info.free) rows.push({ value: 'dia livre', label: 'sem hábitos previstos' });
-        else if (info.p == null) rows.push({ value: 'sem registro', label: '' });
+        else if (info.free) rows.push({ value: 'dia livre', label: 'clique para anular' });
+        else if (info.p == null) rows.push({ value: 'sem registro', label: 'clique para anular' });
         else {
           rows.push({ value: fmtPct(info.p), label: `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0})`, color: 'var(--c-habit)', box: true });
           if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
           if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
           if (rec?.sleep != null) rows.push({ value: fmtSleep(rec.sleep), label: 'de sono' });
+          rows.push({ value: 'anular', label: 'clique no quadrado' });
         }
         showTip(e, fmtDay.format(date), rows);
       };
@@ -5286,7 +5427,7 @@ function renderCharts() {
     showX: (i) => i === 0 || i === ms.daysIn - 1 || ((i + 1) % 5 === 0 && ms.daysIn - (i + 1) >= 3),
     tip: (i) => {
       const d = ms.days[i];
-      if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+      if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.off ? 'dia anulado' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
       return { title: fmtDay.format(d.date), rows: [
         { value: fmtPct(d.p), label: 'conclusão do dia', color: 'var(--c-habit)', box: true },
         { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
@@ -5407,7 +5548,7 @@ function yearStats(y) {
     wDone += (w.goals || []).filter((g) => g.done).length;
     wTotal += (w.goals || []).length;
   }
-  for (const [k, d] of Object.entries(S.days)) if (k.startsWith(`${y}-`)) study += studyOf(d);
+  for (const [k, d] of Object.entries(S.days)) if (k.startsWith(`${y}-`) && !d.off) study += studyOf(d);
   const mDone = months.reduce((a, x) => a + x.ms.mDone, 0), mTotal = months.reduce((a, x) => a + x.ms.mTotal, 0);
   const perfect = months.reduce((a, x) => a + x.ms.perfect, 0);
   const yearAvg = averageBetween(new Date(y, 0, 1), new Date(Math.min(new Date(y, 11, 31), new Date())));
@@ -5479,7 +5620,8 @@ function renderYearGrid(y) {
       const cell = document.createElement('span');
       if (date.getFullYear() !== y) { grid.append(cell); continue; }
       let cls = 'rounded-[3px] ';
-      if (k > tk) cls += 'bg-zinc-50 dark:bg-zinc-900';
+      if (isAnulado(k)) cls += 'day-off';
+      else if (k > tk) cls += 'bg-zinc-50 dark:bg-zinc-900';
       else if (k < S.startDate) { cls += 'day-x'; cell.title = 'antes do 1º uso'; }
       else {
         const p = completion(k);
@@ -5496,7 +5638,8 @@ function renderYearGrid(y) {
     const k = e.target.dataset?.k;
     if (!k) return;
     const date = parseKey(k), rec = peek(k), rows = [];
-    if (k > todayKey()) rows.push({ value: 'ainda não chegou', label: '' });
+    if (isAnulado(k)) rows.push({ value: 'dia anulado', label: 'não entra nas métricas' });
+    else if (k > todayKey()) rows.push({ value: 'ainda não chegou', label: '' });
     else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: '' });
     else {
       const p = completion(k);
@@ -5578,13 +5721,14 @@ function renderMonthCards(ys) {
     for (const d of ms.days) {
       const c = document.createElement('span');
       let cls = 'aspect-square rounded-[3px] ';
-      if (d.future) cls += 'bg-zinc-50 dark:bg-zinc-900';
+      if (d.off) cls += 'day-off';
+      else if (d.future) cls += 'bg-zinc-50 dark:bg-zinc-900';
       else if (d.k < S.startDate) cls += 'day-x';
       else if (d.free) cls += 'border border-zinc-200 dark:border-zinc-700';
       else cls += HEAT[heatLevel(d.p ?? 0)];
       if (d.k === tk) cls += ' ring-1 ring-zinc-900 dark:ring-zinc-100';
       c.className = cls;
-      c.title = `${d.date.getDate()} · ${d.k < S.startDate ? 'antes do 1º uso' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : d.p == null ? 'sem dados' : fmtPct(d.p)}`;
+      c.title = `${d.date.getDate()} · ${d.off ? 'dia anulado' : d.k < S.startDate ? 'antes do 1º uso' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : d.p == null ? 'sem dados' : fmtPct(d.p)}`;
       cal.append(c);
     }
 
@@ -5641,7 +5785,7 @@ function renderMonthDetail() {
   const prevSt = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
   const ms = monthStats(y, m);
   const dayKeys = [];
-  for (let d = parseKey(from); keyOf(d) <= to; d = addDays(d, 1)) dayKeys.push(keyOf(d));
+  for (let d = parseKey(from); keyOf(d) <= to; d = addDays(d, 1)) if (!isAnulado(keyOf(d))) dayKeys.push(keyOf(d));
   const recs = dayKeys.map((k) => [k, peek(k)]).filter(([, r]) => r);
 
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -6232,7 +6376,7 @@ function renderMonthDetail() {
       showX: showXDay,
       tip: (i) => {
         const d = ms.days[i], r = d.rec;
-        if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+        if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.off ? 'dia anulado' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
         const rows = [
           { value: fmtPct(d.p), label: 'hábitos do dia', color: 'var(--c-habit)', box: true },
           { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
@@ -6247,8 +6391,8 @@ function renderMonthDetail() {
     // 2. Gráfico diário de Sono (colunas) + Energia (linha 1–5)
     if (sleepChartHost) {
       const sMax = Math.max(10, Math.ceil(Math.max(0, ...sleeps)));
-      const dailySleep = ms.days.map((d) => (d.future || d.k < S.startDate ? null : d.rec?.sleep ?? null));
-      const dailyEnergy = ms.days.map((d) => (d.future || d.k < S.startDate ? null : d.rec?.energy > 0 ? d.rec.energy : null));
+      const dailySleep = ms.days.map((d) => (d.off || d.future || d.k < S.startDate ? null : d.rec?.sleep ?? null));
+      const dailyEnergy = ms.days.map((d) => (d.off || d.future || d.k < S.startDate ? null : d.rec?.energy > 0 ? d.rec.energy : null));
       columnChart(sleepChartHost, {
         n: ms.daysIn,
         max: sMax,
@@ -6261,9 +6405,12 @@ function renderMonthDetail() {
         showX: showXDay,
         tip: (i) => {
           const d = ms.days[i], r = d.rec, rows = [];
-          if (r?.sleep != null) rows.push({ value: fmtSleep(r.sleep), label: r.sleep >= goalH ? 'sono (na meta ✓)' : `sono (meta ${fmtSleep(goalH)})`, color: 'var(--c-goal)', box: true });
-          if (r?.energy > 0) rows.push({ value: `${r.energy}/5`, label: 'energia', color: 'var(--c-habit)' });
-          if (!rows.length) rows.push({ value: d.future ? 'ainda não chegou' : 'sem registro', label: '' });
+          if (d.off) rows.push({ value: 'dia anulado', label: '' });
+          else {
+            if (r?.sleep != null) rows.push({ value: fmtSleep(r.sleep), label: r.sleep >= goalH ? 'sono (na meta ✓)' : `sono (meta ${fmtSleep(goalH)})`, color: 'var(--c-goal)', box: true });
+            if (r?.energy > 0) rows.push({ value: `${r.energy}/5`, label: 'energia', color: 'var(--c-habit)' });
+            if (!rows.length) rows.push({ value: d.future ? 'ainda não chegou' : 'sem registro', label: '' });
+          }
           return { title: fmtDay.format(d.date), rows };
         },
       });
@@ -6271,7 +6418,7 @@ function renderMonthDetail() {
 
     // 3. Gráfico diário de Estudo (minutos por dia)
     if (studyChartHost) {
-      const dailyStudy = ms.days.map((d) => (d.future || d.k < S.startDate ? null : studyOf(d.rec)));
+      const dailyStudy = ms.days.map((d) => (d.off || d.future || d.k < S.startDate ? null : studyOf(d.rec)));
       const goalMinDay = Math.round(((S.settings.studyGoalH || 10) * 60) / 7);
       const maxMin = Math.max(60, Math.ceil(Math.max(...dailyStudy.filter(Boolean), goalMinDay) / 60) * 60);
       columnChart(studyChartHost, {
@@ -6286,8 +6433,8 @@ function renderMonthDetail() {
         showX: showXDay,
         tip: (i) => {
           const d = ms.days[i], mTot = studyOf(d.rec);
-          if (d.future || d.k < S.startDate || !mTot) {
-            return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : '0 min', label: 'sem estudo' }] };
+          if (d.off || d.future || d.k < S.startDate || !mTot) {
+            return { title: fmtDay.format(d.date), rows: [{ value: d.off ? 'dia anulado' : d.future ? 'ainda não chegou' : '0 min', label: d.off ? '' : 'sem estudo' }] };
           }
           const rows = [{ value: fmtMin(mTot), label: 'total do dia', color: 'var(--c-goal)', box: true }];
           for (const [sid, mv] of Object.entries(d.rec?.studyBy || {})) {
@@ -6677,7 +6824,27 @@ function renderTabs() {
    AÇÕES
    ========================================================= */
 function commit(...renders) { save(); renders.forEach((r) => r()); }
-const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); renderProjects(); renderPending(); };
+const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderSleep(); renderCheckinSummary(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); renderProjects(); renderPending(); if (currentTab() === 'meses') renderYear(); };
+
+/** Anula ou reativa um dia (`off: true`), excluindo-o das métricas gerais sem apagar registros existentes. */
+function toggleDayOff(k = selKey) {
+  const d = wday(k);
+  if (d.off) delete d.off; else d.off = true;
+  syncDay(k);
+  commit(renderDayNav, renderTasks, renderProgress);
+}
+/** Anula um conjunto de dias da semana (ou reativa todos se todos já estiverem anulados). */
+function toggleDaysOff(keys) {
+  const valid = keys.filter((k) => k >= S.startDate);
+  if (!valid.length) return;
+  const allOff = valid.every(isAnulado);
+  for (const k of valid) {
+    const d = wday(k);
+    if (allOff) delete d.off; else d.off = true;
+    syncDay(k);
+  }
+  commit(renderDayNav, renderTasks, renderProgress);
+}
 
 function toggleTask(id) {
   const d = wday();
@@ -7081,6 +7248,10 @@ $$('dialog').forEach((dlg) => {
 });
 $('#journal-open').onclick = () => { $('#journal-search').value = ''; renderJournal(); $('#journal').showModal(); };
 $('#journal-search').addEventListener('input', renderJournal);
+
+$('#skip-day').onclick = () => toggleDayOff(selKey);
+$('#day-skip-top').onclick = () => toggleDayOff(selKey);
+$('#skip-banner-undo').onclick = () => toggleDayOff(selKey);
 
 $('#reset-day').onclick = (e) => {
   const btn = e.currentTarget;
