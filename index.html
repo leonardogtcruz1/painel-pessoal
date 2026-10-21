@@ -246,15 +246,17 @@
         <button role="tab" data-tab="meses" class="rounded-md px-4 py-1.5 transition">Meses</button>
       </nav>
       <!-- Dia em edição: volta até 30 dias para registrar o que esqueceu -->
-      <div id="daynav" class="flex flex-wrap items-center gap-1 text-sm" title="Esqueceu de marcar? Volte até 30 dias">
-        <button id="day-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Dia anterior">
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <span id="day-label" class="min-w-[120px] text-center font-medium"></span>
-        <button id="day-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo dia">
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-        <button id="day-skip-top" type="button" class="ml-1 rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:border-zinc-400 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:text-white" title="Anula este dia (viagem, férias ou feriado) para não contar nas métricas">Anular dia</button>
+      <div id="daynav" class="flex flex-wrap items-center gap-1.5 text-sm" title="Esqueceu de marcar? Volte até 30 dias">
+        <div class="flex items-center gap-1">
+          <button id="day-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Dia anterior">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <span id="day-label" class="min-w-[120px] text-center font-medium"></span>
+          <button id="day-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo dia">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div id="top-skip-bar" class="flex flex-wrap items-center gap-1 border-l border-zinc-200 pl-2.5 text-[11px] text-zinc-500 dark:border-zinc-800"></div>
       </div>
     </div>
 
@@ -1300,11 +1302,11 @@ const isToday = () => selKey === todayKey();
 const isAnulado = (k) => !!peek(k)?.off;
 /** Leitura do dia em edição — não cria registro para dias passados só por olhar. */
 const rday = () => (isToday() ? day() : { ...blankDay(), ...peek(selKey) });
-/** Escrita no dia em edição. Registrar um dia antes do 1º uso passa a contá-lo no histórico. */
-function wday() {
-  if (selKey < S.startDate) S.startDate = selKey;
-  const fresh = !peek(selKey), d = day(selKey);
-  if (fresh) syncDay(selKey);   // sem isso o dia nasceria com total 0 e contaria como "dia livre"
+/** Escrita no dia em edição (ou na chave `k`). Registrar um dia antes do 1º uso passa a contá-lo no histórico. */
+function wday(k = selKey) {
+  if (k < S.startDate) S.startDate = k;
+  const fresh = !peek(k), d = day(k);
+  if (fresh) syncDay(k);   // sem isso o dia nasceria com total 0 e contaria como "dia livre"
   return d;
 }
 
@@ -2158,20 +2160,12 @@ function scheduleEditor(t) {
 }
 
 let editingTask = null, showOffTasks = false;
-function renderSkipBar(now) {
-  const voided = isAnulado(selKey);
-  const skipBtn = $('#skip-day');
-  skipBtn.textContent = voided ? 'Dia anulado ✓' : 'Anular dia';
-  skipBtn.setAttribute('aria-pressed', String(voided));
-  skipBtn.title = voided ? 'Reativar este dia nas métricas gerais' : 'Anula este dia (viagem, feriado, imprevisto) para não contar nas métricas gerais';
-  skipBtn.className = 'inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ' +
-    (voided ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100');
-
-  const bar = $('#skip-week-bar');
+function fillSkipBar(bar, now) {
+  if (!bar) return;
   bar.replaceChildren();
   const lbl = document.createElement('span');
   lbl.className = 'mr-0.5 text-zinc-400 dark:text-zinc-500';
-  lbl.textContent = 'Anular na semana:';
+  lbl.textContent = 'Anular dias:';
   bar.append(lbl);
 
   const ws = weekStart(now);
@@ -2179,7 +2173,7 @@ function renderSkipBar(now) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'rounded-md border px-1.5 py-0.5 text-[11px] font-medium transition ' + (on
-      ? 'border-amber-500/50 bg-amber-500/15 text-amber-800 line-through decoration-amber-600/70 dark:border-amber-400/40 dark:text-amber-300'
+      ? 'border-amber-500/60 bg-amber-500/15 text-amber-800 line-through decoration-amber-600/80 dark:border-amber-400/50 dark:text-amber-300'
       : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200') + (extra ? ' ' + extra : '');
     b.textContent = text;
     b.title = title;
@@ -2202,12 +2196,25 @@ function renderSkipBar(now) {
   sep.className = 'mx-0.5 text-zinc-300 dark:text-zinc-700';
   sep.textContent = '·';
   const wdKeys = wkKeys.slice(0, 5), weKeys = wkKeys.slice(5, 7);
-  const wdAllOff = wdKeys.every(isAnulado), weAllOff = weKeys.every(isAnulado);
+  const wdAllOff = wdKeys.every(isAnulado), weAllOff = weKeys.every(isAnulado), allWkOff = wkKeys.every(isAnulado);
   bar.append(
     sep,
-    mkChip('seg–sex', wdAllOff, wdAllOff ? 'Reativar segunda a sexta' : 'Anular segunda a sexta desta semana', () => toggleDaysOff(wdKeys, !wdAllOff)),
-    mkChip('fim de semana', weAllOff, weAllOff ? 'Reativar sábado e domingo' : 'Anular sábado e domingo desta semana', () => toggleDaysOff(weKeys, !weAllOff)),
+    mkChip('seg–sex', wdAllOff, wdAllOff ? 'Reativar segunda a sexta' : 'Anular segunda a sexta desta semana', () => toggleDaysOff(wdKeys)),
+    mkChip('fim de semana', weAllOff, weAllOff ? 'Reativar sábado e domingo' : 'Anular sábado e domingo desta semana', () => toggleDaysOff(weKeys)),
+    mkChip('semana', allWkOff, allWkOff ? 'Reativar a semana inteira' : 'Anular a semana inteira', () => toggleDaysOff(wkKeys)),
   );
+}
+function renderSkipBar(now) {
+  const voided = isAnulado(selKey);
+  const skipBtn = $('#skip-day');
+  skipBtn.textContent = voided ? 'Dia anulado ✓' : 'Anular dia';
+  skipBtn.setAttribute('aria-pressed', String(voided));
+  skipBtn.title = voided ? 'Reativar este dia nas métricas gerais' : 'Anula este dia (viagem, feriado, imprevisto) para não contar nas métricas gerais';
+  skipBtn.className = 'inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ' +
+    (voided ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100');
+
+  fillSkipBar($('#skip-week-bar'), now);
+  fillSkipBar($('#top-skip-bar'), now);
 }
 
 function renderTasks() {
@@ -4610,18 +4617,24 @@ function renderDayNav() {
   $('#past-text').textContent = back === 0 ? '' :
     `Editando ${new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date)}: foco, hábitos, sono, estudo manual, reflexão e métricas vão para esse dia.`;
   const off = isAnulado(selKey);
-  const topBtn = $('#day-skip-top');
-  if (topBtn) {
-    topBtn.textContent = off ? 'Dia anulado · reativar' : 'Anular dia';
-    topBtn.setAttribute('aria-pressed', String(off));
-    topBtn.className = 'ml-1 rounded-md border px-2.5 py-1 text-xs font-medium transition ' + (off
-      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-      : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:text-white');
+  fillSkipBar($('#top-skip-bar'), date);
+  const ws = weekStart(date);
+  const weekOffKeys = [];
+  for (let i = 0; i < 7; i++) {
+    const k = keyOf(addDays(ws, i));
+    if (isAnulado(k)) weekOffKeys.push(k);
   }
-  $('#skip-banner').classList.toggle('hidden', !off);
-  $('#skip-banner-text').textContent = off
-    ? `${back === 0 ? 'Hoje' : cap(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' }).format(date).replace(/\./g, ''))} está anulado (férias, viagem ou feriado) — não entra nas médias, metas semanais, ofensiva nem pendentes.`
-    : '';
+  const showBanner = off || weekOffKeys.length > 0;
+  $('#skip-banner').classList.toggle('hidden', !showBanner);
+  if (showBanner) {
+    const names = weekOffKeys.map((k) => fmtDay.format(parseKey(k)).replace(/\./g, ''));
+    $('#skip-banner-text').textContent = weekOffKeys.length > 1
+      ? `${weekOffKeys.length} dias anulados nesta semana (${names.join(' · ')}) — não contam nas médias, metas semanais, ofensiva nem pendentes.`
+      : `${cap(names[0] || fmtDay.format(date).replace(/\./g, ''))} está anulado (férias, viagem ou feriado) — não entra nas médias, metas semanais, ofensiva nem pendentes.`;
+    const undoBtn = $('#skip-banner-undo');
+    undoBtn.textContent = weekOffKeys.length > 1 ? 'Reativar todos' : 'Reativar dia';
+    undoBtn.onclick = () => toggleDaysOff(weekOffKeys.length ? weekOffKeys : [selKey]);
+  }
 }
 function setSelDay(k) {
   selKey = k;
@@ -6828,18 +6841,19 @@ const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); ren
 
 /** Anula ou reativa um dia (`off: true`), excluindo-o das métricas gerais sem apagar registros existentes. */
 function toggleDayOff(k = selKey) {
-  const d = wday(k);
+  const fresh = !peek(k), d = day(k);
+  if (fresh) syncDay(k);
   if (d.off) delete d.off; else d.off = true;
   syncDay(k);
   commit(renderDayNav, renderTasks, renderProgress);
 }
 /** Anula um conjunto de dias da semana (ou reativa todos se todos já estiverem anulados). */
 function toggleDaysOff(keys) {
-  const valid = keys.filter((k) => k >= S.startDate);
-  if (!valid.length) return;
-  const allOff = valid.every(isAnulado);
-  for (const k of valid) {
-    const d = wday(k);
+  if (!keys.length) return;
+  const allOff = keys.every(isAnulado);
+  for (const k of keys) {
+    const fresh = !peek(k), d = day(k);
+    if (fresh) syncDay(k);
     if (allOff) delete d.off; else d.off = true;
     syncDay(k);
   }
@@ -7250,7 +7264,6 @@ $('#journal-open').onclick = () => { $('#journal-search').value = ''; renderJour
 $('#journal-search').addEventListener('input', renderJournal);
 
 $('#skip-day').onclick = () => toggleDayOff(selKey);
-$('#day-skip-top').onclick = () => toggleDayOff(selKey);
 $('#skip-banner-undo').onclick = () => toggleDayOff(selKey);
 
 $('#reset-day').onclick = (e) => {
