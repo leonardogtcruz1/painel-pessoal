@@ -883,6 +883,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-baseline gap-3">
           <h2 class="text-sm font-semibold">Visão mensal</h2>
+          <span id="month-voided-badge" class="hidden rounded-full border border-dashed border-zinc-400 bg-zinc-100/70 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400"></span>
           <button id="mreview-open" class="btn-ghost -ml-1 text-xs">Reflexão do mês →</button>
         </div>
         <div class="flex items-center gap-1">
@@ -926,11 +927,12 @@
           </div>
           <p id="mf-note" class="mt-3 text-xs leading-relaxed text-zinc-500"></p>
 
-          <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-zinc-100 pt-5 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 dark:border-zinc-800">
+          <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-zinc-100 pt-5 sm:grid-cols-3 lg:grid-cols-5 dark:border-zinc-800">
             <div><p class="eyebrow">Dias 100%</p><p id="ms-perfect" class="mt-1 text-lg font-semibold">0</p></div>
             <div><p class="eyebrow">One Thing</p><p id="ms-one" class="mt-1 text-lg font-semibold">0</p></div>
             <div><p class="eyebrow">Estudo</p><p id="ms-study" class="mt-1 text-lg font-semibold">0m</p></div>
             <div><p class="eyebrow">Sono médio</p><p id="ms-sleep" class="mt-1 text-lg font-semibold">—</p></div>
+            <div title="Dias anulados (viagem, feriado, imprevisto) ficam fora das médias gerais"><p class="eyebrow">Anulados</p><p id="ms-voided" class="mt-1 text-lg font-semibold">0</p></div>
           </div>
 
           <div class="mt-6 border-t border-zinc-100 pt-5 dark:border-zinc-800">
@@ -960,20 +962,22 @@
               <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
               <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
               <span class="ml-1">100%</span>
+              <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-off"></span>anulado</span>
             </div>
           </div>
           <div id="contrib" class="mt-4 overflow-x-auto pb-1"></div>
-          <p class="mt-3 text-xs text-zinc-500">Cada coluna é uma semana (seg → dom). Embaixo: metas semanais concluídas.</p>
+          <p id="contrib-caption" class="mt-3 text-xs text-zinc-500">Cada coluna é uma semana (seg → dom). Embaixo: metas semanais concluídas.</p>
         </div>
       </div>
 
       <div class="mt-8 grid gap-8 border-t border-zinc-100 pt-6 lg:grid-cols-2 dark:border-zinc-800">
         <div>
           <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <p class="text-sm font-semibold">Evolução do mês</p>
+            <p class="text-sm font-semibold">Evolução do mês <span id="chart-month-sub" class="font-normal text-zinc-500"></span></p>
             <div class="flex items-center gap-3 text-xs text-zinc-500">
               <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Conclusão do dia</span>
               <span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-off"></span>Anulado</span>
             </div>
           </div>
           <div id="chart-month" class="relative mt-3 h-48"></div>
@@ -1029,6 +1033,7 @@
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
             <span class="ml-1">100%</span>
+            <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-off"></span>anulado</span>
           </div>
         </div>
         <div id="year-grid" class="mt-4 overflow-x-auto pb-2"></div>
@@ -1286,7 +1291,7 @@ function save() {
  * daquele dia para hábitos com quantidade (a meta fica gravada para o histórico não mudar).
  */
 const blankDay = () => ({ done: [], wk: [], qty: {}, tgt: {}, answers: {}, tags: [], total: 0, oneThing: '', oneDone: false, sleep: null, energy: 0,
-                          studyMin: 0, sessions: 0, topic: '', win: '', improve: '' });
+                          studyMin: 0, sessions: 0, topic: '', win: '', improve: '', offTasks: [] });
 /** Registro de um dia (cria se não existir). */
 function day(k = todayKey()) {
   if (!S.days[k]) S.days[k] = blankDay();
@@ -1325,7 +1330,7 @@ const scheduledOn = (t, date) => t.once ? keyOf(date) === t.once : !isWeekly(t) 
  * Não feita → vai para Pendentes; concluir depois grava `t.lateK`, descartar grava `t.dropK`.
  */
 const habits = () => S.tasks.filter((t) => !t.once);
-const wentPending = (t, tk = todayKey()) => !!t.once && t.once < tk && !isAnulado(t.once) && !peek(t.once)?.done?.includes(t.id);
+const wentPending = (t, tk = todayKey()) => !!t.once && t.once < tk && !isAnulado(t.once) && !peek(t.once)?.offTasks?.includes(t.id) && !peek(t.once)?.done?.includes(t.id);
 const pendingTasks = () => S.tasks.filter((t) => wentPending(t) && !t.lateK && !t.dropK).sort((a, b) => (a.once < b.once ? -1 : 1));
 const tasksFor = (date) => S.tasks.filter((t) => scheduledOn(t, date));
 const weeklyTasks = () => S.tasks.filter(isWeekly);
@@ -1350,6 +1355,10 @@ function syncDay(k = todayKey()) {
   const d = day(k), list = tasksFor(parseKey(k));
   const ids = new Set(list.map((t) => t.id));
   d.qty ||= {}; d.tgt ||= {}; d.wk ||= [];
+  d.offTasks = (d.offTasks || []).filter((id) => ids.has(id));
+  if (!d.offTasks.length) delete d.offTasks;
+  const offSet = new Set(d.offTasks || []);
+
   // Hábito que mudou entre "dias fixos" e "N por semana" leva a marcação do dia junto
   for (const t of S.tasks) {
     if (isWeekly(t) && d.done.includes(t.id)) { d.done = d.done.filter((x) => x !== t.id); if (!d.wk.includes(t.id)) d.wk.push(t.id); }
@@ -1357,9 +1366,10 @@ function syncDay(k = todayKey()) {
   }
   const wkIds = new Set(weeklyTasks().map((t) => t.id));
   d.wk = d.wk.filter((id) => wkIds.has(id));
-  d.done = d.done.filter((id) => ids.has(id));
+  d.done = d.done.filter((id) => ids.has(id) && !offSet.has(id));
   for (const id of Object.keys(d.qty)) if (!ids.has(id)) { delete d.qty[id]; delete d.tgt[id]; }
   for (const t of list) {
+    if (offSet.has(t.id)) { d.done = d.done.filter((x) => x !== t.id); continue; }
     // Hábito de check-in: feito quando as perguntas de nota/número do dia estão respondidas
     if (t.checkin) {
       const qs = checkinQs(), n = qs.filter((q) => d.answers?.[q.id] != null && d.answers[q.id] !== '').length;
@@ -1381,11 +1391,11 @@ function syncDay(k = todayKey()) {
     if (full && !has) d.done.push(t.id);
     if (!full && has) d.done = d.done.filter((x) => x !== t.id);
   }
-  // Meio feito: só hábitos de marcar previstos no dia e ainda não completos
+  // Meio feito: só hábitos de marcar previstos no dia e ainda não completos nem anulados
   const qtyIds = new Set(list.filter((t) => t.target || t.sleep || t.checkin).map((t) => t.id));
-  d.half = (d.half || []).filter((id) => ids.has(id) && !qtyIds.has(id) && !d.done.includes(id));
+  d.half = (d.half || []).filter((id) => ids.has(id) && !qtyIds.has(id) && !d.done.includes(id) && !offSet.has(id));
   if (!d.half.length) delete d.half;
-  d.total = ids.size;
+  d.total = list.filter((t) => !offSet.has(t.id)).length;
 }
 const syncToday = () => syncDay();
 /** Depois de mudar a lista de hábitos: ajusta hoje e o dia em edição (se já tiver registro). */
@@ -1429,18 +1439,19 @@ function holidays(y) {
   return (holidayCache[y] = map);
 }
 const holidayName = (date) => holidays(date.getFullYear())[keyOf(date)] || null;
-/** Hábitos completos valem 1; hábitos com quantidade valem a fração feita (14/20 pág = 0,7). */
+/** Hábitos completos valem 1; hábitos com quantidade valem a fração feita (14/20 pág = 0,7); hábitos anulados não contam. */
 function dayScore(d) {
   if (!d.total) return null;
-  const done = new Set(d.done);
+  const offSet = new Set(d.offTasks || []);
+  const done = new Set((d.done || []).filter((id) => !offSet.has(id)));
   let s = done.size;
-  for (const [id, v] of Object.entries(d.qty || {})) if (!done.has(id) && d.tgt?.[id]) s += Math.min(1, v / d.tgt[id]);
-  for (const id of d.half || []) if (!done.has(id)) s += 0.5;   // hábito de marcar feito pela metade
+  for (const [id, v] of Object.entries(d.qty || {})) if (!offSet.has(id) && !done.has(id) && d.tgt?.[id]) s += Math.min(1, v / d.tgt[id]);
+  for (const id of d.half || []) if (!offSet.has(id) && !done.has(id)) s += 0.5;   // hábito de marcar feito pela metade
   return Math.min(s, d.total) / d.total;
 }
 /** Minutos que um hábito vale num dia: pela unidade (min/hora) ou "cada vez vale X min" (`t.projectMin`). */
 function habitMinutes(t, rec) {
-  if (!rec) return 0;
+  if (!rec || rec.offTasks?.includes(t.id)) return 0;
   const f = t.target ? minPerUnit(t.unit) : 0;
   if (f) return Math.round((rec.qty?.[t.id] || 0) * f);
   const done = rec.done?.includes(t.id) || rec.wk?.includes(t.id);
@@ -1464,7 +1475,7 @@ function habitStudy(rec) {
 const studyOf = (rec) => (rec?.studyMin || 0) + habitStudy(rec).total;
 /** Quanto de um hábito foi feito num registro de dia (0–1). */
 function habitDone(rec, id) {
-  if (!rec) return 0;
+  if (!rec || rec.offTasks?.includes(id)) return 0;
   // Hábitos automáticos: calculados do próprio dado do dia (vale também para dias antes de criar o hábito)
   const auto = S.tasks.find((t) => t.id === id && (t.sleep || t.checkin));
   if (auto?.sleep) return rec.sleep == null ? 0 : Math.min(1, rec.sleep / auto.target);
@@ -1571,12 +1582,14 @@ function monthStats(y, m) {
   const tk = todayKey(), start = S.startDate;
   const days = [];
   let habitSum = 0, possible = 0, possibleElapsed = 0, perfect = 0, one = 0, study = 0; const sleeps = [];
+  let voided = 0;
   for (let i = 1; i <= daysIn; i++) {
     const date = new Date(y, m, i), k = keyOf(date), rec = peek(k), off = isAnulado(k);
     const future = k > tk, tracked = !future && k >= start;
     const p = tracked ? completion(k) : null;
     const free = off || (future ? !tasksFor(date).length || dayOff(date) : tracked && p == null);
     if (k >= start && !free) { possible++; if (!future) possibleElapsed++; }
+    if (off) voided++;
     if (p != null) habitSum += p;
     if (p === 1) perfect++;
     if (!off && rec?.oneDone) one++;
@@ -1607,7 +1620,7 @@ function monthStats(y, m) {
 
   return { daysIn, days, weeks, hasGoals, habitsPart, goalsPart, monthPart, fill, weights,
            pace: possible ? possibleElapsed / possible : 0,
-           perfect, one, study, sleepAvg: sleeps.length ? avg(sleeps) : null,
+           perfect, one, study, sleepAvg: sleeps.length ? avg(sleeps) : null, voided,
            goalsDone: weeks.reduce((a, w) => a + w.done, 0), goalsTotal: weeks.reduce((a, w) => a + w.total, 0),
            mDone: mg.filter((g) => g.done).length, mTotal: mg.length };
 }
@@ -1813,11 +1826,13 @@ function renderOne() {
 // ---------- Tarefas ----------
 const ICON_X = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const ICON_CAL = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>';
-const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-zinc-800 dark:hover:text-zinc-200';
+const ICON_BAN = '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5.7" y1="5.7" x2="18.3" y2="18.3"/></svg>';
+const ROW_BTN = 'rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 sm:opacity-35 sm:group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-zinc-800 dark:hover:text-zinc-200';
 
 /**
  * Linha de lista com checkbox + remover (hábitos e metas).
- * opts: { badge, onEdit, editing, off, qty } — `off` = hábito fora do dia (sem checkbox);
+ * opts: { badge, onEdit, editing, off, voided, onToggleVoid, qty } — `off` = hábito fora do dia (sem checkbox);
+ * `voided` = atividade anulada no dia (estilo .day-off, fora das métricas do dia);
  * `qty` = { value, target, unit, onSet } para hábitos com quantidade (mostra 14/20 pág).
  * `partial` = feito em parte → caixa amarela. `dragId`/`dragGroup` = linha arrastável (ver enableDrag).
  * `tag` = selo âmbar ao lado do nome (ex.: "Atrasada 1 semana"); `sub` = elemento extra embaixo do nome.
@@ -1827,10 +1842,18 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   const tog = onToggle;
   onToggle = (e) => { popKey = `${tone}|${title}`; tog(e); setTimeout(() => { popKey = null; }, 0); };
   const li = document.createElement('li');
-  li.className = 'group -mx-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-2 transition hover:bg-zinc-50 sm:flex-nowrap sm:gap-x-3 dark:hover:bg-zinc-800/40';
+  li.className = 'group -mx-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-2 transition hover:bg-zinc-50 sm:flex-nowrap sm:gap-x-3 dark:hover:bg-zinc-800/40' +
+    (opts.voided ? ' opacity-75' : '');
 
   let check;
-  if (opts.off) {
+  if (opts.voided) {
+    check = document.createElement('button');
+    check.type = 'button';
+    check.className = 'day-off flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition hover:opacity-100 cursor-pointer';
+    check.title = 'Atividade anulada hoje (clique para reativar)';
+    check.setAttribute('aria-label', `Reativar “${title}”`);
+    check.onclick = opts.onToggleVoid || onToggle;
+  } else if (opts.off) {
     check = document.createElement('span');
     check.className = 'flex h-5 w-5 shrink-0 items-center justify-center text-zinc-300 dark:text-zinc-700';
     check.textContent = '–';
@@ -1847,16 +1870,23 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
   textCol.className = 'flex min-w-0 flex-1 flex-col';
   const label = document.createElement('span');
   label.textContent = title;
-  label.title = title;
+  label.title = opts.voided ? `${title} (anulado hoje)` : title;
   label.className = 'select-none break-words text-sm transition ' +
-    (opts.off ? 'text-zinc-400 dark:text-zinc-500' : 'cursor-pointer ' + (on ? 'text-zinc-600 dark:text-zinc-300' : ''));
-  if (on && !opts.off) {
+    (opts.voided ? 'cursor-pointer text-zinc-400 line-through decoration-zinc-400/60 dark:text-zinc-500'
+     : opts.off ? 'text-zinc-400 dark:text-zinc-500'
+     : 'cursor-pointer ' + (on ? 'text-zinc-600 dark:text-zinc-300' : ''));
+  if (on && !opts.off && !opts.voided) {
     const c = tone === 'goal' ? 'var(--c-goal)' : tone === 'month' ? '#71717a' : 'rgb(var(--acc-500))';
     li.style.background = `color-mix(in srgb, ${c} 11%, transparent)`;
   }
-  if (!opts.off) label.onclick = onToggle;
+  if (!opts.off) label.onclick = opts.voided ? (opts.onToggleVoid || onToggle) : onToggle;
   textCol.append(label);
-  if (opts.tag) {
+  if (opts.voided) {
+    const tg = document.createElement('span');
+    tg.className = 'mt-0.5 self-start rounded-full border border-dashed border-zinc-400 bg-zinc-100/70 px-1.5 py-px text-[10px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400';
+    tg.textContent = 'anulado hoje';
+    textCol.append(tg);
+  } else if (opts.tag) {
     const tg = document.createElement('span');
     tg.className = 'mt-0.5 self-start rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400';
     tg.textContent = opts.tag;
@@ -1884,7 +1914,7 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     li.prepend(h);
   }
 
-  if (opts.qty && !opts.off) {
+  if (opts.qty && !opts.off && !opts.voided) {
     const q = opts.qty, box = document.createElement('span');
     const plClass = opts.dragId ? 'pl-8 sm:pl-0' : 'pl-7 sm:pl-0';
     box.className = `order-last flex w-full basis-full shrink-0 items-center gap-1 text-xs tabular-nums text-zinc-500 ${plClass} pt-0.5 sm:order-none sm:w-auto sm:basis-auto sm:pt-0`;
@@ -1930,6 +1960,17 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
 
   const actions = document.createElement('span');
   actions.className = 'flex shrink-0 items-center gap-0.5 sm:order-last';
+
+  if (opts.onToggleVoid) {
+    const vb = document.createElement('button');
+    vb.type = 'button';
+    vb.className = ROW_BTN + (opts.voided ? ' !opacity-100 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300' : '');
+    vb.setAttribute('aria-label', opts.voided ? `Reativar “${title}”` : `Anular “${title}” hoje`);
+    vb.title = opts.voided ? 'Reativar esta atividade hoje' : 'Anular esta atividade hoje (não conta nas métricas)';
+    vb.innerHTML = ICON_BAN;
+    vb.onclick = (e) => { e.stopPropagation(); opts.onToggleVoid(); };
+    actions.append(vb);
+  }
 
   if (opts.onEdit) {
     const ed = document.createElement('button');
@@ -2135,8 +2176,19 @@ function scheduleEditor(t) {
   // Ações
   const act = document.createElement('div');
   act.className = 'flex items-center justify-end gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800';
+  const isOffToday = (rday().offTasks || []).includes(t.id);
+  const voidTodayBtn = document.createElement('button');
+  voidTodayBtn.type = 'button';
+  voidTodayBtn.className = 'mr-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition ' +
+    (isOffToday
+      ? 'border-amber-500/60 bg-amber-500/15 text-amber-700 dark:border-amber-400/50 dark:text-amber-300'
+      : 'border-zinc-200 text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:text-zinc-100');
+  voidTodayBtn.innerHTML = `${ICON_BAN}<span>${isOffToday ? 'Reativar neste dia' : 'Anular neste dia'}</span>`;
+  voidTodayBtn.title = isOffToday ? 'Reativar esta atividade hoje' : 'Anula esta atividade hoje para não contar nas métricas';
+  voidTodayBtn.onclick = () => { toggleTaskOff(t.id); renderTasks(); };
+  act.append(voidTodayBtn);
   const err = document.createElement('span');
-  err.className = 'mr-auto text-xs text-rose-500';
+  err.className = 'text-xs text-rose-500';
   const cancel = document.createElement('button');
   cancel.type = 'button'; cancel.className = 'btn-ghost text-xs'; cancel.textContent = 'Fechar';
   cancel.onclick = () => { taskDraft = null; editingTask = null; renderTasks(); };
@@ -2245,13 +2297,15 @@ function renderTasks() {
   const projectName = (t) => S.projects.find((p) => p.id === t.projectId)?.name;
   const links = (t) => [metricName(t), projectName(t)].filter(Boolean).map((n) => `→ ${n}`);
   const row = (t, isOff) => {
+    const isTaskVoided = !isOff && !voided && (d.offTasks || []).includes(t.id);
     const badge = [schedLabel(t), t.sleep ? 'vem do card Sono' : '', t.checkin ? `vem do Check-in · ${d.qty?.[t.id] || 0}/${checkinQs().length}` : '', ...links(t)].filter(Boolean).join(' · ');
     const frac = habitDone(d, t.id);
     ul.append(checkRow(t.title, d.done.includes(t.id), () => toggleTask(t.id), () => removeTask(t.id), undefined, {
-      badge, off: isOff, editing: editingTask === t.id, partial: frac > 0 && frac < 1,
+      badge, off: isOff, voided: isTaskVoided, editing: editingTask === t.id, partial: frac > 0 && frac < 1,
       dragId: editingTask ? null : t.id, dragGroup: isOff ? 'off' : 'day',
       qty: t.target ? { value: d.qty?.[t.id] || 0, target: t.target, unit: t.unit, onSet: (v) => (t.sleep ? setSleep(v) : setQty(t.id, v)) } : null,
       onEdit: () => { editingTask = editingTask === t.id ? null : t.id; taskDraft = null; renderTasks(); },
+      onToggleVoid: isOff || voided ? null : () => toggleTaskOff(t.id),
     }));
     if (editingTask === t.id) ul.append(scheduleEditor(t));
   };
@@ -2286,7 +2340,9 @@ function renderTasks() {
     ul.append(li);
     if (showOffTasks) off.forEach((t) => row(t, true));
   }
-  $('#task-count').textContent = voided ? 'anulado' : today.length ? `${d.done.length}/${today.length}` : '';
+  const voidedTasksCount = today.filter((t) => (d.offTasks || []).includes(t.id)).length;
+  const activeCount = today.length - voidedTasksCount;
+  $('#task-count').textContent = voided ? 'anulado' : today.length ? `${d.done.length}/${activeCount}${voidedTasksCount ? ` (${voidedTasksCount} ${voidedTasksCount === 1 ? 'anulada' : 'anuladas'})` : ''}` : '';
   // Hábito que não move nenhum número é candidato a sair (ou a ganhar uma métrica)
   const loose = S.metrics.length ? habits().filter((t) => !t.metricId && !t.projectId && !t.study && !t.sleep && !t.checkin).length : 0;
   infoHint($('#task-loose'), loose ? String(loose) : '', `${loose} ${loose === 1 ? 'hábito não move' : 'hábitos não movem'} nenhuma métrica, projeto ou estudo`,
@@ -2534,8 +2590,10 @@ function renderKPIs() {
   countTo($('#kpi-today'), today == null ? '—' : fmtPct(today));
   paintTab(today);
   document.documentElement.classList.toggle('all-done', today === 1);
+  const voidedTodayN = (d.offTasks || []).filter((id) => tasksFor(now).some((t) => t.id === id)).length;
+  const activeN = n - voidedTodayN;
   $('#kpi-today-sub').textContent = isAnulado(k) ? 'dia anulado · não conta' : !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
-    : today === 1 ? 'tudo feito 🎉' : `${d.done.length} de ${n} hábitos`;
+    : today === 1 ? `tudo feito 🎉${voidedTodayN ? ` (${voidedTodayN} ${voidedTodayN === 1 ? 'anulada' : 'anuladas'})` : ''}` : `${d.done.length} de ${activeN} hábitos${voidedTodayN ? ` (${voidedTodayN} ${voidedTodayN === 1 ? 'anulada' : 'anuladas'})` : ''}`;
 
   const week = averageBetween(addDays(now, -6), now);
   countTo($('#kpi-week'), week ? fmtPct(week.value) : '—');
@@ -2583,7 +2641,7 @@ function renderHeatmap() {
     sq.type = 'button';
     sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${k < S.startDate ? 'day-x cursor-default' : off ? 'day-off cursor-pointer' : HEAT[lvl] + ' cursor-pointer'} ` +
       (k === selKey ? 'ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900' : k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
-    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${off ? 'dia anulado (não conta)' : p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${off ? 'dia anulado (não conta)' : p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.offTasks?.length ? ` (${rec.offTasks.length} ${rec.offTasks.length === 1 ? 'anulada' : 'anuladas'})` : ''}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
     if (k >= S.startDate) sq.onclick = () => setSelDay(k);
     const lbl = document.createElement('span');
     lbl.className = 'text-[10px] font-medium uppercase ' + (k === tk ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
@@ -2809,6 +2867,7 @@ function metricSeries(m) {
 }
 /** Quanto um hábito soma num dia: a quantidade feita (hábito de quantidade) ou 1 por vez. */
 function habitAmount(t, d, m) {
+  if (d?.offTasks?.includes(t.id)) return 0;
   if (t.target) {
     const q = d.qty?.[t.id] || 0, a = minPerUnit(t.unit), b = minPerUnit(m?.unit);
     return a && b ? (q * a) / b : q;   // hábito em horas → métrica em min (e vice-versa)
@@ -2918,6 +2977,7 @@ function adherence(tasks, fromK, toK) {
     const rec = peek(k);
     for (const t of tasks) {
       if (!scheduledOn(t, d)) continue;
+      if (rec?.offTasks?.includes(t.id)) continue;   // atividade anulada neste dia: fica fora do cálculo
       const v = habitDone(rec, t.id);
       if (autoDayOff(d) && v === 0) continue;   // dia opcional (só se fizer): não derruba a aderência quando fica em branco
       if (k === tk && v < 1) continue;          // hoje só conta se já foi feito
@@ -3405,12 +3465,12 @@ function periodStats(fromK, toK) {
   if (toK > tk) toK = tk;
   if (fromK < S.startDate) fromK = S.startDate;
   const res = { fromK, toK, days: 0, habitAvg: null, perfect: 0, zero: 0, study: 0, sleepAvg: null, energyAvg: null, habits: [], metrics: [],
-                learned: 0, retention: { ok: 0, n: 0, rate: null }, bySubject: {}, projects: [] };
+                learned: 0, retention: { ok: 0, n: 0, rate: null }, bySubject: {}, projects: [], voided: 0 };
   if (fromK > toK) return res;
   const ps = [], sleeps = [], energies = [];
   for (let d = parseKey(fromK); keyOf(d) <= toK; d = addDays(d, 1)) {
     const k = keyOf(d);
-    if (isAnulado(k)) continue;
+    if (isAnulado(k)) { res.voided++; continue; }
     const p = completion(k), r = peek(k);
     if (k === tk && (p == null || p < 1)) { res.study += studyOf(r); continue; }   // hoje ainda está em andamento
     if (p != null) { ps.push(p); if (p === 1) res.perfect++; if (p === 0) res.zero++; }
@@ -5015,10 +5075,17 @@ function renderMonth() {
   $('#month-next').disabled = view.y === cur.getFullYear() && view.m === cur.getMonth();
   $('#month-prev').disabled = keyOf(new Date(view.y, view.m, 0)) < S.startDate;
 
+  const vb = $('#month-voided-badge');
+  if (vb) {
+    vb.textContent = `${ms.voided} ${ms.voided === 1 ? 'anulado' : 'anulados'}`;
+    vb.classList.toggle('hidden', !ms.voided);
+  }
+
   $('#mf-value').textContent = fmtPct(ms.fill);
   $('#mf-bar').style.width = `${ms.fill * 100}%`;
   $('#mf-marker').style.left = `calc(${ms.pace * 100}% - 1px)`;
-  $('#mf-pace').textContent = ms.pace >= 1 ? 'mês encerrado' : `${fmtPct(ms.pace)} do mês já passou`;
+  $('#mf-pace').textContent = (ms.pace >= 1 ? 'mês encerrado' : `${fmtPct(ms.pace)} do mês já passou`) +
+    (ms.voided ? ` · ${ms.voided} ${ms.voided === 1 ? 'dia anulado' : 'dias anulados'}` : '');
   $('#mf-habits').textContent = fmtPct(ms.habitsPart);
   $('#mf-goals').textContent = ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal} · ${fmtPct(ms.goalsPart)}` : 'sem metas';
   $('#mf-mgoals').textContent = ms.mTotal ? `${ms.mDone}/${ms.mTotal} · ${fmtPct(ms.monthPart)}` : 'sem metas';
@@ -5027,12 +5094,14 @@ function renderMonth() {
   if (W.weekly) partsTxt.push(`${pctW(W.weekly)} metas semanais`);
   if (W.monthly) partsTxt.push(`${pctW(W.monthly)} metas do mês`);
   $('#mf-note').textContent = `O mês enche com ${partsTxt.join(' + ')}. O traço marca quanto do mês já passou — fique perto ou à frente dele.` +
-    (W.weekly && W.monthly ? '' : ' Metas semanais e do mês entram na conta assim que você cria a primeira.');
+    (W.weekly && W.monthly ? '' : ' Metas semanais e do mês entram na conta assim que você cria a primeira.') +
+    (ms.voided ? ` (${ms.voided} ${ms.voided === 1 ? 'dia anulado não entra' : 'dias anulados não entram'} nas métricas).` : '');
   renderMonthGoals();
   $('#ms-perfect').textContent = ms.perfect;
   $('#ms-one').textContent = `${ms.one} ${ms.one === 1 ? 'dia' : 'dias'}`;
   $('#ms-study').textContent = fmtMin(ms.study);
   $('#ms-sleep').textContent = ms.sleepAvg != null ? fmtSleep(ms.sleepAvg) : '—';
+  if ($('#ms-voided')) $('#ms-voided').textContent = `${ms.voided} ${ms.voided === 1 ? 'dia' : 'dias'}`;
 
   renderContrib(ms);
   renderCharts();
@@ -5092,7 +5161,8 @@ function renderContrib(ms) {
         else if (info.free) rows.push({ value: 'dia livre', label: 'clique para anular' });
         else if (info.p == null) rows.push({ value: 'sem registro', label: 'clique para anular' });
         else {
-          rows.push({ value: fmtPct(info.p), label: `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0})`, color: 'var(--c-habit)', box: true });
+          const offN = rec?.offTasks?.length || 0;
+          rows.push({ value: fmtPct(info.p), label: `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0}${offN ? ` · ${offN} anulada(s)` : ''})`, color: 'var(--c-habit)', box: true });
           if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
           if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
           if (rec?.sleep != null) rows.push({ value: fmtSleep(rec.sleep), label: 'de sono' });
@@ -5119,6 +5189,11 @@ function renderContrib(ms) {
     grid.append(s);
   }
   wrap.append(grid);
+  const caption = $('#contrib-caption');
+  if (caption) {
+    caption.textContent = 'Cada coluna é uma semana (seg → dom). Embaixo: metas semanais concluídas.' +
+      (ms.voided ? ` · ${ms.voided} ${ms.voided === 1 ? 'dia anulado (fora das métricas)' : 'dias anulados (fora das métricas)'}.` : '');
+  }
 }
 
 // ---------- Revisão da semana ----------
@@ -5364,16 +5439,62 @@ function columnChart(host, cfg) {
   svg.append(wash);
   const cx = (i) => m.l + band * i + band / 2;
 
-  for (let i = 0; i < cfg.n; i++) {
-    cfg.series.forEach((s, j) => {
-      const v = s.values[i];
-      if (v == null) return;
-      const x = cx(i) - groupW / 2 + j * (bw + gap);
-      const h = v > 0 ? Math.max(2, (Math.min(max, v) / max) * ph) : 2;
-      const col = s.colorOf ? s.colorOf(v, i) : s.color;
-      const op = v > 0 ? (s.opacityOf ? s.opacityOf(v, i) : 1) : 0.35;
-      svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: col, opacity: op }));
+  let patId = null;
+  if (cfg.isVoided) {
+    patId = 'pat-void-' + Math.random().toString(36).slice(2, 8);
+    const defs = svgEl('defs');
+    const pat = svgEl('pattern', {
+      id: patId,
+      width: 6,
+      height: 6,
+      patternUnits: 'userSpaceOnUse',
+      patternTransform: 'rotate(45)'
     });
+    pat.append(svgEl('line', {
+      x1: 0, y1: 0, x2: 0, y2: 6,
+      stroke: 'var(--c-axis)',
+      'stroke-width': 1.2,
+      opacity: 0.5
+    }));
+    defs.append(pat);
+    svg.append(defs);
+  }
+
+  for (let i = 0; i < cfg.n; i++) {
+    if (cfg.isVoided && cfg.isVoided(i)) {
+      const vx = cx(i) - groupW / 2;
+      svg.append(svgEl('rect', {
+        x: vx, y: m.t, width: groupW, height: ph, rx: 3,
+        fill: `url(#${patId})`,
+        opacity: 0.75
+      }));
+      svg.append(svgEl('rect', {
+        x: vx, y: m.t, width: groupW, height: ph, rx: 3,
+        fill: 'none',
+        stroke: 'var(--c-axis)',
+        'stroke-width': 1,
+        'stroke-dasharray': '3 2',
+        opacity: 0.75
+      }));
+      svg.append(svgEl('line', {
+        x1: vx + 0.5, y1: m.t + ph - 0.5,
+        x2: vx + groupW - 0.5, y2: m.t + 0.5,
+        stroke: 'var(--c-axis)',
+        'stroke-width': 1.2,
+        'stroke-linecap': 'round',
+        opacity: 0.7
+      }));
+    } else {
+      cfg.series.forEach((s, j) => {
+        const v = s.values[i];
+        if (v == null) return;
+        const x = cx(i) - groupW / 2 + j * (bw + gap);
+        const h = v > 0 ? Math.max(2, (Math.min(max, v) / max) * ph) : 2;
+        const col = s.colorOf ? s.colorOf(v, i) : s.color;
+        const op = v > 0 ? (s.opacityOf ? s.opacityOf(v, i) : 1) : 0.35;
+        svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: col, opacity: op }));
+      });
+    }
     if (cfg.showX(i)) {
       const t = svgEl('text', { x: cx(i), y: H - 5, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--c-axis)', class: 'tabular-nums' });
       t.textContent = cfg.xLabel(i);
@@ -5432,15 +5553,27 @@ function renderCharts() {
   const daily = ms.days.map((d) => (d.p == null ? null : d.p * 100));
   let sum = 0, cnt = 0;
   const running = daily.map((v) => (v == null ? null : ((sum += v), ++cnt, sum / cnt)));
+  const voidedDays = ms.days.filter((d) => d.off).length;
+  if ($('#chart-month-sub')) $('#chart-month-sub').textContent = voidedDays ? `· ${voidedDays} ${voidedDays === 1 ? 'anulado' : 'anulados'}` : '';
   columnChart($('#chart-month'), {
     n: ms.daysIn,
     series: [{ values: daily, color: 'var(--c-habit)' }],
     line: { values: running, color: 'var(--c-avg)' },
+    isVoided: (i) => ms.days[i]?.off,
     xLabel: (i) => String(i + 1),
     showX: (i) => i === 0 || i === ms.daysIn - 1 || ((i + 1) % 5 === 0 && ms.daysIn - (i + 1) >= 3),
     tip: (i) => {
       const d = ms.days[i];
-      if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.off ? 'dia anulado' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+      if (d.off) {
+        return {
+          title: fmtDay.format(d.date),
+          rows: [
+            { value: 'dia anulado', label: 'fora das métricas', color: 'var(--c-axis)', box: true },
+            ...(d.rec?.done?.length ? [{ value: `${d.rec.done.length} hábitos`, label: 'marcados (não contam)' }] : [])
+          ]
+        };
+      }
+      if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
       return { title: fmtDay.format(d.date), rows: [
         { value: fmtPct(d.p), label: 'conclusão do dia', color: 'var(--c-habit)', box: true },
         { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
@@ -5455,13 +5588,15 @@ function renderCharts() {
   const weeks = [];
   for (let i = 7; i >= 0; i--) {
     const start = addDays(anchor, -7 * i), vals = [];
+    let voidedW = 0;
     for (let d = 0; d < 7; d++) {
       const k = keyOf(addDays(start, d));
+      if (isAnulado(k)) voidedW++;
       if (k >= S.startDate && k <= tk) { const p = completion(k); if (p != null) vals.push(p); }
     }
     const wk = keyOf(start), g = S.weeks[wk]?.goals || [];
     weeks.push({ start, habit: vals.length ? avg(vals) * 100 : null, goal: g.length ? (g.filter((x) => x.done).length / g.length) * 100 : null,
-                 gDone: g.filter((x) => x.done).length, gTotal: g.length, days: vals.length });
+                 gDone: g.filter((x) => x.done).length, gTotal: g.length, days: vals.length, voided: voidedW });
   }
   columnChart($('#chart-week'), {
     n: weeks.length,
@@ -5471,10 +5606,12 @@ function renderCharts() {
     showX: () => true,
     tip: (i) => {
       const w = weeks[i];
-      return { title: `Semana de ${fmtShort.format(w.start)}`, rows: [
-        { value: w.habit == null ? '—' : `${Math.round(w.habit)}%`, label: w.habit == null ? 'hábitos: sem registro' : `hábitos · média de ${w.days} ${w.days === 1 ? 'dia' : 'dias'}`, color: 'var(--c-habit)', box: true },
+      const rows = [
+        { value: w.habit == null ? '—' : `${Math.round(w.habit)}%`, label: w.habit == null ? 'hábitos: sem registro' : `hábitos · média de ${w.days} ${w.days === 1 ? 'dia' : 'dias'}${w.voided ? ` (${w.voided} ${w.voided === 1 ? 'anulado' : 'anulados'})` : ''}`, color: 'var(--c-habit)', box: true },
         { value: w.gTotal ? `${w.gDone}/${w.gTotal}` : '—', label: w.gTotal ? 'metas concluídas' : 'sem metas', color: 'var(--c-goal)', box: true },
-      ] };
+      ];
+      if (w.voided) rows.push({ value: `${w.voided} ${w.voided === 1 ? 'anulado' : 'anulados'}`, label: 'fora da média semanal' });
+      return { title: `Semana de ${fmtShort.format(w.start)}`, rows };
     },
   });
 }
@@ -5685,11 +5822,13 @@ function renderYearChart() {
     tip: (i) => {
       const x = ys.months[i], title = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(ys.y, i, 1)));
       if (x.status !== 'active') return { title, rows: [{ value: x.status === 'future' ? 'ainda não chegou' : 'sem dados', label: '' }] };
-      return { title, rows: [
+      const rows = [
         { value: x.habitAvg == null ? '—' : fmtPct(x.habitAvg), label: 'hábitos (média)', color: 'var(--c-habit)', box: true },
         { value: x.ms.goalsTotal ? `${x.ms.goalsDone}/${x.ms.goalsTotal}` : '—', label: x.ms.goalsTotal ? 'metas semanais' : 'sem metas semanais', color: 'var(--c-goal)', box: true },
         { value: fmtPct(x.ms.fill), label: 'mês preenchido' },
-      ] };
+      ];
+      if (x.ms.voided) rows.push({ value: `${x.ms.voided} ${x.ms.voided === 1 ? 'anulado' : 'anulados'}`, label: 'dias fora das métricas' });
+      return { title, rows };
     },
   });
 }
@@ -5749,7 +5888,7 @@ function renderMonthCards(ys) {
     foot.className = 'space-y-0.5 text-xs text-zinc-500';
     const lines = x.status === 'future' ? ['ainda não chegou']
       : x.status === 'before' ? ['antes do 1º uso']
-      : [[x.habitAvg == null ? null : `hábitos ${fmtPct(x.habitAvg)}`, ms.study ? `estudo ${fmtMin(ms.study)}` : null],
+      : [[x.habitAvg == null ? null : `hábitos ${fmtPct(x.habitAvg)}`, ms.study ? `estudo ${fmtMin(ms.study)}` : null, ms.voided ? `${ms.voided} ${ms.voided === 1 ? 'anulado' : 'anulados'}` : null],
          [ms.goalsTotal ? `metas semanais ${ms.goalsDone}/${ms.goalsTotal}` : null, ms.mTotal ? `do mês ${ms.mDone}/${ms.mTotal}` : null],
          [goalsRatingAvg(S.months[monthKey(ys.y, x.m)]?.goals || []) != null ? `nota das metas ${fmtNum(+goalsRatingAvg(S.months[monthKey(ys.y, x.m)].goals).toFixed(1))}/5` : null]]
           .map((l) => l.filter(Boolean).join(' · ')).filter(Boolean);
@@ -5854,6 +5993,9 @@ function renderMonthDetail() {
     el('h2', 'text-xl font-semibold tracking-tight sm:text-2xl', cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)))),
     el('span', 'rounded-full bg-emerald-500/15 px-2.5 py-0.5 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-300', `${fmtPct(ms.fill)} preenchido`)
   );
+  if (ms.voided) {
+    titleRow.append(el('span', 'rounded-full border border-dashed border-zinc-400 bg-zinc-100/70 px-2.5 py-0.5 font-mono text-xs font-semibold text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300', `${ms.voided} ${ms.voided === 1 ? 'dia anulado' : 'dias anulados'}`));
+  }
   ttl.append(titleRow);
   if (first < S.startDate) ttl.append(el('p', 'mt-1 text-xs text-zinc-500', `Painel em uso desde ${fmtShort.format(parseKey(S.startDate)).replace('.', '')} — dias anteriores não contam.`));
 
@@ -5886,11 +6028,12 @@ function renderMonthDetail() {
   const one = recs.filter(([, r]) => r.oneThing).length, oneDone = recs.filter(([, r]) => r.oneDone).length;
   const sleeps = recs.filter(([, r]) => r.sleep != null).map(([, r]) => r.sleep);
   const dh = st.habitAvg != null && prevSt.habitAvg != null ? Math.round((st.habitAvg - prevSt.habitAvg) * 100) : null;
-  const kpiGrid = el('div', 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6');
+  const kpiGrid = el('div', 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7');
   kpiGrid.append(
     statCard('Hábitos (média)', st.habitAvg == null ? '—' : fmtPct(st.habitAvg),
       dh != null ? `${dh > 0 ? '+' : ''}${dh} pts vs mês anterior` : `em ${st.days} ${st.days === 1 ? 'dia' : 'dias'}`),
     statCard('Dias 100%', String(st.perfect), `de ${st.days} ${st.days === 1 ? 'dia' : 'dias'} · ${st.zero} com 0%`),
+    statCard('Anulados', `${ms.voided} ${ms.voided === 1 ? 'dia' : 'dias'}`, ms.voided ? 'fora das médias' : 'nenhum anulado'),
     statCard('Metas', ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—',
       ms.mTotal && ms.goalsTotal ? `do mês · ${ms.goalsDone}/${ms.goalsTotal} semanais` : ms.mTotal ? 'metas do mês' : ms.goalsTotal ? 'metas semanais' : 'sem metas'),
     statCard('Estudo total', fmtMin(st.study), `${st.learned} ${st.learned === 1 ? 'tópico aprendido' : 'tópicos aprendidos'}`),
@@ -5904,8 +6047,9 @@ function renderMonthDetail() {
   const dailyLegend = el('div', 'flex flex-wrap items-center gap-3 text-xs text-zinc-500');
   dailyLegend.innerHTML =
     '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Conclusão do dia</span>' +
-    '<span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>';
-  const dailyPanel = panel('Ritmo diário no mês', 'Conclusão diária de hábitos e evolução da média ao longo dos dias', dailyLegend);
+    '<span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>' +
+    '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-off"></span>Anulado</span>';
+  const dailyPanel = panel('Ritmo diário no mês', `Conclusão diária de hábitos e evolução da média ao longo dos dias${ms.voided ? ` · ${ms.voided} ${ms.voided === 1 ? 'anulado' : 'anulados'}` : ''}`, dailyLegend);
   const dailyChartHost = el('div', 'relative mt-3 h-44 w-full');
   dailyPanel.append(dailyChartHost);
   box.append(dailyPanel);
@@ -6385,11 +6529,21 @@ function renderMonthDetail() {
       n: ms.daysIn,
       series: [{ values: daily, color: 'var(--c-habit)' }],
       line: { values: running, color: 'var(--c-avg)' },
+      isVoided: (i) => ms.days[i]?.off,
       xLabel: (i) => String(i + 1),
       showX: showXDay,
       tip: (i) => {
         const d = ms.days[i], r = d.rec;
-        if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.off ? 'dia anulado' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+        if (d.off) {
+          return {
+            title: fmtDay.format(d.date),
+            rows: [
+              { value: 'dia anulado', label: 'fora das métricas', color: 'var(--c-axis)', box: true },
+              ...(r?.done?.length ? [{ value: `${r.done.length} hábitos`, label: 'marcados (não contam)' }] : [])
+            ]
+          };
+        }
+        if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
         const rows = [
           { value: fmtPct(d.p), label: 'hábitos do dia', color: 'var(--c-habit)', box: true },
           { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
@@ -6414,6 +6568,7 @@ function renderMonthDetail() {
         refLine: { value: goalH, color: 'var(--c-axis)' },
         series: [{ values: dailySleep, color: 'var(--c-goal)', opacityOf: (v) => (v >= goalH ? 1 : 0.45) }],
         line: energies.length ? { values: dailyEnergy, max: 5, color: 'var(--c-habit)', dots: true, showLast: false } : null,
+        isVoided: (i) => ms.days[i]?.off,
         xLabel: (i) => String(i + 1),
         showX: showXDay,
         tip: (i) => {
@@ -6442,6 +6597,7 @@ function renderMonthDetail() {
         padL: 38,
         refLine: { value: goalMinDay, color: 'var(--c-axis)' },
         series: [{ values: dailyStudy, color: 'var(--c-goal)', opacityOf: (v) => (v >= goalMinDay ? 1 : 0.65) }],
+        isVoided: (i) => ms.days[i]?.off,
         xLabel: (i) => String(i + 1),
         showX: showXDay,
         tip: (i) => {
@@ -6860,8 +7016,28 @@ function toggleDaysOff(keys) {
   commit(renderDayNav, renderTasks, renderProgress);
 }
 
+/** Anula ou reativa uma atividade/hábito específico num dia (não conta nas métricas daquele dia). */
+function toggleTaskOff(id, k = selKey) {
+  const d = wday(k);
+  d.offTasks ||= [];
+  if (d.offTasks.includes(id)) {
+    d.offTasks = d.offTasks.filter((x) => x !== id);
+    if (!d.offTasks.length) delete d.offTasks;
+  } else {
+    d.offTasks.push(id);
+    d.done = (d.done || []).filter((x) => x !== id);
+    if (d.half) {
+      d.half = d.half.filter((x) => x !== id);
+      if (!d.half.length) delete d.half;
+    }
+  }
+  syncDay(k);
+  commit(renderTasks, renderProgress);
+}
+
 function toggleTask(id) {
   const d = wday();
+  if (d.offTasks?.includes(id)) return toggleTaskOff(id, selKey);
   syncDay(selKey);
   const t = S.tasks.find((x) => x.id === id);
   if (t?.checkin) { $('#checkin').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
@@ -7279,7 +7455,7 @@ $('#reset-day').onclick = (e) => {
   btn.textContent = 'Zerar dia';
   btn.classList.remove('text-rose-500');
   const d = wday();
-  d.done = []; d.qty = {}; d.wk = []; delete d.half;
+  d.done = []; d.qty = {}; d.wk = []; delete d.half; delete d.offTasks;
   syncDay(selKey);
   commit(renderTasks, renderProgress);
 };
