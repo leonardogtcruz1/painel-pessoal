@@ -279,12 +279,6 @@
         <button id="past-back" class="font-medium underline decoration-dotted underline-offset-2">Voltar para hoje</button>
       </div>
     </div>
-    <div id="skip-banner" class="hidden rounded-xl border border-zinc-300/80 bg-zinc-100/90 px-4 py-2.5 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <span id="skip-banner-text"></span>
-        <button id="skip-banner-undo" type="button" class="font-medium underline decoration-dotted underline-offset-2 hover:text-zinc-900 dark:hover:text-white">Reativar dia</button>
-      </div>
-    </div>
 
     <!-- ============ REVISÕES: gaveta lateral no computador, no fluxo no celular ============ -->
     <div id="drawer" class="space-y-4 sm:space-y-5" aria-label="Revisões">
@@ -4691,25 +4685,7 @@ function renderDayNav() {
   $('#past-banner').classList.toggle('hidden', back === 0);
   $('#past-text').textContent = back === 0 ? '' :
     `Editando ${new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date)}: foco, hábitos, sono, estudo manual, reflexão e métricas vão para esse dia.`;
-  const off = isAnulado(selKey);
   fillSkipBar($('#top-skip-bar'), date);
-  const ws = weekStart(date);
-  const weekOffKeys = [];
-  for (let i = 0; i < 7; i++) {
-    const k = keyOf(addDays(ws, i));
-    if (isAnulado(k)) weekOffKeys.push(k);
-  }
-  const showBanner = off || weekOffKeys.length > 0;
-  $('#skip-banner').classList.toggle('hidden', !showBanner);
-  if (showBanner) {
-    const names = weekOffKeys.map((k) => fmtDay.format(parseKey(k)).replace(/\./g, ''));
-    $('#skip-banner-text').textContent = weekOffKeys.length > 1
-      ? `${weekOffKeys.length} dias anulados nesta semana (${names.join(' · ')}) — não contam nas médias, metas semanais, ofensiva nem pendentes.`
-      : `${cap(names[0] || fmtDay.format(date).replace(/\./g, ''))} está anulado (férias, viagem ou feriado) — não entra nas médias, metas semanais, ofensiva nem pendentes.`;
-    const undoBtn = $('#skip-banner-undo');
-    undoBtn.textContent = weekOffKeys.length > 1 ? 'Reativar todos' : 'Reativar dia';
-    undoBtn.onclick = () => toggleDaysOff(weekOffKeys.length ? weekOffKeys : [selKey]);
-  }
 }
 function setSelDay(k) {
   selKey = k;
@@ -7467,7 +7443,6 @@ $('#journal-open').onclick = () => { $('#journal-search').value = ''; renderJour
 $('#journal-search').addEventListener('input', renderJournal);
 
 $('#skip-day').onclick = () => toggleDayOff(selKey);
-$('#skip-banner-undo').onclick = () => toggleDayOff(selKey);
 
 $('#reset-day').onclick = (e) => {
   const btn = e.currentTarget;
