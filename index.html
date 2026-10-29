@@ -1250,6 +1250,36 @@ function loadState() {
 
 let S = loadState();
 
+const isHourUnit = (u) => /^(h|hr|hrs|hora|horas)\.?$/i.test((u || '').trim());
+
+/** Converte tarefas diárias medidas em horas para minutos (meta * 60, unidade 'min'). */
+function migrateHourTasks() {
+  let changed = false;
+  for (const t of S.tasks) {
+    if (t.sleep) continue;
+    if (t.target && isHourUnit(t.unit)) {
+      const oldTarget = t.target;
+      const newTarget = oldTarget <= 8 ? Math.round(oldTarget * 60) : oldTarget;
+      t.target = newTarget;
+      t.unit = 'min';
+      changed = true;
+      for (const d of Object.values(S.days || {})) {
+        if (d.qty && d.qty[t.id] != null) {
+          const oldVal = d.qty[t.id];
+          d.qty[t.id] = oldVal <= 8 ? Math.round(oldVal * 60) : oldVal;
+        }
+        if (d.tgt && d.tgt[t.id] != null) {
+          const oldTgt = d.tgt[t.id];
+          d.tgt[t.id] = oldTgt <= 8 ? Math.round(oldTgt * 60) : oldTgt;
+        }
+      }
+    }
+  }
+  if (changed) {
+    resync();
+  }
+}
+
 /*
  * Carimbo de edição para a sincronização: cada dia/semana/mês guarda `u`
  * (momento da última mudança). save() compara uma assinatura de cada registro
@@ -1935,8 +1965,9 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     pf.style.width = `${Math.min(100, ((q.value || 0) / q.target) * 100)}%`;
     pr.append(pf);
     textCol.append(pr);
-    // − e + com passo proporcional à meta
-    const stepBy = q.target <= 10 ? 1 : q.target <= 60 ? 5 : 10;
+    // − e + com passo proporcional à meta (em minutos, passos de 5 min facilitam aulas e vídeos)
+    const isMin = q.unit === 'min' || q.unit === 'm';
+    const stepBy = isMin ? (q.target >= 60 ? 5 : 5) : (q.target <= 10 ? 1 : q.target <= 60 ? 5 : 10);
     const stepBtn = (sign) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -1951,7 +1982,7 @@ function checkRow(title, on, onToggle, onRemove, tone, opts = {}) {
     inp.value = q.value || '';
     inp.placeholder = '0';
     inp.setAttribute('aria-label', `Quanto de “${title}”`);
-    inp.className = 'w-12 rounded-md border border-zinc-200 bg-transparent px-1.5 py-0.5 text-right text-sm font-medium text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:text-zinc-100';
+    inp.className = 'w-14 rounded-md border border-zinc-200 bg-transparent px-1.5 py-0.5 text-right text-sm font-medium text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:text-zinc-100';
     inp.onchange = () => q.onSet(inp.value === '' ? 0 : Number(inp.value));
     inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); };
     const of = document.createElement('span');
@@ -2012,7 +2043,10 @@ function emptyRow(text) {
  */
 let taskDraft = null;
 function scheduleEditor(t) {
-  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: t.target || '', unit: t.unit || '', metricId: t.metricId || '', projectId: t.projectId || '', metricAdd: !!t.metricAdd, projectMin: t.projectMin || '', study: t.study ? t.studySubject || '*' : '',
+  const isHr = !t.sleep && isHourUnit(t.unit);
+  const initUnit = isHr ? 'min' : (t.unit || '');
+  const initTarget = isHr ? Math.round((t.target || 1) * 60) : (t.target || '');
+  if (taskDraft?.id !== t.id) taskDraft = { id: t.id, qty: !!t.target, target: initTarget, unit: initUnit, metricId: t.metricId || '', projectId: t.projectId || '', metricAdd: !!t.metricAdd, projectMin: t.projectMin || '', study: t.study ? t.studySubject || '*' : '',
                                               weeklyMode: isWeekly(t), onceMode: !!t.once, weekly: t.weekly || 3 };
   const dr = taskDraft;
   const wrapLi = document.createElement('li');
@@ -2094,18 +2128,37 @@ function scheduleEditor(t) {
     row.className = 'mt-2 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500';
     const tg = document.createElement('input');
     tg.type = 'number'; tg.min = '0'; tg.step = 'any'; tg.inputMode = 'decimal';
-    tg.value = dr.target; tg.placeholder = '20';
+    tg.value = dr.target; tg.placeholder = '60';
     tg.className = small + ' w-20';
     tg.setAttribute('aria-label', 'Meta por dia');
     tg.oninput = () => { dr.target = tg.value; };
     const un = document.createElement('input');
-    un.value = dr.unit; un.placeholder = 'pág'; un.maxLength = 10;
+    un.value = dr.unit; un.placeholder = 'min'; un.maxLength = 10;
     un.className = small + ' w-24';
     un.setAttribute('aria-label', 'Unidade');
     un.oninput = () => { dr.unit = un.value; };
     const l = document.createElement('span'); l.textContent = 'Meta por dia:';
     row.append(l, tg, un);
-    qBox.append(row);
+
+    const unitPills = document.createElement('div');
+    unitPills.className = 'mt-1.5 flex flex-wrap items-center gap-1.5';
+    const uChip = (lbl, unitVal, defTgt) => chip(lbl, dr.unit === unitVal, () => {
+      dr.unit = unitVal;
+      if (!dr.target || dr.target === '1') dr.target = String(defTgt);
+      renderTasks();
+    });
+    unitPills.append(
+      uChip('min (tempo)', 'min', 60),
+      uChip('pág', 'pág', 20),
+      uChip('vezes', 'vezes', 1),
+    );
+    qBox.append(row, unitPills);
+    if (!t.sleep && isHourUnit(dr.unit)) {
+      const tip = document.createElement('p');
+      tip.className = 'mt-1.5 text-xs text-amber-600 dark:text-amber-400';
+      tip.textContent = 'Tempo diário é registrado em minutos (ex.: 60 min em vez de 1h) para facilitar anotar aulas com duração picada.';
+      qBox.append(tip);
+    }
   }
 
   // 3. Métrica de resultado
@@ -2139,7 +2192,7 @@ function scheduleEditor(t) {
   const projs = S.projects.filter((p) => p.status !== 'done' || p.id === dr.projectId);
   const pBox = document.createElement('div');
   pBox.append(sectionLabel('Projeto que este hábito move',
-    projs.length ? 'Cada dia feito conta como avanço do projeto. Se o hábito for medido em min ou horas, o tempo entra no projeto (1 hora = 60 min).'
+    projs.length ? 'Cada dia feito conta como avanço do projeto. Se o hábito for medido em minutos, o tempo entra direto no projeto.'
       : 'Crie um projeto no card "Projetos" para ligar este hábito a ele.'));
   const psel = document.createElement('select');
   psel.className = small + ' mt-1.5 w-full max-w-xs';
@@ -2178,7 +2231,7 @@ function scheduleEditor(t) {
     sBox.append(r);
   } else if (dr.study && minUnit) {
     const h = document.createElement('p'); h.className = 'mt-1 text-xs text-zinc-500';
-    h.textContent = `Medido em ${dr.unit.trim()}: o tempo feito entra direto (1 hora = 60 min).`;
+    h.textContent = dr.unit.trim() === 'min' ? 'Medido em minutos: o tempo feito entra direto no total de estudo do dia.' : `Medido em ${dr.unit.trim()}: o tempo feito entra direto.`;
     sBox.append(h);
   }
 
@@ -2204,12 +2257,17 @@ function scheduleEditor(t) {
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button'; saveBtn.className = 'btn-primary !py-1.5 text-xs'; saveBtn.textContent = 'Salvar';
   saveBtn.onclick = () => {
-    const target = Number(dr.target);
-    if (!dr.weeklyMode && dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 20).'; return; }
+    let target = Number(dr.target);
+    let unit = (dr.unit || '').trim();
+    if (!t.sleep && isHourUnit(unit)) {
+      target = Math.round((target || 1) * 60);
+      unit = 'min';
+    }
+    if (!dr.weeklyMode && dr.qty && !(target > 0)) { err.textContent = 'Informe a meta por dia (ex.: 60 min ou 20 pág).'; return; }
     taskDraft = null; editingTask = null;
     const qty = !dr.weeklyMode && dr.qty;
     const once = dr.onceMode ? t.once || selKey : null;
-    setTaskConfig(t.id, { once, ...(once ? {} : { lateK: null, dropK: null }), target: qty ? target : null, unit: qty ? dr.unit.trim() || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
+    setTaskConfig(t.id, { once, ...(once ? {} : { lateK: null, dropK: null }), target: qty ? target : null, unit: qty ? unit || null : null, metricId: dr.metricId || null, projectId: dr.projectId || null,
                           metricAdd: dr.metricId && dr.metricAdd ? true : null, projectMin: (dr.projectId || dr.study) && Number(dr.projectMin) > 0 ? Math.round(Number(dr.projectMin)) : null,
                           study: dr.study ? true : null, studySubject: dr.study && dr.study !== '*' ? dr.study : null,
                           weekly: dr.weeklyMode && !once ? dr.weekly : null, ...(dr.weeklyMode || once ? { days: null } : {}) });
@@ -7099,6 +7157,10 @@ function setTaskConfig(id, patch) {
   const t = S.tasks.find((x) => x.id === id);
   if (!t) return;
   const wasWeekly = isWeekly(t);
+  if (!t.sleep && patch.unit && isHourUnit(patch.unit)) {
+    if (patch.target != null) patch.target = Math.round(Number(patch.target) * 60);
+    patch.unit = 'min';
+  }
   for (const [k, v] of Object.entries(patch)) { if (v == null) delete t[k]; else t[k] = v; }
   // Mudou entre "dias fixos" e "N por semana": leva o histórico junto (senão a aderência some)
   if (wasWeekly !== isWeekly(t)) {
@@ -7622,6 +7684,7 @@ function adoptRemote(r) {
   const base = freshState();
   S = { ...base, ...r, tasks: r.tasks || [], settings: { ...base.settings, ...r.settings, ...keep } };
   delete S.pristine;
+  migrateHourTasks();
   rememberSigs();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
   return true;
@@ -7805,6 +7868,7 @@ function rollDay() {
 }
 function renderAll(openReflection = true) {
   migrateMetrics();
+  migrateHourTasks();
   syncToday();
   carryGoals();
   save();
