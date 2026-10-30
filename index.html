@@ -1077,6 +1077,58 @@
         <!-- Injetado por JS -->
       </div>
 
+      <!-- ============ COLETÂNEA DE DADOS & GRÁFICOS DE EVOLUÇÃO ============ -->
+      <section id="evo-charts-card" class="card space-y-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              <p class="eyebrow">Coletânea & Análise Visual</p>
+            </div>
+            <h3 class="mt-1 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Gráficos da Minha Evolução
+            </h3>
+            <p class="mt-0.5 text-xs text-zinc-500">
+              Acompanhe sua trajetória em gráficos claros. Os dados reais comprovam visualmente que você não está estagnado.
+            </p>
+          </div>
+
+          <!-- Controles do Gráfico -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Seletor de Métrica -->
+            <div id="evo-chart-metric-tabs" class="inline-flex rounded-xl bg-zinc-100 p-1 text-xs font-semibold dark:bg-[#1F1F1F]">
+              <button id="evo-cm-habits" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">📊 Hábitos & Metas</button>
+              <button id="evo-cm-study" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">📚 Estudo</button>
+              <button id="evo-cm-sleep" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">🌙 Sono & Energia</button>
+            </div>
+            <!-- Seletor de Período do Gráfico -->
+            <div id="evo-chart-scope-tabs" class="inline-flex rounded-xl bg-zinc-100 p-1 text-xs font-semibold dark:bg-[#1F1F1F]">
+              <button id="evo-cs-weeks" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">Semanas (10)</button>
+              <button id="evo-cs-months" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">Meses</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coletânea de Dados Acumulados (Cards Resumo da Evolução) -->
+        <div id="evo-aggregate-stats" class="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <!-- Injetado por JS: Média Geral de Hábitos, Total de Metas Concluídas, Horas de Estudo, Dias 100%, Conquistas Registradas -->
+        </div>
+
+        <!-- Legenda e Título do Gráfico Ativo -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+          <p id="evo-chart-title" class="font-semibold text-zinc-800 dark:text-zinc-200"></p>
+          <div id="evo-chart-legend" class="flex flex-wrap items-center gap-3 text-zinc-500"></div>
+        </div>
+
+        <!-- Host do Gráfico SVG -->
+        <div id="evo-chart-host" class="relative h-56 w-full"></div>
+
+        <!-- Diagnóstico / Insight do Gráfico -->
+        <div id="evo-chart-insight" class="rounded-xl border border-emerald-500/20 bg-emerald-50/30 p-3.5 text-xs leading-relaxed text-zinc-700 dark:border-emerald-500/20 dark:bg-emerald-950/20 dark:text-zinc-300">
+          <!-- Injetado por JS -->
+        </div>
+      </section>
+
       <!-- 3. Linha do Tempo da Minha Evolução (Histórico Antiestagnação) -->
       <section class="card space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
@@ -5889,6 +5941,14 @@ new ResizeObserver(() => {
   cancelAnimationFrame(resizeRafYear);
   resizeRafYear = requestAnimationFrame(() => { if (currentTab() === 'meses') { renderYearGrid(viewYear); renderYearChart(); if (monthOpen && mdChartRender) mdChartRender(); } });
 }).observe($('#chart-year'));
+let resizeRafEvo;
+const evoHost = $('#evo-chart-host');
+if (evoHost) {
+  new ResizeObserver(() => {
+    cancelAnimationFrame(resizeRafEvo);
+    resizeRafEvo = requestAnimationFrame(() => { if (currentTab() === 'evolucao') renderEvolutionCharts(); });
+  }).observe(evoHost);
+}
 
 // ---------- Tooltip ----------
 const tipEl = $('#tip');
@@ -7452,6 +7512,7 @@ function renderEvolutionTab() {
   }
 
   renderEvolutionEditor(rec, hints, isWeek);
+  renderEvolutionCharts();
   renderEvolutionTimeline();
 }
 
@@ -7985,6 +8046,390 @@ function renderEvolutionTimeline() {
   }
 }
 
+let evoChartMetric = 'habits';
+let evoChartScope = 'weeks';
+
+function renderEvolutionCharts() {
+  const host = $('#evo-chart-host');
+  const panel = $('#view-evolucao');
+  if (!host || !panel || panel.classList.contains('hidden')) return;
+
+  // 1. Atualizar botões de controle
+  const bHabits = $('#evo-cm-habits'), bStudy = $('#evo-cm-study'), bSleep = $('#evo-cm-sleep');
+  const bWeeks = $('#evo-cs-weeks'), bMonths = $('#evo-cs-months');
+
+  const activeBtnCls = 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100';
+  const inactiveBtnCls = 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100';
+
+  if (bHabits && bStudy && bSleep) {
+    bHabits.className = `rounded-lg px-2.5 py-1 text-xs transition font-semibold ${evoChartMetric === 'habits' ? activeBtnCls : inactiveBtnCls}`;
+    bStudy.className = `rounded-lg px-2.5 py-1 text-xs transition font-semibold ${evoChartMetric === 'study' ? activeBtnCls : inactiveBtnCls}`;
+    bSleep.className = `rounded-lg px-2.5 py-1 text-xs transition font-semibold ${evoChartMetric === 'sleep' ? activeBtnCls : inactiveBtnCls}`;
+    bHabits.onclick = () => { evoChartMetric = 'habits'; renderEvolutionCharts(); };
+    bStudy.onclick = () => { evoChartMetric = 'study'; renderEvolutionCharts(); };
+    bSleep.onclick = () => { evoChartMetric = 'sleep'; renderEvolutionCharts(); };
+  }
+
+  if (bWeeks && bMonths) {
+    bWeeks.className = `rounded-lg px-2.5 py-1 text-xs transition font-semibold ${evoChartScope === 'weeks' ? activeBtnCls : inactiveBtnCls}`;
+    bMonths.className = `rounded-lg px-2.5 py-1 text-xs transition font-semibold ${evoChartScope === 'months' ? activeBtnCls : inactiveBtnCls}`;
+    bWeeks.onclick = () => { evoChartScope = 'weeks'; renderEvolutionCharts(); };
+    bMonths.onclick = () => { evoChartScope = 'months'; renderEvolutionCharts(); };
+  }
+
+  // 2. Coletânea Acumulada de Todo o Histórico
+  const aggHost = $('#evo-aggregate-stats');
+  if (aggHost) {
+    const allDayKeys = Object.keys(S.days).filter((k) => k >= S.startDate && k <= todayKey() && !isAnulado(k)).sort();
+    let totalCompletions = 0, totalHabitDays = 0, totalStudyMin = 0, totalPerfectDays = 0;
+    for (const k of allDayKeys) {
+      const c = completion(k);
+      if (c != null) {
+        totalCompletions += c;
+        totalHabitDays++;
+        if (c >= 0.999) totalPerfectDays++;
+      }
+      const d = peek(k);
+      if (d) totalStudyMin += studyOf(d);
+    }
+    const overallHabitPct = totalHabitDays ? (totalCompletions / totalHabitDays) : null;
+
+    let totalGoalsDone = 0, totalGoalsCount = 0;
+    for (const w of Object.values(S.weeks || {})) {
+      if (Array.isArray(w.goals)) {
+        for (const g of w.goals) {
+          totalGoalsCount++;
+          if (g.done) totalGoalsDone++;
+        }
+      }
+    }
+    for (const m of Object.values(S.months || {})) {
+      if (Array.isArray(m.goals)) {
+        for (const g of m.goals) {
+          totalGoalsCount++;
+          if (g.done) totalGoalsDone++;
+        }
+      }
+    }
+
+    let totalWinsLogged = 0;
+    for (const w of Object.values(S.weeks || {})) {
+      if (w.refl?.wins && w.refl.wins.trim()) totalWinsLogged++;
+    }
+    for (const m of Object.values(S.months || {})) {
+      if (m.refl?.wins && m.refl.wins.trim()) totalWinsLogged++;
+    }
+
+    const aggItems = [
+      {
+        label: 'Adesão Geral',
+        val: overallHabitPct != null ? fmtPct(overallHabitPct) : '—',
+        sub: `${totalHabitDays} dias avaliados`,
+        icon: '📊',
+        color: 'text-emerald-600 dark:text-emerald-400'
+      },
+      {
+        label: 'Metas Batidas',
+        val: totalGoalsCount ? `${totalGoalsDone}` : '—',
+        sub: totalGoalsCount ? `${fmtPct(totalGoalsDone / totalGoalsCount)} de ${totalGoalsCount} metas` : 'sem metas',
+        icon: '🎯',
+        color: 'text-lime-600 dark:text-lime-400'
+      },
+      {
+        label: 'Horas de Estudo',
+        val: fmtMin(totalStudyMin),
+        sub: `${(totalStudyMin / 60).toFixed(0)}h dedicadas`,
+        icon: '📚',
+        color: 'text-indigo-600 dark:text-indigo-400'
+      },
+      {
+        label: 'Dias 100% Impecáveis',
+        val: String(totalPerfectDays),
+        sub: 'todos os hábitos feitos',
+        icon: '⭐',
+        color: 'text-amber-500'
+      },
+      {
+        label: 'Evoluções Anotadas',
+        val: String(totalWinsLogged),
+        sub: 'marcos registrados',
+        icon: '🚀',
+        color: 'text-rose-500'
+      }
+    ];
+
+    aggHost.replaceChildren();
+    for (const a of aggItems) {
+      const card = document.createElement('div');
+      card.className = 'rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800/80 dark:bg-zinc-800/30';
+      card.innerHTML = `
+        <p class="eyebrow flex items-center justify-between">${a.label} <span class="text-sm">${a.icon}</span></p>
+        <p class="mt-1 text-lg font-bold tabular-nums ${a.color}">${a.val}</p>
+        <p class="mt-0.5 text-[11px] text-zinc-500">${a.sub}</p>
+      `;
+      aggHost.append(card);
+    }
+  }
+
+  // 3. Montar dados para o gráfico ativo
+  const now = new Date();
+  const titleEl = $('#evo-chart-title');
+  const legendEl = $('#evo-chart-legend');
+  const insightEl = $('#evo-chart-insight');
+
+  const items = [];
+  if (evoChartScope === 'weeks') {
+    const curW = weekStart(now);
+    const nWeeks = 10;
+    for (let i = nWeeks - 1; i >= 0; i--) {
+      const ws = addDays(curW, -i * 7);
+      const wk = keyOf(ws);
+      const sum = weekSummary(ws);
+      const hPct = sum.habit != null ? sum.habit * 100 : null;
+      const gPct = sum.goalsTotal ? (sum.goalsDone / sum.goalsTotal) * 100 : null;
+      items.push({
+        label: `${ws.getDate()}/${ws.getMonth() + 1}`,
+        tipTitle: `Semana de ${fmtRange(ws)}`,
+        habitPct: hPct,
+        goalPct: gPct,
+        goalsDone: sum.goalsDone,
+        goalsTotal: sum.goalsTotal,
+        studyHours: sum.study ? sum.study / 60 : 0,
+        studyMin: sum.study || 0,
+        sleepHours: sum.sleep ?? null
+      });
+    }
+  } else {
+    const curY = now.getFullYear(), curM = now.getMonth();
+    const startM = Math.max(0, curM - 7);
+    for (let m = startM; m <= curM; m++) {
+      const mk = monthKey(curY, m);
+      const ms = monthStats(curY, m);
+      const first = keyOf(new Date(curY, m, 1)), last = keyOf(new Date(curY, m + 1, 0));
+      const ps = periodStats(first, last);
+      const mDate = new Date(curY, m, 1);
+      const mLabel = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(mDate).replace('.', '');
+      const hPct = ps.habitAvg != null ? ps.habitAvg * 100 : null;
+      const gTotal = ms.mTotal || ms.goalsTotal;
+      const gDone = ms.mTotal ? ms.mDone : ms.goalsDone;
+      const gPct = gTotal ? (gDone / gTotal) * 100 : null;
+      items.push({
+        label: cap(mLabel),
+        tipTitle: cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(mDate)),
+        habitPct: hPct,
+        goalPct: gPct,
+        goalsDone: gDone,
+        goalsTotal: gTotal,
+        studyHours: ps.study ? ps.study / 60 : 0,
+        studyMin: ps.study || 0,
+        sleepHours: ps.sleepAvg ?? null
+      });
+    }
+  }
+
+  // Linha de média móvel acumulada
+  let sumH = 0, cntH = 0;
+  const runningHabits = items.map((it) => {
+    if (it.habitPct == null) return null;
+    sumH += it.habitPct;
+    cntH++;
+    return sumH / cntH;
+  });
+
+  // 4. Configurar e renderizar o gráfico específico
+  if (evoChartMetric === 'habits') {
+    if (titleEl) {
+      titleEl.textContent = evoChartScope === 'weeks'
+        ? 'Evolução Semanal de Adesão a Hábitos e Metas'
+        : 'Evolução Mensal de Adesão a Hábitos e Metas';
+    }
+    if (legendEl) {
+      legendEl.innerHTML = `
+        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-[var(--c-habit)]"></span> % Hábitos</span>
+        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-[var(--c-goal)]"></span> % Metas</span>
+        <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-3.5 rounded-full bg-[var(--c-avg)]"></span> Tendência Média</span>
+      `;
+    }
+
+    columnChart(host, {
+      n: items.length,
+      max: 100,
+      ticks: [0, 25, 50, 75, 100],
+      yFmt: (v) => `${v}%`,
+      series: [
+        { values: items.map((it) => it.habitPct), color: 'var(--c-habit)' },
+        { values: items.map((it) => it.goalPct), color: 'var(--c-goal)' }
+      ],
+      line: {
+        values: runningHabits,
+        color: 'var(--c-avg)',
+        dots: true,
+        fmt: (v) => `${Math.round(v)}%`
+      },
+      xLabel: (i) => items[i].label,
+      showX: () => true,
+      tip: (i) => {
+        const it = items[i];
+        const rH = runningHabits[i];
+        return {
+          title: it.tipTitle,
+          rows: [
+            { label: 'Adesão a Hábitos', value: it.habitPct != null ? `${Math.round(it.habitPct)}%` : '—', color: 'var(--c-habit)' },
+            { label: 'Metas Batidas', value: it.goalPct != null ? `${Math.round(it.goalPct)}% (${it.goalsDone}/${it.goalsTotal})` : '—', color: 'var(--c-goal)' },
+            { label: 'Média de Tendência', value: rH != null ? `${Math.round(rH)}%` : '—', color: 'var(--c-avg)' }
+          ]
+        };
+      }
+    });
+  } else if (evoChartMetric === 'study') {
+    const isWeek = evoChartScope === 'weeks';
+    const goalH = isWeek ? (S.settings.studyGoalH || 10) : ((S.settings.studyGoalH || 10) * 4);
+    const studyHoursList = items.map((it) => it.studyHours);
+    const maxH = Math.max(goalH + 2, Math.ceil(Math.max(0, ...studyHoursList) + 1));
+
+    let sumS = 0, cntS = 0;
+    const runningStudy = items.map((it) => {
+      sumS += it.studyHours;
+      cntS++;
+      return sumS / cntS;
+    });
+
+    if (titleEl) {
+      titleEl.textContent = isWeek
+        ? 'Horas de Estudo por Semana vs Meta'
+        : 'Horas de Estudo por Mês vs Meta';
+    }
+    if (legendEl) {
+      legendEl.innerHTML = `
+        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-indigo-500"></span> Horas Estudadas</span>
+        <span class="inline-flex items-center gap-1.5"><span class="h-0.5 w-3.5 border-b border-dashed border-zinc-400"></span> Meta (${goalH}h)</span>
+        <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-3.5 rounded-full bg-emerald-500"></span> Média Móvel</span>
+      `;
+    }
+
+    columnChart(host, {
+      n: items.length,
+      max: maxH,
+      ticks: [0, Math.round(maxH / 2), maxH],
+      yFmt: (v) => `${v}h`,
+      series: [
+        { values: studyHoursList, color: '#6366f1' }
+      ],
+      refLine: { value: goalH, color: 'var(--c-axis)' },
+      line: {
+        values: runningStudy,
+        color: '#10b981',
+        dots: true,
+        fmt: (v) => `${v.toFixed(1)}h`
+      },
+      xLabel: (i) => items[i].label,
+      showX: () => true,
+      tip: (i) => {
+        const it = items[i];
+        const rS = runningStudy[i];
+        return {
+          title: it.tipTitle,
+          rows: [
+            { label: 'Tempo Estudado', value: fmtMin(it.studyMin), color: '#6366f1' },
+            { label: 'Meta Planejada', value: `${goalH}h`, color: 'var(--c-axis)' },
+            { label: 'Média de Volume', value: `${rS.toFixed(1)}h`, color: '#10b981' }
+          ]
+        };
+      }
+    });
+  } else if (evoChartMetric === 'sleep') {
+    const targetSleep = (sleepHabit()?.target || 8);
+    const sleeps = items.map((it) => it.sleepHours);
+    const maxS = Math.max(10, Math.ceil(Math.max(0, ...sleeps.filter(Boolean)) + 1));
+
+    if (titleEl) {
+      titleEl.textContent = evoChartScope === 'weeks'
+        ? 'Média de Sono Semanal vs Meta'
+        : 'Média de Sono Mensal vs Meta';
+    }
+    if (legendEl) {
+      legendEl.innerHTML = `
+        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-sky-500"></span> Horas de Sono</span>
+        <span class="inline-flex items-center gap-1.5"><span class="h-0.5 w-3.5 border-b border-dashed border-zinc-400"></span> Meta (${targetSleep}h)</span>
+      `;
+    }
+
+    columnChart(host, {
+      n: items.length,
+      max: maxS,
+      ticks: [0, Math.round(maxS / 2), maxS],
+      yFmt: (v) => `${v}h`,
+      series: [
+        { values: sleeps, color: '#0ea5e9' }
+      ],
+      refLine: { value: targetSleep, color: 'var(--c-axis)' },
+      xLabel: (i) => items[i].label,
+      showX: () => true,
+      tip: (i) => {
+        const it = items[i];
+        return {
+          title: it.tipTitle,
+          rows: [
+            { label: 'Sono Médio', value: it.sleepHours != null ? fmtSleep(it.sleepHours) : '—', color: '#0ea5e9' },
+            { label: 'Meta de Descanso', value: `${targetSleep}h`, color: 'var(--c-axis)' }
+          ]
+        };
+      }
+    });
+  }
+
+  // 5. Diagnóstico de Evolução / Antiestagnação Dinâmico
+  if (insightEl) {
+    const validHabits = items.map((x) => x.habitPct).filter((x) => x != null);
+    if (validHabits.length >= 2) {
+      const mid = Math.floor(validHabits.length / 2);
+      const firstHalf = validHabits.slice(0, mid);
+      const secondHalf = validHabits.slice(mid);
+      const avg1 = Math.round(firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length);
+      const avg2 = Math.round(secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length);
+      const diff = avg2 - avg1;
+
+      if (diff > 2) {
+        insightEl.innerHTML = `
+          <p class="font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+            <span class="text-base">📈</span> Evolução Comprovada: Subida de +${diff} pontos percentuais!
+          </p>
+          <p class="mt-1 text-zinc-700 dark:text-zinc-300">
+            Seus dados comprovam que sua consistência recente (<strong>${avg2}%</strong> de adesão) superou o início do período analisado (<strong>${avg1}%</strong>). Você <strong>não está estagnado</strong>: sua rotina está gerando tração real e hábitos mais sólidos. Continue aplicando o plano de ação acima!
+          </p>
+        `;
+      } else if (diff >= -2) {
+        insightEl.innerHTML = `
+          <p class="font-semibold text-indigo-800 dark:text-indigo-300 flex items-center gap-1.5">
+            <span class="text-base">🛡️</span> Consistência Sólida: Ritmo estável em ${avg2}% de execução.
+          </p>
+          <p class="mt-1 text-zinc-700 dark:text-zinc-300">
+            A impressão de estagnação muitas vezes surge quando a rotina se torna natural, mas <strong>sustentar a consistência ao longo do tempo é a maior vitória</strong>. Sua taxa manteve-se firme (${avg1}% → ${avg2}%). Para atingir o próximo patamar, foque em 1 meta chave no plano de ação acima.
+          </p>
+        `;
+      } else {
+        insightEl.innerHTML = `
+          <p class="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+            <span class="text-base">⚠️</span> Ponto de Atenção Identificado: Oscilação de ${avg1}% para ${avg2}%.
+          </p>
+          <p class="mt-1 text-zinc-700 dark:text-zinc-300">
+            Houve uma leve queda na regularidade nos períodos recentes. Isso não anula seu progresso anterior nem significa estagnação permanente: é apenas um sinal para calibrar a rotina. Use as anotações do card acima ("O que eu pequei") para simplificar as metas e recuperar a tração.
+          </p>
+        `;
+      }
+    } else {
+      insightEl.innerHTML = `
+        <p class="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+          <span>📊</span> Gráficos de Evolução Ativados
+        </p>
+        <p class="mt-1 text-zinc-600 dark:text-zinc-400">
+          Conforme você registrar seus hábitos diários e reflexões periódicas, os gráficos traçarão sua linha de tendência e diagnósticos comparativos automáticos para comprovar sua evolução no tempo.
+        </p>
+      `;
+    }
+  }
+}
+
 // ---------- Abas ----------
 function currentTab() {
   const h = location.hash.replace(/^#/, '');
@@ -8462,7 +8907,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !documen
 // Cards recolhíveis: ▾ no título; o que fica recolhido é lembrado neste aparelho
 const COLLAPSIBLE = { improve: '#improve-list', tasks: '#task-list', pending: '#pending-list', study: '#study-today', goals: '#goal-list',
   heat: '#heatmap', sleep: '#sleep-input', checkin: '#checkin', metrics: '#metric-list', projects: '#project-list',
-  money: '#exp-stats', insights: '#insight-list', month: '#month-card', evotoday: '#evo-today-body' };
+  money: '#exp-stats', insights: '#insight-list', month: '#month-card', evotoday: '#evo-today-body', evocharts: '#evo-chart-host' };
 let collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('evolution-collapsed')) || []; } catch (e) { return []; } })());
 for (const [key, sel] of Object.entries(COLLAPSIBLE)) {
   const sec = $(sel)?.closest('section');
