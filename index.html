@@ -255,6 +255,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200/90 bg-white p-2 sm:px-3 sm:py-2 dark:border-[#272727] dark:bg-[#181818]">
       <nav id="tabs" role="tablist" aria-label="Seções" class="inline-flex rounded-xl bg-zinc-100 p-1 text-sm font-semibold dark:bg-[#1F1F1F]">
         <button role="tab" data-tab="hoje" class="rounded-lg px-4 py-1.5 transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">Hoje</button>
+        <button role="tab" data-tab="evolucao" class="rounded-lg px-4 py-1.5 transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">Evolução</button>
         <button role="tab" data-tab="meses" class="rounded-lg px-4 py-1.5 transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">Meses</button>
       </nav>
       <!-- Dia em edição: volta até 30 dias para registrar o que esqueceu -->
@@ -434,6 +435,18 @@
             </button>
           </form>
           <p class="mt-2 text-xs leading-snug text-zinc-500">Marque ⭐ para virar prioridade. Os pontos ficam na reflexão da semana; a <button id="improve-review" type="button" class="underline decoration-dotted underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300">revisão completa</button> tem sugestões tiradas dos seus dados.</p>
+        </section>
+
+        <!-- ============ EVOLUÇÃO DA SEMANA (RESUMO & ACESSO RÁPIDO) ============ -->
+        <section id="evo-today-card" class="card">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+              <h2 class="text-sm font-semibold">Minha evolução nesta semana</h2>
+            </div>
+            <button id="evo-today-btn" type="button" class="btn-ghost -mr-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">Ver / Anotar →</button>
+          </div>
+          <div id="evo-today-body" class="mt-3 text-xs leading-relaxed"></div>
         </section>
 
         <!-- ============ KPIs ============ -->
@@ -1005,6 +1018,104 @@
 
     </div><!-- /view-hoje -->
 
+    <!-- ============ ABA EVOLUÇÃO — anotações semanais/mensais e histórico antiestagnação ============ -->
+    <div id="view-evolucao" role="tabpanel" class="hidden space-y-4 sm:space-y-6">
+      <!-- 1. Header do Painel de Evolução -->
+      <section class="card">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              <p class="eyebrow">Retrospectiva & Registro de Crescimento</p>
+            </div>
+            <h2 class="mt-1 text-xl font-bold tracking-tight sm:text-2xl text-zinc-900 dark:text-zinc-100">
+              Anotações de Evolução
+            </h2>
+            <p class="mt-1 text-xs sm:text-sm text-zinc-500 max-w-2xl">
+              Registre com clareza o que você evoluiu e onde vacilou. Quando bater a sensação de estar estagnado, venha aqui: seu histórico prova seu avanço real ao longo das semanas e meses.
+            </p>
+          </div>
+
+          <!-- Seletor Semanal vs Mensal -->
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="evo-mode-tabs" class="inline-flex rounded-xl bg-zinc-100 p-1 text-xs font-semibold dark:bg-[#1F1F1F]">
+              <button id="evo-mode-week" type="button" class="rounded-lg px-3 py-1.5 transition">📅 Semanal</button>
+              <button id="evo-mode-month" type="button" class="rounded-lg px-3 py-1.5 transition">🗓️ Mensal</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navegação de período + Ações -->
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="inline-flex items-center gap-1 rounded-xl bg-zinc-100 px-1.5 py-1 dark:bg-[#1F1F1F]">
+              <button id="evo-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Período anterior">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <span id="evo-period-label" class="min-w-[140px] text-center text-xs sm:text-sm font-semibold"></span>
+              <button id="evo-next" class="btn-ghost h-7 w-7 p-0" aria-label="Próximo período">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+            <button id="evo-current-btn" type="button" class="btn-ghost text-xs">Ir para atual</button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span id="evo-save-status" class="text-xs text-zinc-400">✓ Salvo automaticamente</span>
+            <button id="evo-done-btn" type="button" class="btn-primary text-xs">Concluir período</button>
+          </div>
+        </div>
+
+        <!-- KPIs do período selecionado -->
+        <div id="evo-kpis" class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          <!-- Injetado por JS: Hábitos, Metas, Estudo, Sono, Dias 100% -->
+        </div>
+      </section>
+
+      <!-- 2. Editor Principal (O que evoluí x O que pequei x Onde melhorei x Plano) -->
+      <div id="evo-editor" class="space-y-4">
+        <!-- Injetado por JS -->
+      </div>
+
+      <!-- 3. Linha do Tempo da Minha Evolução (Histórico Antiestagnação) -->
+      <section class="card space-y-4">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              <p class="eyebrow">Feed Histórico Antiestagnação</p>
+            </div>
+            <h3 class="mt-1 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Linha do Tempo da Minha Evolução
+            </h3>
+            <p class="mt-0.5 text-xs text-zinc-500">
+              A prova visual de que você não está parado. Suas conquistas e correções registradas ao longo do tempo.
+            </p>
+          </div>
+
+          <!-- Filtros do Feed -->
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="evo-feed-filter-btns" class="inline-flex rounded-xl bg-zinc-100 p-1 text-xs font-semibold dark:bg-[#1F1F1F]">
+              <button id="evo-feed-all" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">Todas</button>
+              <button id="evo-feed-weeks" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">Semanas</button>
+              <button id="evo-feed-months" type="button" class="rounded-lg px-2.5 py-1 text-xs transition">Meses</button>
+            </div>
+            <input id="evo-feed-search" type="search" placeholder="Buscar no histórico…" class="field !w-auto text-xs py-1" />
+          </div>
+        </div>
+
+        <!-- Banner resumo de conquistas acumuladas -->
+        <div id="evo-stats-strip" class="rounded-xl bg-zinc-50 p-3.5 dark:bg-[#1F1F1F]/60 border border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <!-- Injetado por JS -->
+        </div>
+
+        <!-- Lista de cards históricos -->
+        <div id="evo-feed-list" class="space-y-4 pt-1">
+          <!-- Injetado por JS -->
+        </div>
+      </section>
+    </div>
+
     <!-- ============ ABA MESES — todos os meses do ano ============ -->
     <div id="view-meses" role="tabpanel" class="hidden space-y-4 sm:space-y-5">
       <section class="card">
@@ -1108,8 +1219,14 @@
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="px-5 pt-4">
-      <input id="journal-search" class="field" type="search" placeholder="Buscar nas reflexões…" autocomplete="off" />
+    <div class="px-5 pt-4 space-y-2">
+      <input id="journal-search" class="field" type="search" placeholder="Buscar nas reflexões diárias, semanais e mensais…" autocomplete="off" />
+      <div id="journal-filter-btns" class="flex flex-wrap gap-1 text-xs">
+        <button type="button" data-jfilter="all" class="chip">Todos</button>
+        <button type="button" data-jfilter="days" class="chip">Diário</button>
+        <button type="button" data-jfilter="weeks" class="chip">Semanas</button>
+        <button type="button" data-jfilter="months" class="chip">Meses</button>
+      </div>
     </div>
     <div id="journal-list" class="max-h-[60vh] space-y-3 overflow-y-auto px-5 py-5"></div>
   </dialog>
@@ -1205,6 +1322,7 @@ const parseKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const todayKey = () => keyOf(new Date());
 const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+const escapeHtml = (str) => String(str || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 /** Segunda-feira da semana de `d` (semanas começam na segunda). */
 const weekStart = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const weekKey = (d) => keyOf(weekStart(d));
@@ -5373,32 +5491,98 @@ function renderReview() {
   $('#review-done').textContent = done ? 'Revisão concluída ✓' : 'Concluir revisão';
 }
 
-// ---------- Diário das reflexões ----------
+// ---------- Diário das reflexões (Dias, Semanas e Meses) ----------
+let journalFilter = 'all';
+
 function renderJournal() {
   const q = $('#journal-search').value.trim().toLowerCase();
-  const keys = Object.keys(S.days).filter((k) => {
-    const d = S.days[k];
-    return (d.win || '').trim() || (d.improve || '').trim();
-  }).sort().reverse();
-  const match = keys.filter((k) => {
-    if (!q) return true;
-    const d = S.days[k];
-    return [d.win, d.improve, d.oneThing].some((t) => (t || '').toLowerCase().includes(q));
+
+  // Atualiza botões de filtro no diálogo
+  $$('#journal-filter-btns [data-jfilter]').forEach((b) => {
+    const on = b.dataset.jfilter === journalFilter;
+    b.className = 'chip text-xs transition ' + (on ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-transparent font-semibold shadow-sm' : '');
+    b.onclick = () => { journalFilter = b.dataset.jfilter; renderJournal(); };
   });
-  $('#journal-count').textContent = `${keys.length} ${keys.length === 1 ? 'reflexão' : 'reflexões'}`;
+
+  const entries = [];
+
+  // 1. Dias
+  if (journalFilter === 'all' || journalFilter === 'days') {
+    for (const k of Object.keys(S.days)) {
+      const d = S.days[k];
+      const win = (d.win || '').trim(), improve = (d.improve || '').trim(), one = (d.oneThing || '').trim();
+      if (!win && !improve) continue;
+      if (q && ![win, improve, one, ...(d.tags || [])].some((t) => (t || '').toLowerCase().includes(q))) continue;
+      entries.push({
+        type: 'day',
+        dateKey: k,
+        date: parseKey(k),
+        title: cap(fmtDay.format(parseKey(k)).replace(/\./g, '')),
+        d
+      });
+    }
+  }
+
+  // 2. Semanas
+  if (journalFilter === 'all' || journalFilter === 'weeks') {
+    for (const wk of Object.keys(S.weeks)) {
+      const w = S.weeks[wk], R = w.refl;
+      const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim(), rev = (w.review || '').trim();
+      const imp = (R?.improve || []).map((x) => (typeof x === 'string' ? x : x.text)).join(' ');
+      if (!wins && !sins && !better && !rev && !imp) continue;
+      if (q && ![wins, sins, better, rev, imp, wk].some((t) => (t || '').toLowerCase().includes(q))) continue;
+      entries.push({
+        type: 'week',
+        dateKey: wk,
+        date: parseKey(wk),
+        title: `Semana de ${fmtRange(parseKey(wk))}`,
+        w,
+        R
+      });
+    }
+  }
+
+  // 3. Meses
+  if (journalFilter === 'all' || journalFilter === 'months') {
+    for (const mk of Object.keys(S.months)) {
+      const mRec = S.months[mk], R = mRec.refl;
+      const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim();
+      const imp = (R?.improve || []).map((x) => (typeof x === 'string' ? x : x.text)).join(' ');
+      if (!wins && !sins && !better && !imp) continue;
+      if (q && ![wins, sins, better, imp, mk].some((t) => (t || '').toLowerCase().includes(q))) continue;
+      const [y, m] = mk.split('-').map(Number);
+      const mDate = new Date(y, m - 1, 1);
+      entries.push({
+        type: 'month',
+        dateKey: mk + '-01',
+        date: mDate,
+        title: cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(mDate)),
+        mRec,
+        R
+      });
+    }
+  }
+
+  // Ordena por data decrescente
+  entries.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
+
+  $('#journal-count').textContent = `${entries.length} ${entries.length === 1 ? 'registro' : 'registros'}`;
   const wrap = $('#journal-list');
   wrap.replaceChildren();
-  if (!match.length) {
+
+  if (!entries.length) {
     const p = document.createElement('p');
     p.className = 'py-8 text-center text-sm text-zinc-500';
-    p.textContent = keys.length ? 'Nada encontrado.' : 'Suas reflexões noturnas aparecem aqui.';
+    p.textContent = q ? 'Nada encontrado para esta busca.' : 'Suas reflexões aparecerão aqui.';
     wrap.append(p);
     return;
   }
+
   const fmtMonth = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
   let lastMonth = '';
-  for (const k of match) {
-    const d = S.days[k], date = parseKey(k), mLabel = fmtMonth.format(date);
+
+  for (const it of entries) {
+    const mLabel = fmtMonth.format(it.date);
     if (mLabel !== lastMonth) {
       lastMonth = mLabel;
       const h = document.createElement('p');
@@ -5406,32 +5590,64 @@ function renderJournal() {
       h.textContent = mLabel;
       wrap.append(h);
     }
-    // Um bloco por dia: data em cima, cada parte com rótulo próprio
+
     const art = document.createElement('article');
-    art.className = 'rounded-xl border border-zinc-100 px-4 py-3 dark:border-zinc-800';
+    art.className = 'rounded-xl border border-zinc-100 px-4 py-3 dark:border-zinc-800 space-y-2';
+
+    const top = document.createElement('div');
+    top.className = 'flex items-center justify-between gap-2';
+
     const when = document.createElement('p');
     when.className = 'text-xs font-semibold text-zinc-700 dark:text-zinc-300';
-    when.textContent = cap(fmtDay.format(date).replace(/\./g, ''));
+    when.textContent = it.title;
+
+    const badge = document.createElement('span');
+    badge.className = 'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ' +
+      (it.type === 'day' ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' :
+       it.type === 'week' ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' :
+       'bg-purple-500/10 text-purple-700 dark:text-purple-400');
+    badge.textContent = it.type === 'day' ? 'Diário' : it.type === 'week' ? 'Semanal' : 'Mensal';
+
+    top.append(when, badge);
+    art.append(top);
+
     const body = document.createElement('dl');
-    body.className = 'mt-2.5 space-y-2.5';
-    const part = (label, text, small = false) => {
+    body.className = 'mt-1 space-y-2 text-xs';
+
+    const part = (label, text, colorClass = '') => {
       if (!(text || '').trim()) return;
       const row = document.createElement('div');
       const dt = document.createElement('dt');
-      dt.className = 'text-xs font-medium uppercase tracking-[0.08em] text-zinc-500';
+      dt.className = 'text-[10px] font-bold uppercase tracking-wider ' + (colorClass || 'text-zinc-500');
       dt.textContent = label;
       const dd = document.createElement('dd');
-      dd.className = 'mt-0.5 whitespace-pre-wrap break-words leading-relaxed ' + (small ? 'text-xs text-zinc-600 dark:text-zinc-400' : 'text-sm');
+      dd.className = 'mt-0.5 whitespace-pre-wrap break-words leading-relaxed text-zinc-800 dark:text-zinc-200';
       dd.textContent = text.trim();
       row.append(dt, dd);
       body.append(row);
     };
-    part(d.oneDone ? 'One Thing ✓' : 'One Thing', d.oneThing);
-    part('Vitória', d.win);
-    part('Melhorar', d.improve);
-    const tg = dayTags(d);
-    if (tg.length) part('Tags', tg.map((t) => '#' + t).join(' '), true);
-    art.append(when, body);
+
+    if (it.type === 'day') {
+      const d = it.d;
+      part(d.oneDone ? 'One Thing ✓' : 'One Thing', d.oneThing);
+      part('Vitória', d.win, 'text-emerald-600 dark:text-emerald-400');
+      part('Melhorar', d.improve, 'text-amber-600 dark:text-amber-400');
+      const tg = dayTags(d);
+      if (tg.length) part('Tags', tg.map((t) => '#' + t).join(' '));
+    } else {
+      const R = it.R;
+      part('🚀 O que evoluí', R?.wins, 'text-emerald-600 dark:text-emerald-400');
+      part('⚠️ O que pequei', R?.sins, 'text-rose-600 dark:text-rose-400');
+      part('📈 Onde melhorei vs anterior', R?.better, 'text-indigo-600 dark:text-indigo-400');
+      if (R?.improve?.length) {
+        part('🎯 Plano de Ação', R.improve.map((x) => (typeof x === 'string' ? x : x.text)).filter(Boolean).map((t) => '• ' + t).join('\n'));
+      }
+      if (it.type === 'week' && it.w?.review) {
+        part('💡 Foco da semana', it.w.review);
+      }
+    }
+
+    art.append(body);
     wrap.append(art);
   }
 }
@@ -7016,16 +7232,776 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 $('#exp-prev').onclick = () => { const P = expPeriod(-1); expAnchor = parseKey(P.from); renderExpenses(); };
 $('#exp-next').onclick = () => { const P = expPeriod(1); expAnchor = parseKey(P.from); renderExpenses(); };
 
+// =========================================================
+// ABA EVOLUÇÃO — anotações semanais/mensais e histórico antiestagnação
+// =========================================================
+let evoMode = 'semana'; // 'semana' | 'mes'
+let evoWeek = weekStart(new Date());
+let evoMonth = { y: new Date().getFullYear(), m: new Date().getMonth() };
+let evoFeedFilter = 'tudo'; // 'tudo' | 'semanas' | 'meses'
+let evoFeedSearch = '';
+
+function updateEvoSaveIndicator() {
+  const el = $('#evo-save-status');
+  if (!el) return;
+  el.textContent = '✓ Salvo automaticamente';
+  el.className = 'text-xs text-emerald-600 dark:text-emerald-400 transition opacity-100';
+  setTimeout(() => {
+    if (el) el.className = 'text-xs text-zinc-400 transition opacity-80';
+  }, 1800);
+}
+
+function renderEvolutionTodayWidget() {
+  const box = $('#evo-today-body');
+  if (!box) return;
+  const ws = weekStart(new Date()), wk = keyOf(ws);
+  const W = S.weeks[wk], R = W?.refl;
+  const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim();
+
+  box.replaceChildren();
+  if (!wins && !sins) {
+    const wrap = document.createElement('div');
+    wrap.className = 'rounded-xl border border-dashed border-zinc-200/80 bg-zinc-50/50 p-3 text-center dark:border-zinc-800 dark:bg-zinc-800/20';
+    const p = document.createElement('p');
+    p.className = 'text-xs text-zinc-600 dark:text-zinc-400';
+    p.textContent = 'Não perca o rastro do seu progresso: o que você evoluiu e onde vacilou nesta semana?';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-primary mt-2 text-xs py-1 px-3';
+    btn.textContent = 'Anotar evolução da semana →';
+    btn.onclick = () => {
+      evoMode = 'semana';
+      evoWeek = weekStart(new Date());
+      setTab('evolucao');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    wrap.append(p, btn);
+    box.append(wrap);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'space-y-1.5';
+  if (wins) {
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-1.5 text-xs';
+    const tag = document.createElement('span');
+    tag.className = 'shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400';
+    tag.textContent = '🚀 Evoluí';
+    const txt = document.createElement('span');
+    txt.className = 'line-clamp-2 text-zinc-700 dark:text-zinc-300';
+    txt.textContent = wins.split('\n')[0].replace(/^[•\-*]\s*/, '');
+    row.append(tag, txt);
+    list.append(row);
+  }
+  if (sins) {
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-1.5 text-xs';
+    const tag = document.createElement('span');
+    tag.className = 'shrink-0 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-400';
+    tag.textContent = '⚠️ Pequei';
+    const txt = document.createElement('span');
+    txt.className = 'line-clamp-2 text-zinc-700 dark:text-zinc-300';
+    txt.textContent = sins.split('\n')[0].replace(/^[•\-*]\s*/, '');
+    row.append(tag, txt);
+    list.append(row);
+  }
+
+  const foot = document.createElement('div');
+  foot.className = 'mt-2.5 flex items-center justify-between border-t border-zinc-100 pt-2 text-[11px] dark:border-zinc-800';
+  const st = document.createElement('span');
+  st.className = 'text-zinc-400';
+  st.textContent = W?.reviewDone ? '✓ Semana concluída' : 'Semana em aberto';
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'font-semibold text-emerald-600 hover:underline dark:text-emerald-400';
+  edit.textContent = 'Anotar / Ver histórico →';
+  edit.onclick = () => {
+    evoMode = 'semana';
+    evoWeek = weekStart(new Date());
+    setTab('evolucao');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  foot.append(st, edit);
+
+  box.append(list, foot);
+}
+
+function renderEvolutionTab() {
+  const panel = $('#view-evolucao');
+  if (!panel || panel.classList.contains('hidden')) return;
+
+  const isWeek = evoMode === 'semana';
+  const bW = $('#evo-mode-week'), bM = $('#evo-mode-month');
+  if (bW && bM) {
+    bW.className = 'rounded-lg px-3 py-1.5 transition text-xs font-semibold ' +
+      (isWeek ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100');
+    bM.className = 'rounded-lg px-3 py-1.5 transition text-xs font-semibold ' +
+      (!isWeek ? 'bg-emerald-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100');
+    bW.onclick = () => { evoMode = 'semana'; renderEvolutionTab(); };
+    bM.onclick = () => { evoMode = 'mes'; renderEvolutionTab(); };
+  }
+
+  const now = new Date();
+  const curWeekStart = weekStart(now);
+  const curMonthY = now.getFullYear(), curMonthM = now.getMonth();
+
+  const prevBtn = $('#evo-prev'), nextBtn = $('#evo-next'), labelEl = $('#evo-period-label'), curBtn = $('#evo-current-btn');
+  const doneBtn = $('#evo-done-btn');
+
+  let rec = null, isDone = false, hints = null, stats = null;
+
+  if (isWeek) {
+    const ws = evoWeek, wk = keyOf(ws), we = addDays(ws, 6);
+    rec = week(wk);
+    isDone = !!rec.reviewDone;
+    const isCurrent = keyOf(ws) === keyOf(curWeekStart);
+    labelEl.innerHTML = `<span>Semana de ${fmtRange(ws)}</span>` +
+      (isCurrent ? ' <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 ml-1.5">Atual</span>' : '');
+
+    prevBtn.disabled = keyOf(addDays(ws, 6)) < S.startDate;
+    nextBtn.disabled = keyOf(addDays(ws, 7)) > todayKey();
+    prevBtn.onclick = () => { evoWeek = addDays(evoWeek, -7); renderEvolutionTab(); };
+    nextBtn.onclick = () => { evoWeek = addDays(evoWeek, 7); renderEvolutionTab(); };
+    curBtn.onclick = () => { evoWeek = weekStart(new Date()); renderEvolutionTab(); };
+
+    doneBtn.textContent = isDone ? 'Semana concluída ✓' : 'Concluir revisão da semana';
+    doneBtn.className = isDone ? 'btn-ghost border border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs py-1.5 px-3' : 'btn-primary text-xs py-1.5 px-3';
+    doneBtn.onclick = () => {
+      rec.reviewDone = !rec.reviewDone;
+      commit(renderEvolutionTab, renderReview, renderEvolutionTodayWidget);
+    };
+
+    const curSum = weekSummary(ws), prevSum = weekSummary(addDays(ws, -7));
+    const deltaH = curSum.habit != null && prevSum.habit != null ? Math.round((curSum.habit - prevSum.habit) * 100) : null;
+    stats = [
+      { label: 'Hábitos (média)', val: curSum.habit == null ? '—' : fmtPct(curSum.habit), sub: deltaH != null ? `${deltaH > 0 ? '+' : ''}${deltaH} pts vs anterior` : `${curSum.scoredDays} dias avaliados` },
+      { label: 'Metas da semana', val: curSum.goalsTotal ? `${curSum.goalsDone}/${curSum.goalsTotal}` : '—', sub: curSum.goalsTotal ? `${fmtPct(curSum.goalsDone / curSum.goalsTotal)} batidas` : 'sem metas' },
+      { label: 'Estudo total', val: fmtMin(curSum.study), sub: `meta: ${S.settings.studyGoalH || 10}h` },
+      { label: 'Sono médio', val: curSum.sleep == null ? '—' : fmtSleep(curSum.sleep), sub: prevSum.sleep ? `antes: ${fmtSleep(prevSum.sleep)}` : '' },
+      { label: 'Dias 100%', val: String(curSum.perfect), sub: `de ${curSum.scoredDays} dias` },
+    ];
+
+    hints = reflectionHints(
+      periodStats(wk, keyOf(we)),
+      periodStats(keyOf(addDays(ws, -7)), keyOf(addDays(ws, -1))),
+      rec.goals || [],
+      (S.settings.studyGoalH || 10) * 60
+    );
+  } else {
+    const { y, m } = evoMonth, mk = monthKey(y, m);
+    rec = monthRec(mk);
+    isDone = !!rec.reflDone;
+    const isCurrent = y === curMonthY && m === curMonthM;
+    const mName = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)));
+    labelEl.innerHTML = `<span>${mName}</span>` +
+      (isCurrent ? ' <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 ml-1.5">Atual</span>' : '');
+
+    prevBtn.disabled = keyOf(new Date(y, m, 0)) < S.startDate;
+    nextBtn.disabled = y > curMonthY || (y === curMonthY && m >= curMonthM);
+    prevBtn.onclick = () => {
+      let ny = evoMonth.y, nm = evoMonth.m - 1;
+      if (nm < 0) { nm = 11; ny--; }
+      evoMonth = { y: ny, m: nm };
+      renderEvolutionTab();
+    };
+    nextBtn.onclick = () => {
+      let ny = evoMonth.y, nm = evoMonth.m + 1;
+      if (nm > 11) { nm = 0; ny++; }
+      evoMonth = { y: ny, m: nm };
+      renderEvolutionTab();
+    };
+    curBtn.onclick = () => { evoMonth = { y: now.getFullYear(), m: now.getMonth() }; renderEvolutionTab(); };
+
+    doneBtn.textContent = isDone ? 'Mês concluído ✓' : 'Concluir reflexão do mês';
+    doneBtn.className = isDone ? 'btn-ghost border border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs py-1.5 px-3' : 'btn-primary text-xs py-1.5 px-3';
+    doneBtn.onclick = () => {
+      rec.reflDone = !rec.reflDone;
+      commit(renderEvolutionTab, renderMonthReview);
+    };
+
+    const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0));
+    const pm = m ? [y, m - 1] : [y - 1, 11];
+    const curP = periodStats(first, last), prevP = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
+    const ms = monthStats(y, m);
+    const deltaH = curP.habitAvg != null && prevP.habitAvg != null ? Math.round((curP.habitAvg - prevP.habitAvg) * 100) : null;
+    stats = [
+      { label: 'Hábitos (média)', val: curP.habitAvg == null ? '—' : fmtPct(curP.habitAvg), sub: deltaH != null ? `${deltaH > 0 ? '+' : ''}${deltaH} pts vs anterior` : `${curP.days} dias` },
+      { label: 'Metas do mês', val: ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : (ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—'), sub: ms.mTotal ? 'metas do mês' : 'metas semanais' },
+      { label: 'Estudo total', val: fmtMin(curP.study), sub: `${curP.learned} aprendidos` },
+      { label: 'Sono médio', val: curP.sleepAvg == null ? '—' : fmtSleep(curP.sleepAvg), sub: prevP.sleepAvg ? `antes: ${fmtSleep(prevP.sleepAvg)}` : '' },
+      { label: 'Dias 100%', val: String(curP.perfect), sub: `de ${curP.days} dias` },
+    ];
+
+    const weeksIn = ms.weeks.filter((w) => w.start.getMonth() === m).length;
+    const allGoals = [...(rec.goals || [])];
+    for (const w of ms.weeks) if (w.start.getMonth() === m) allGoals.push(...(S.weeks[w.wk]?.goals || []));
+
+    hints = reflectionHints(curP, prevP, allGoals, (S.settings.studyGoalH || 10) * 60 * weeksIn, weeksIn);
+  }
+
+  const kpiHost = $('#evo-kpis');
+  if (kpiHost && stats) {
+    kpiHost.replaceChildren();
+    for (const s of stats) {
+      const card = document.createElement('div');
+      card.className = 'rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800/80 dark:bg-zinc-800/30';
+      card.innerHTML = `<p class="eyebrow">${s.label}</p><p class="mt-1 text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">${s.val}</p><p class="mt-0.5 text-xs text-zinc-500">${s.sub}</p>`;
+      kpiHost.append(card);
+    }
+  }
+
+  renderEvolutionEditor(rec, hints, isWeek);
+  renderEvolutionTimeline();
+}
+
+function renderEvolutionEditor(rec, hints, isWeek) {
+  const host = $('#evo-editor');
+  if (!host) return;
+  host.replaceChildren();
+
+  rec.refl ||= blankRefl();
+  const R = rec.refl;
+
+  const grid = document.createElement('div');
+  grid.className = 'grid gap-4 lg:grid-cols-2';
+
+  const hintChips = (items, isUsed, onPick) => {
+    const w = document.createElement('div');
+    w.className = 'mt-2 flex flex-wrap gap-1.5';
+    for (const txt of items) {
+      const used = isUsed(txt);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rounded-md border px-2 py-1 text-left text-xs leading-snug transition ' + (used
+        ? 'border-transparent text-zinc-400 line-through dark:text-zinc-600'
+        : 'border-dashed border-zinc-300 text-zinc-600 hover:border-emerald-500 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-emerald-400 bg-white/50 dark:bg-zinc-800/40');
+      b.textContent = (used ? '✓ ' : '+ ') + txt;
+      b.disabled = used;
+      b.onclick = () => onPick(txt);
+      w.append(b);
+    }
+    return w;
+  };
+
+  // 1. O que eu evoluí
+  const boxWins = document.createElement('div');
+  boxWins.className = 'card relative overflow-hidden border-emerald-500/30 dark:border-emerald-500/20';
+  boxWins.innerHTML = `
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🚀 O que eu evoluí</h3>
+      </div>
+      <span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Conquistas & Vitórias</span>
+    </div>
+    <p class="mt-1 text-xs text-zinc-500">Do que você se orgulha? Quais hábitos manteve? Quais pequenas ou grandes vitórias teve neste período?</p>
+  `;
+  const taWins = document.createElement('textarea');
+  taWins.rows = 4;
+  taWins.className = 'field mt-2.5 resize-y text-sm leading-relaxed';
+  taWins.placeholder = 'Ex.: Consegui ler todos os dias; avancei no projeto; mantive a calma diante do imprevisto…';
+  taWins.value = R.wins || '';
+  taWins.oninput = () => { R.wins = taWins.value; save(); updateEvoSaveIndicator(); renderEvolutionTodayWidget(); };
+  boxWins.append(taWins);
+
+  const winsHints = hints?.wins || [];
+  if (winsHints.length) {
+    const hintWrap = document.createElement('div');
+    hintWrap.className = 'mt-2.5 border-t border-zinc-100 pt-2 dark:border-zinc-800/80';
+    hintWrap.innerHTML = '<p class="text-[11px] font-medium text-zinc-400">Toque para adicionar conquistas tiradas dos seus dados:</p>';
+    hintWrap.append(hintChips(winsHints, (t) => (taWins.value || '').includes(t), (t) => {
+      const cur = taWins.value.trimEnd();
+      R.wins = (cur ? cur + '\n' : '') + '• ' + t;
+      taWins.value = R.wins;
+      save();
+      updateEvoSaveIndicator();
+      renderEvolutionTodayWidget();
+      renderEvolutionEditor(rec, hints, isWeek);
+    }));
+    boxWins.append(hintWrap);
+  }
+
+  // 2. O que eu pequei
+  const boxSins = document.createElement('div');
+  boxSins.className = 'card relative overflow-hidden border-rose-500/30 dark:border-rose-500/20';
+  boxSins.innerHTML = `
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="flex h-2.5 w-2.5 rounded-full bg-rose-500"></span>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">⚠️ O que eu pequei</h3>
+      </div>
+      <span class="rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-400">Deslizes & Sabotagens</span>
+    </div>
+    <p class="mt-1 text-xs text-zinc-500">Onde falhou, procrastinou ou foi inconsistente? O que não deu certo? Seja sincero para poder ajustar a rota.</p>
+  `;
+  const taSins = document.createElement('textarea');
+  taSins.rows = 4;
+  taSins.className = 'field mt-2.5 resize-y text-sm leading-relaxed';
+  taSins.placeholder = 'Ex.: Dormi tarde na quarta e perdi a rotina; procrastinei para começar o estudo; me distraí com…';
+  taSins.value = R.sins || '';
+  taSins.oninput = () => { R.sins = taSins.value; save(); updateEvoSaveIndicator(); renderEvolutionTodayWidget(); };
+  boxSins.append(taSins);
+
+  const sinsHints = hints?.sins || [];
+  if (sinsHints.length) {
+    const hintWrap = document.createElement('div');
+    hintWrap.className = 'mt-2.5 border-t border-zinc-100 pt-2 dark:border-zinc-800/80';
+    hintWrap.innerHTML = '<p class="text-[11px] font-medium text-zinc-400">Pontos de atenção dos seus dados para adicionar:</p>';
+    hintWrap.append(hintChips(sinsHints, (t) => (taSins.value || '').includes(t), (t) => {
+      const cur = taSins.value.trimEnd();
+      R.sins = (cur ? cur + '\n' : '') + '• ' + t;
+      taSins.value = R.sins;
+      save();
+      updateEvoSaveIndicator();
+      renderEvolutionTodayWidget();
+      renderEvolutionEditor(rec, hints, isWeek);
+    }));
+    boxSins.append(hintWrap);
+  }
+
+  // 3. Onde melhorei vs antes
+  const boxBetter = document.createElement('div');
+  boxBetter.className = 'card relative overflow-hidden';
+  boxBetter.innerHTML = `
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="flex h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">📈 Onde melhorei vs antes</h3>
+      </div>
+      <span class="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Crescimento Real</span>
+    </div>
+    <p class="mt-1 text-xs text-zinc-500">O que avançou em relação à semana/mês anterior? Perceber a melhora direta quebra a ilusão de estagnação.</p>
+  `;
+  const taBetter = document.createElement('textarea');
+  taBetter.rows = 3;
+  taBetter.className = 'field mt-2.5 resize-y text-sm leading-relaxed';
+  taBetter.placeholder = 'Ex.: Desta vez não deixei o erro de ontem estragar a semana inteira; melhorei a retenção…';
+  taBetter.value = R.better || '';
+  taBetter.oninput = () => { R.better = taBetter.value; save(); updateEvoSaveIndicator(); };
+  boxBetter.append(taBetter);
+
+  const betterHints = hints?.better || [];
+  if (betterHints.length) {
+    const hintWrap = document.createElement('div');
+    hintWrap.className = 'mt-2.5 border-t border-zinc-100 pt-2 dark:border-zinc-800/80';
+    hintWrap.innerHTML = '<p class="text-[11px] font-medium text-zinc-400">Comparações automáticas vs período anterior:</p>';
+    hintWrap.append(hintChips(betterHints, (t) => (taBetter.value || '').includes(t), (t) => {
+      const cur = taBetter.value.trimEnd();
+      R.better = (cur ? cur + '\n' : '') + '• ' + t;
+      taBetter.value = R.better;
+      save();
+      updateEvoSaveIndicator();
+      renderEvolutionEditor(rec, hints, isWeek);
+    }));
+    boxBetter.append(hintWrap);
+  }
+
+  // 4. O que posso melhorar (Plano de ação)
+  const boxImp = document.createElement('div');
+  boxImp.className = 'card relative overflow-hidden';
+  boxImp.innerHTML = `
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="flex h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🎯 O que posso melhorar</h3>
+      </div>
+      <span class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">Plano de Ação</span>
+    </div>
+    <p class="mt-1 text-xs text-zinc-500">Ações concretas para o próximo período. Marque ★ em até 3 para virarem prioridade na página inicial.</p>
+  `;
+
+  const ulImp = document.createElement('ul');
+  ulImp.className = 'mt-2.5 space-y-1';
+  if (!R.improve.length) {
+    const li = document.createElement('li');
+    li.className = 'text-xs text-zinc-400 py-1';
+    li.textContent = 'Nenhuma ação adicionada ainda.';
+    ulImp.append(li);
+  }
+  for (const it of R.improve) {
+    const li = document.createElement('li');
+    li.className = 'flex items-center justify-between gap-2 rounded-lg border border-zinc-100 px-2.5 py-1.5 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-xs';
+    const on = S.priorities.some((p) => p.id === it.id);
+    const star = document.createElement('button');
+    star.type = 'button';
+    star.className = 'shrink-0 text-sm leading-none transition ' + (on ? 'text-amber-500 font-bold' : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-500');
+    star.textContent = on ? '★' : '☆';
+    star.title = on ? 'Tirar das prioridades' : 'Tornar prioridade na página inicial';
+    const srcLabel = isWeek ? `Revisão de ${fmtRange(evoWeek)}` : `Reflexão do mês`;
+    star.onclick = () => { togglePriority(it, srcLabel); renderEvolutionEditor(rec, hints, isWeek); };
+
+    const t = document.createElement('span');
+    t.className = 'min-w-0 flex-1 break-words font-medium text-zinc-800 dark:text-zinc-200';
+    t.textContent = it.text;
+
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = ROW_BTN;
+    rm.innerHTML = ICON_X;
+    rm.setAttribute('aria-label', `Remover "${it.text}"`);
+    rm.onclick = () => {
+      R.improve = R.improve.filter((x) => x.id !== it.id);
+      S.priorities = S.priorities.filter((p) => p.id !== it.id);
+      commit(() => renderEvolutionEditor(rec, hints, isWeek), renderPriorities);
+    };
+
+    li.append(star, t, rm);
+    ulImp.append(li);
+  }
+  boxImp.append(ulImp);
+
+  const addImpItem = (txt) => {
+    txt = (txt || '').trim();
+    if (!txt) return;
+    R.improve.push({ id: uid(), text: txt });
+    commit(() => renderEvolutionEditor(rec, hints, isWeek), renderPriorities);
+  };
+  const impForm = document.createElement('form');
+  impForm.className = 'mt-3 flex gap-2';
+  const impInp = document.createElement('input');
+  impInp.className = 'field text-xs py-1.5';
+  impInp.maxLength = 120;
+  impInp.placeholder = 'Ação concreta para melhorar…';
+  const impAdd = document.createElement('button');
+  impAdd.type = 'submit';
+  impAdd.className = 'btn-ghost shrink-0 border border-zinc-200 dark:border-zinc-800 text-xs py-1.5 px-3';
+  impAdd.textContent = 'Adicionar';
+  impForm.onsubmit = (e) => { e.preventDefault(); addImpItem(impInp.value); impInp.value = ''; };
+  impForm.append(impInp, impAdd);
+  boxImp.append(impForm);
+
+  const impHints = hints?.improve || [];
+  if (impHints.length) {
+    const hintWrap = document.createElement('div');
+    hintWrap.className = 'mt-2.5 border-t border-zinc-100 pt-2 dark:border-zinc-800/80';
+    hintWrap.innerHTML = '<p class="text-[11px] font-medium text-zinc-400">Sugestões de melhoria baseadas nos seus hábitos:</p>';
+    hintWrap.append(hintChips(impHints, (t) => R.improve.some((x) => x.text === t), addImpItem));
+    boxImp.append(hintWrap);
+  }
+
+  grid.append(boxWins, boxSins, boxBetter, boxImp);
+  host.append(grid);
+
+  if (isWeek) {
+    const boxFocus = document.createElement('div');
+    boxFocus.className = 'card';
+    boxFocus.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+        <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Foco principal da próxima semana</h3>
+      </div>
+      <p class="mt-1 text-xs text-zinc-500">Em uma frase: no que você vai concentrar sua energia na próxima semana?</p>
+    `;
+    const taFocus = document.createElement('input');
+    taFocus.type = 'text';
+    taFocus.maxLength = 160;
+    taFocus.className = 'field mt-2 text-sm';
+    taFocus.placeholder = 'Ex.: Fechar o módulo de backend e não falhar na hidratação.';
+    taFocus.value = rec.review || '';
+    taFocus.oninput = () => { rec.review = taFocus.value; save(); updateEvoSaveIndicator(); renderGoals(); };
+    boxFocus.append(taFocus);
+    host.append(boxFocus);
+  }
+}
+
+function renderEvolutionTimeline() {
+  const host = $('#evo-feed-list');
+  const strip = $('#evo-stats-strip');
+  if (!host) return;
+
+  const bAll = $('#evo-feed-all'), bW = $('#evo-feed-weeks'), bM = $('#evo-feed-months');
+  if (bAll && bW && bM) {
+    bAll.className = 'rounded-lg px-2.5 py-1 text-xs font-semibold transition ' + (evoFeedFilter === 'tudo' ? 'bg-emerald-600 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100');
+    bW.className = 'rounded-lg px-2.5 py-1 text-xs font-semibold transition ' + (evoFeedFilter === 'semanas' ? 'bg-emerald-600 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100');
+    bM.className = 'rounded-lg px-2.5 py-1 text-xs font-semibold transition ' + (evoFeedFilter === 'meses' ? 'bg-emerald-600 text-white' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100');
+    bAll.onclick = () => { evoFeedFilter = 'tudo'; renderEvolutionTimeline(); };
+    bW.onclick = () => { evoFeedFilter = 'semanas'; renderEvolutionTimeline(); };
+    bM.onclick = () => { evoFeedFilter = 'meses'; renderEvolutionTimeline(); };
+  }
+
+  const searchInput = $('#evo-feed-search');
+  if (searchInput && !searchInput.dataset.wired) {
+    searchInput.dataset.wired = '1';
+    searchInput.oninput = (e) => {
+      evoFeedSearch = e.target.value.trim().toLowerCase();
+      renderEvolutionTimeline();
+    };
+  }
+
+  const items = [];
+  let totalWinsCount = 0, totalWeeksCount = 0, totalMonthsCount = 0;
+
+  const weekKeys = new Set(Object.keys(S.weeks));
+  for (let d = weekStart(new Date()); keyOf(d) >= S.startDate; d = addDays(d, -7)) {
+    weekKeys.add(keyOf(d));
+  }
+  for (const wk of [...weekKeys].sort().reverse()) {
+    const W = S.weeks[wk];
+    const ws = parseKey(wk);
+    const sum = weekSummary(ws);
+    const R = W?.refl;
+    const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim();
+    const imp = (R?.improve || []);
+    const review = (W?.review || '').trim();
+
+    const hasContent = !!(wins || sins || better || imp.length || review || sum.scoredDays > 0 || sum.goalsTotal > 0);
+    if (!hasContent) continue;
+
+    if (wins) {
+      totalWinsCount += wins.split('\n').map((l) => l.trim()).filter(Boolean).length;
+    }
+    if (wins || sins) totalWeeksCount++;
+
+    items.push({
+      type: 'semana',
+      dateSort: wk,
+      dateLabel: `Semana de ${fmtRange(ws)}`,
+      ws,
+      rec: W,
+      sum,
+      wins,
+      sins,
+      better,
+      imp,
+      review,
+      isDone: !!W?.reviewDone
+    });
+  }
+
+  const monthKeys = new Set(Object.keys(S.months));
+  const now = new Date();
+  for (let y = now.getFullYear(); y >= parseKey(S.startDate).getFullYear(); y--) {
+    for (let m = 11; m >= 0; m--) {
+      if (y === now.getFullYear() && m > now.getMonth()) continue;
+      if (new Date(y, m + 1, 0) < parseKey(S.startDate)) continue;
+      monthKeys.add(monthKey(y, m));
+    }
+  }
+  for (const mk of [...monthKeys].sort().reverse()) {
+    const M = S.months[mk];
+    const [y, m] = mk.split('-').map(Number);
+    const first = keyOf(new Date(y, m - 1, 1)), last = keyOf(new Date(y, m, 0));
+    const st = periodStats(first, last);
+    const ms = monthStats(y, m - 1);
+    const R = M?.refl;
+    const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim();
+    const imp = (R?.improve || []);
+
+    const hasContent = !!(wins || sins || better || imp.length || st.days > 0 || ms.mTotal > 0);
+    if (!hasContent) continue;
+
+    if (wins) {
+      totalWinsCount += wins.split('\n').map((l) => l.trim()).filter(Boolean).length;
+    }
+    if (wins || sins) totalMonthsCount++;
+
+    const mLabel = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1)));
+
+    items.push({
+      type: 'mes',
+      dateSort: mk,
+      dateLabel: mLabel,
+      y,
+      m: m - 1,
+      rec: M,
+      st,
+      ms,
+      wins,
+      sins,
+      better,
+      imp,
+      isDone: !!M?.reflDone
+    });
+  }
+
+  items.sort((a, b) => (a.dateSort < b.dateSort ? 1 : -1));
+
+  if (strip) {
+    strip.innerHTML = `
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span class="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+          🏆 <span class="tabular-nums font-mono text-sm">${totalWinsCount}</span> ${totalWinsCount === 1 ? 'vitória registrada' : 'vitórias registradas'}
+        </span>
+        <span class="text-zinc-300 dark:text-zinc-700">·</span>
+        <span class="inline-flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+          📅 <span class="tabular-nums font-mono">${totalWeeksCount}</span> semanas avaliadas
+        </span>
+        <span class="text-zinc-300 dark:text-zinc-700">·</span>
+        <span class="inline-flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+          🗓️ <span class="tabular-nums font-mono">${totalMonthsCount}</span> meses avaliados
+        </span>
+      </div>
+      <p class="text-[11px] text-zinc-500 italic max-w-md">
+        “O progresso real é a soma dos seus acertos e correções. Você não está estagnado.”
+      </p>
+    `;
+  }
+
+  const filtered = items.filter((it) => {
+    if (evoFeedFilter === 'semanas' && it.type !== 'semana') return false;
+    if (evoFeedFilter === 'meses' && it.type !== 'mes') return false;
+    if (evoFeedSearch) {
+      const haystack = [it.dateLabel, it.wins, it.sins, it.better, ...(it.imp || []).map((x) => x.text), it.review].join(' ').toLowerCase();
+      if (!haystack.includes(evoFeedSearch)) return false;
+    }
+    return true;
+  });
+
+  host.replaceChildren();
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.className = 'py-10 text-center text-xs text-zinc-500';
+    empty.textContent = items.length ? 'Nenhuma anotação encontrada com este filtro.' : 'Seu histórico começará a se formar assim que você anotar a primeira semana!';
+    host.append(empty);
+    return;
+  }
+
+  for (const it of filtered) {
+    const card = document.createElement('article');
+    card.className = 'rounded-2xl border border-zinc-200/90 bg-white p-4 sm:p-5 dark:border-[#272727] dark:bg-[#181818] shadow-sm space-y-3';
+
+    const topRow = document.createElement('div');
+    topRow.className = 'flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-3 dark:border-zinc-800';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'flex flex-wrap items-center gap-2';
+
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ' +
+      (it.type === 'semana' ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'bg-purple-500/10 text-purple-700 dark:text-purple-400');
+    typeBadge.textContent = it.type === 'semana' ? 'Semana' : 'Mês';
+
+    const h = document.createElement('h4');
+    h.className = 'text-sm font-bold text-zinc-900 dark:text-zinc-100';
+    h.textContent = it.dateLabel;
+
+    titleGroup.append(typeBadge, h);
+    if (it.isDone) {
+      const doneBadge = document.createElement('span');
+      doneBadge.className = 'rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400';
+      doneBadge.textContent = '✓ Concluída';
+      titleGroup.append(doneBadge);
+    }
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-ghost text-xs py-1 px-2.5 font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400';
+    editBtn.textContent = '✏️ Editar anotação';
+    editBtn.onclick = () => {
+      if (it.type === 'semana') {
+        evoMode = 'semana';
+        evoWeek = it.ws;
+      } else {
+        evoMode = 'mes';
+        evoMonth = { y: it.y, m: it.m };
+      }
+      renderEvolutionTab();
+      $('#evo-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    topRow.append(titleGroup, editBtn);
+    card.append(topRow);
+
+    const kpiRow = document.createElement('div');
+    kpiRow.className = 'flex flex-wrap items-center gap-2 text-[11px] font-mono text-zinc-500';
+    if (it.type === 'semana' && it.sum) {
+      if (it.sum.habit != null) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">📊 Hábitos: <b>${fmtPct(it.sum.habit)}</b></span>`;
+      if (it.sum.goalsTotal) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">🎯 Metas: <b>${it.sum.goalsDone}/${it.sum.goalsTotal}</b></span>`;
+      if (it.sum.study) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">📚 Estudo: <b>${fmtMin(it.sum.study)}</b></span>`;
+      if (it.sum.sleep) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">🌙 Sono: <b>${fmtSleep(it.sum.sleep)}</b></span>`;
+    } else if (it.type === 'mes' && it.st) {
+      if (it.st.habitAvg != null) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">📊 Hábitos: <b>${fmtPct(it.st.habitAvg)}</b></span>`;
+      if (it.ms && (it.ms.mTotal || it.ms.goalsTotal)) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">🎯 Metas: <b>${it.ms.mTotal ? `${it.ms.mDone}/${it.ms.mTotal}` : `${it.ms.goalsDone}/${it.ms.goalsTotal}`}</b></span>`;
+      if (it.st.study) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">📚 Estudo: <b>${fmtMin(it.st.study)}</b></span>`;
+      if (it.st.sleepAvg) kpiRow.innerHTML += `<span class="rounded bg-zinc-100 dark:bg-zinc-800/60 px-2 py-0.5">🌙 Sono: <b>${fmtSleep(it.st.sleepAvg)}</b></span>`;
+    }
+    if (kpiRow.children.length || kpiRow.innerHTML) card.append(kpiRow);
+
+    const bodyGrid = document.createElement('div');
+    bodyGrid.className = 'grid gap-3 sm:grid-cols-2 pt-1';
+
+    const wCol = document.createElement('div');
+    wCol.className = 'rounded-xl border border-emerald-500/20 bg-emerald-50/30 p-3 dark:border-emerald-500/20 dark:bg-emerald-950/15';
+    wCol.innerHTML = '<p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> O que eu evoluí</p>';
+    if (it.wins) {
+      const p = document.createElement('p');
+      p.className = 'mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800 dark:text-zinc-200';
+      p.textContent = it.wins;
+      wCol.append(p);
+    } else {
+      wCol.innerHTML += '<p class="mt-1.5 text-xs text-zinc-400 italic">Nenhuma anotação de evolução neste período.</p>';
+    }
+
+    const sCol = document.createElement('div');
+    sCol.className = 'rounded-xl border border-rose-500/20 bg-rose-50/30 p-3 dark:border-rose-500/20 dark:bg-rose-950/15';
+    sCol.innerHTML = '<p class="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400 flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span> O que eu pequei</p>';
+    if (it.sins) {
+      const p = document.createElement('p');
+      p.className = 'mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800 dark:text-zinc-200';
+      p.textContent = it.sins;
+      sCol.append(p);
+    } else {
+      sCol.innerHTML += '<p class="mt-1.5 text-xs text-zinc-400 italic">Nenhum ponto registrado.</p>';
+    }
+
+    bodyGrid.append(wCol, sCol);
+    card.append(bodyGrid);
+
+    if (it.better) {
+      const bRow = document.createElement('div');
+      bRow.className = 'rounded-lg border border-zinc-200/60 bg-zinc-50/70 p-2.5 text-xs dark:border-zinc-800 dark:bg-zinc-800/30';
+      bRow.innerHTML = '<p class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">📈 Onde melhorei vs anterior</p>';
+      const p = document.createElement('p');
+      p.className = 'mt-1 whitespace-pre-wrap leading-relaxed text-zinc-700 dark:text-zinc-300';
+      p.textContent = it.better;
+      bRow.append(p);
+      card.append(bRow);
+    }
+
+    if (it.imp && it.imp.length) {
+      const impRow = document.createElement('div');
+      impRow.className = 'rounded-lg border border-zinc-200/60 bg-zinc-50/70 p-2.5 text-xs dark:border-zinc-800 dark:bg-zinc-800/30';
+      impRow.innerHTML = '<p class="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">🎯 Plano de Ação</p>';
+      const ul = document.createElement('ul');
+      ul.className = 'mt-1 list-disc space-y-0.5 pl-4 text-zinc-700 dark:text-zinc-300';
+      for (const x of it.imp) {
+        const li = document.createElement('li');
+        li.textContent = typeof x === 'string' ? x : x.text;
+        ul.append(li);
+      }
+      impRow.append(ul);
+      card.append(impRow);
+    }
+
+    if (it.review) {
+      const fRow = document.createElement('p');
+      fRow.className = 'text-xs text-zinc-500 pt-1 border-t border-zinc-100 dark:border-zinc-800';
+      fRow.innerHTML = `<span class="font-semibold text-zinc-700 dark:text-zinc-300">Foco planejado:</span> ${escapeHtml(it.review)}`;
+      card.append(fRow);
+    }
+
+    host.append(card);
+  }
+}
+
 // ---------- Abas ----------
-function currentTab() { return location.hash === '#meses' ? 'meses' : 'hoje'; }
+function currentTab() {
+  const h = location.hash.replace(/^#/, '');
+  if (h === 'meses') return 'meses';
+  if (h === 'evolucao') return 'evolucao';
+  return 'hoje';
+}
 function setTab(tab) {
   if (tab === 'meses') location.hash = 'meses';
+  else if (tab === 'evolucao') location.hash = 'evolucao';
   else history.replaceState(null, '', location.pathname + location.search);
   renderTabs();
 }
 function renderTabs() {
   const tab = currentTab();
   $('#view-hoje').classList.toggle('hidden', tab !== 'hoje');
+  $('#view-evolucao')?.classList.toggle('hidden', tab !== 'evolucao');
   $('#view-meses').classList.toggle('hidden', tab !== 'meses');
   $('#daynav').classList.toggle('invisible', tab !== 'hoje');
   $$('#tabs [data-tab]').forEach((b) => {
@@ -7035,6 +8011,7 @@ function renderTabs() {
       (on ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/20' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100');
   });
   if (tab === 'meses') renderYear();
+  else if (tab === 'evolucao') renderEvolutionTab();
   else renderCharts();   // gráficos da aba Hoje precisam da largura visível
 }
 
@@ -7042,7 +8019,13 @@ function renderTabs() {
    AÇÕES
    ========================================================= */
 function commit(...renders) { save(); renders.forEach((r) => r()); }
-const renderProgress = () => { renderKPIs(); renderHeatmap(); renderStudy(); renderSleep(); renderCheckinSummary(); renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights(); renderLearning(); renderProjects(); renderPending(); if (currentTab() === 'meses') renderYear(); };
+const renderProgress = () => {
+  renderKPIs(); renderHeatmap(); renderStudy(); renderSleep(); renderCheckinSummary();
+  renderMonth(); renderReview(); renderMonthReview(); renderMetrics(); renderInsights();
+  renderLearning(); renderProjects(); renderPending(); renderEvolutionTodayWidget();
+  if (currentTab() === 'meses') renderYear();
+  else if (currentTab() === 'evolucao') renderEvolutionTab();
+};
 
 /** Anula ou reativa um dia (`off: true`), excluindo-o das métricas gerais sem apagar registros existentes. */
 function toggleDayOff(k = selKey) {
@@ -7436,11 +8419,19 @@ $('#sg-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.tar
 
 // Revisão da semana
 $('#review-open').onclick = () => {
-  reviewManual = true;
-  reviewWeek = weekStart(new Date());
-  renderReview();
-  $('#review-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  evoMode = 'semana';
+  evoWeek = weekStart(new Date());
+  setTab('evolucao');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+if ($('#evo-today-btn')) {
+  $('#evo-today-btn').onclick = () => {
+    evoMode = 'semana';
+    evoWeek = weekStart(new Date());
+    setTab('evolucao');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+}
 $('#review-prev').onclick = () => { reviewManual = true; reviewWeek = addDays(reviewWeek, -7); renderReview(); };
 $('#review-next').onclick = () => { reviewManual = true; reviewWeek = addDays(reviewWeek, 7); renderReview(); };
 $('#review-close').onclick = () => {
@@ -7471,7 +8462,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !documen
 // Cards recolhíveis: ▾ no título; o que fica recolhido é lembrado neste aparelho
 const COLLAPSIBLE = { improve: '#improve-list', tasks: '#task-list', pending: '#pending-list', study: '#study-today', goals: '#goal-list',
   heat: '#heatmap', sleep: '#sleep-input', checkin: '#checkin', metrics: '#metric-list', projects: '#project-list',
-  money: '#exp-stats', insights: '#insight-list', month: '#month-card' };
+  money: '#exp-stats', insights: '#insight-list', month: '#month-card', evotoday: '#evo-today-body' };
 let collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('evolution-collapsed')) || []; } catch (e) { return []; } })());
 for (const [key, sel] of Object.entries(COLLAPSIBLE)) {
   const sec = $(sel)?.closest('section');
@@ -7501,7 +8492,7 @@ for (const [key, sel] of Object.entries(COLLAPSIBLE)) {
 $$('dialog').forEach((dlg) => {
   dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
 });
-$('#journal-open').onclick = () => { $('#journal-search').value = ''; renderJournal(); $('#journal').showModal(); };
+$('#journal-open').onclick = () => { $('#journal-search').value = ''; journalFilter = 'all'; renderJournal(); $('#journal').showModal(); };
 $('#journal-search').addEventListener('input', renderJournal);
 
 $('#skip-day').onclick = () => toggleDayOff(selKey);
@@ -7566,9 +8557,10 @@ $('#study-fix').onsubmit = (e) => { e.preventDefault(); setStudyTotal(Number($('
 
 // Reflexão do mês
 $('#mreview-open').onclick = () => {
-  mreviewManual = true; mreview = { ...view };
-  renderMonthReview();
-  $('#mreview-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  evoMode = 'mes';
+  evoMonth = { ...view };
+  setTab('evolucao');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 const shiftMonth = (n) => { let { y, m } = mreview; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } mreviewManual = true; mreview = { y, m }; renderMonthReview(); };
 $('#mr-prev').onclick = () => shiftMonth(-1);
@@ -7877,6 +8869,7 @@ function renderAll(openReflection = true) {
   renderSleep(); renderStudy(); renderReflection(); renderMonth(); renderReview(); renderSync();
   renderMetrics(); renderInsights(); renderPriorities(); renderMonthReview(); renderSubjects(); renderLearning();
   renderCheckin(); renderProjects(); renderPending(); renderExpenses();
+  renderEvolutionTodayWidget();
   renderTabs();
   // Reflexão abre sozinha à noite
   if (openReflection && new Date().getHours() >= 19) $('#reflection').open = true;
