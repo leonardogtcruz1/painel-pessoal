@@ -9836,16 +9836,17 @@ $('#import-file').onchange = async (e) => {
     const data = JSON.parse(await file.text());
     if (Array.isArray(data) && data.every((t) => t && typeof t === 'object' && t.id && t.title)) {
       const existingIds = new Set(S.tasks.map((t) => t.id));
+      const delSet = new Set(Array.isArray(S.deletedTasks) ? S.deletedTasks : []);
       let added = 0;
-      if (!S.deletedTasks || typeof S.deletedTasks !== 'object') S.deletedTasks = {};
       data.forEach((t) => {
-        delete S.deletedTasks[t.id];
+        delSet.delete(t.id);
         if (!existingIds.has(t.id)) {
           S.tasks.push(t);
           existingIds.add(t.id);
           added++;
         }
       });
+      S.deletedTasks = [...delSet];
       S.tasksU = Date.now();
       resync();
       save();
@@ -10132,6 +10133,56 @@ setInterval(renderHeader, 60000);
 
 renderAll();
 booted = true;
+
+function restoreRecoveredOnceTasks() {
+  const RECOVERED_ONCE_TASKS = [
+    { id: 'gqr4he39', once: '2026-09-27', title: 'Configurar Linkedin' },
+    { id: 'e4r64o1k', once: '2026-09-27', title: 'Entregar curriculo em agencias de emprego' },
+    { id: 'h2kba7gv', once: '2026-09-27', title: 'Lavar roupas' },
+    { id: 'n9a1f9js', once: '2026-09-28', lateK: '2026-09-29', title: 'Pedir proof of attendence' },
+    { id: '97tuxhv9', once: '2026-09-28', title: 'olhar mesa pro quarto' },
+    { id: 'ut9ozn7z', once: '2026-09-30', title: 'trabalhar no projeto IR' },
+    { id: '8z9tioah', once: '2026-10-01', title: 'Trabalhar no business IR' },
+    { id: 'lm917ggn', once: '2026-10-01', title: 'botar link do stripe na plat cursos e testar' },
+    { id: '947ng8op', once: '2026-10-01', title: 'call com pedro ramos sobre facul' },
+    { id: 'zpo0fa4c', once: '2026-10-02', title: 'entrar em contato com a tempest' },
+    { id: '342uugex', once: '2026-10-02', title: 'fechar emails chris' },
+    { id: 'xczej7ij', once: '2026-10-04', title: 'fazer comida' },
+    { id: '2rdxtwts', once: '2026-10-06', title: 'Fazer pt 2 jota IR' },
+    { id: 'dlsfb46g', once: '2026-10-06', title: 'Testar mais plat de cursos' },
+    { id: '22wbs81c', once: '2026-10-07', lateK: '2026-10-08', title: 'entregar CVs' },
+    { id: 'iblqdnqm', once: '2026-10-07', lateK: '2026-10-12', title: 'pagar DAS' },
+    { id: 'ywe6o4s5', once: '2026-10-07', lateK: '2026-10-12', title: 'responder email threshold' },
+    { id: 'dcbncmrz', once: '2026-10-07', lateK: '2026-10-12', title: 'testar plataforma de cursos e mandar pro erick' },
+    { id: '69l5gzro', once: '2026-10-12', title: 'responder email threshold' },
+    { id: 'wl8co2vv', once: '2026-10-12', title: 'trabalhar e plataforma cursos' },
+    { id: '75q8pjwa', once: '2026-10-13', title: 'aplicar pro bank of ireland' },
+    { id: '20ketbdj', once: '2026-10-13', title: 'distribuir CVs e aplicar online nos do notepad' },
+    { id: 'omzrx6tp', once: '2026-10-13', title: 'testar simulados com simulado real e gabarito' },
+    { id: 'pnl3i9xc', once: '2026-10-14', title: 'aplicar pras vagas online' },
+    { id: '4t37dk5s', once: '2026-10-15', title: 'comprar paradas no mercado pro final d semana' },
+    { id: 'eax02ybm', once: '2026-10-15', lateK: '2026-10-16', title: 'cozinhar' },
+    { id: 'ppwdivn6', once: '2026-10-15', title: 'fazer 1 simulado CNH irish' },
+    { id: '79ags7f5', once: '2026-10-16', lateK: '2026-10-18', title: 'rapar tudo e limpar quarto' },
+    { id: 'aj2dnru9', once: '2026-10-18', title: 'divulgar mais o negocio do IR' }
+  ];
+  const existingIds = new Set(S.tasks.map((t) => t.id));
+  const deleted = new Set(Array.isArray(S.deletedTasks) ? S.deletedTasks : []);
+  let added = 0;
+  for (const t of RECOVERED_ONCE_TASKS) {
+    if (!existingIds.has(t.id) && !deleted.has(t.id)) {
+      S.tasks.push({ ...t });
+      existingIds.add(t.id);
+      added++;
+    }
+  }
+  if (added > 0) {
+    resync();
+    save();
+    renderAll(false);
+  }
+}
+restoreRecoveredOnceTasks();
 
 // Animação suave de entrada dos cards ao rolar (IntersectionObserver)
 if (!REDUCED_MOTION && 'IntersectionObserver' in window) {
