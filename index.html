@@ -1129,6 +1129,91 @@
         </div>
       </section>
 
+      <!-- ============ MEU MUNDO — globo dos países visitados + lista de viagens ============ -->
+      <section id="travel-card" class="card space-y-5">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              <p class="eyebrow">Meu Mundo</p>
+            </div>
+            <h3 class="mt-1 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Países que já visitei</h3>
+            <p class="mt-0.5 text-xs text-zinc-500">Cada país pintado é uma experiência vivida. Gire o globo e toque em um país para registrar uma viagem.</p>
+          </div>
+          <button id="trip-add-btn" type="button" class="btn-primary text-xs py-1.5 px-3" aria-expanded="false" aria-controls="trip-form">+ Adicionar viagem</button>
+        </div>
+
+        <!-- Números da sua jornada pelo mundo -->
+        <div id="travel-stats" class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <!-- Injetado por JS: países, % do mundo, continentes, viagens -->
+        </div>
+
+        <!-- Globo -->
+        <div class="relative">
+          <div id="globe-wrap" class="relative mx-auto aspect-square w-full max-w-[440px] cursor-grab select-none active:cursor-grabbing" style="touch-action: pan-y">
+            <canvas id="globe-canvas" role="img" aria-label="Globo com os países visitados" class="absolute inset-0 h-full w-full"></canvas>
+            <div id="globe-status" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-xs text-zinc-500">
+              <span class="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-500 motion-reduce:animate-none dark:border-zinc-700 dark:border-t-emerald-500"></span>
+              <span>Carregando globo…</span>
+            </div>
+            <div id="globe-tip" class="pointer-events-none absolute left-0 top-0 z-10 hidden whitespace-nowrap rounded-lg border border-zinc-200 bg-white/95 px-2.5 py-1.5 text-xs shadow-lg backdrop-blur dark:border-[#272727] dark:bg-[#1F1F1F]/95"></div>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span> Visitado</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-zinc-300 dark:bg-zinc-700"></span> Ainda não</span>
+            <span aria-hidden="true">·</span>
+            <span>Arraste para girar</span>
+            <button id="globe-play" type="button" class="btn-ghost py-0.5 px-2 text-[11px]" aria-pressed="true">⏸ Pausar rotação</button>
+          </div>
+        </div>
+
+        <!-- Continentes -->
+        <div id="travel-continents" class="flex flex-wrap justify-center gap-1.5"></div>
+
+        <!-- Formulário de viagem (abre pelo botão ou ao tocar num país) -->
+        <form id="trip-form" class="hidden space-y-3 rounded-xl border border-emerald-500/25 bg-emerald-50/30 p-4 dark:bg-emerald-950/15" novalidate>
+          <p id="trip-form-title" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Nova viagem</p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="space-y-1">
+              <label for="trip-country" class="eyebrow">País *</label>
+              <input id="trip-country" name="country" class="field" list="trip-countries" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Ex.: Portugal" aria-describedby="trip-country-msg" />
+              <p id="trip-country-msg" class="min-h-[1rem] text-[11px] text-zinc-500" aria-live="polite"></p>
+            </div>
+            <div class="space-y-1">
+              <label for="trip-city" class="eyebrow">Cidade(s)</label>
+              <input id="trip-city" name="city" class="field" maxlength="80" placeholder="Ex.: Lisboa, Porto" />
+            </div>
+            <div class="space-y-1">
+              <label for="trip-start" class="eyebrow">Ida *</label>
+              <input id="trip-start" name="start" type="date" class="field" required />
+            </div>
+            <div class="space-y-1">
+              <label for="trip-end" class="eyebrow">Volta</label>
+              <input id="trip-end" name="end" type="date" class="field" aria-describedby="trip-end-msg" />
+              <p id="trip-end-msg" class="min-h-[1rem] text-[11px] text-rose-600 dark:text-rose-400" aria-live="polite"></p>
+            </div>
+            <div class="space-y-1 sm:col-span-2">
+              <label for="trip-note" class="eyebrow">Lembrança da viagem</label>
+              <input id="trip-note" name="note" class="field" maxlength="140" placeholder="Ex.: primeira viagem sozinho, vi a neve pela primeira vez" />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button id="trip-cancel" type="button" class="btn-ghost text-xs">Cancelar</button>
+            <button id="trip-submit" type="submit" class="btn-primary text-xs py-1.5 px-3">Salvar viagem</button>
+          </div>
+        </form>
+        <datalist id="trip-countries"></datalist>
+
+        <!-- Lista de viagens -->
+        <div class="space-y-3">
+          <div class="flex items-baseline justify-between gap-2">
+            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Minhas viagens</p>
+            <p id="trip-count" class="text-xs text-zinc-500"></p>
+          </div>
+          <div id="trip-list" class="space-y-5"></div>
+        </div>
+      </section>
+
       <!-- 3. Linha do Tempo da Minha Evolução (Histórico Antiestagnação) -->
       <section class="card space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800">
@@ -1399,6 +1484,7 @@ function freshState() {
     projects: [],   // { id, name, status: 'active'|'paused'|'done', created, due, milestones: [{ id, text, addedK, doneK }], log: [{ id, k, min, note }] } — hábitos entram via task.projectId
     topics: [],     // tópicos aprendidos (revisão espaçada): { id, title, subjectId, grade, created, stage, due, mastered, reviews: [{ k, ok }] }
     expenses: [],   // gastos: { id, k (AAAA-MM-DD), amount, cat, note }
+    trips: [],      // viagens: { id, c (ISO alfa-2), city, start, end, note } — globo "Meu Mundo"
     settings: { theme: null, studyGoalH: 10, currency: 'R$' },
   };
 }
@@ -1457,7 +1543,7 @@ function migrateHourTasks() {
  */
 const SYNCED = ['days', 'weeks', 'months'];
 /** Listas sincronizadas inteiras (vale a versão editada por último), cada uma com carimbo `<nome>U`. */
-const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics', 'questions', 'projects', 'expenses'];
+const LISTS = ['tasks', 'metrics', 'priorities', 'subjects', 'topics', 'questions', 'projects', 'expenses', 'trips'];
 const sigs = new Map();
 const sigOf = (rec) => { const { u, ...rest } = rec; return JSON.stringify(rest); };
 const settingsSig = () => JSON.stringify({ studyGoalH: S.settings.studyGoalH, currency: S.settings.currency, accent: S.settings.accent });
@@ -7513,6 +7599,7 @@ function renderEvolutionTab() {
 
   renderEvolutionEditor(rec, hints, isWeek);
   renderEvolutionCharts();
+  renderTravel();
   renderEvolutionTimeline();
 }
 
@@ -8430,6 +8517,674 @@ function renderEvolutionCharts() {
   }
 }
 
+/* =========================================================
+   MEU MUNDO — globo dos países visitados + lista de viagens
+   S.trips: [{ id, c (ISO alfa-2), city, start (AAAA-MM-DD), end (AAAA-MM-DD | ''), note }]
+   O globo usa d3-geo + topojson (carregados sob demanda, só quando o card aparece na tela).
+   ========================================================= */
+// alfa-2 + código numérico ISO (id no mapa) + continente (F África, N Am. Norte, S Am. Sul, A Ásia, E Europa, O Oceania, X Antártida)
+const COUNTRY_DATA = 'AF004A AX248E AL008E DZ012F AS016O AD020E AO024F AI660N AQ010X AG028N AR032S AM051A AW533N AU036O AT040E AZ031A BS044N BH048A BD050A BB052N BY112E BE056E BZ084N BJ204F BM060N BT064A BO068S BQ535N BA070E BW072F BV074S BR076S IO086F BN096A BG100E BF854F BI108F CV132F KH116A CM120F CA124N KY136N CF140F TD148F CL152S CN156A CX162O CC166O CO170S KM174F CG178F CD180F CK184O CR188N CI384F HR191E CU192N CW531N CY196A CZ203E DK208E DJ262F DM212N DO214N EC218S EG818F SV222N GQ226F ER232F EE233E SZ748F ET231F FK238S FO234E FJ242O FI246E FR250E GF254S PF258O TF260F GA266F GM270F GE268A DE276E GH288F GI292E GR300E GL304N GD308N GP312N GU316O GT320N GG831E GN324F GW624F GY328S HT332N HM334O VA336E HN340N HK344A HU348E IS352E IN356A ID360A IR364A IQ368A IE372E IM833E IL376A IT380E JM388N JP392A JE832E JO400A KZ398A KE404F KI296O KP408A KR410A KW414A KG417A LA418A LV428E LB422A LS426F LR430F LY434F LI438E LT440E LU442E MO446A MG450F MW454F MY458A MV462A ML466F MT470E MH584O MQ474N MR478F MU480F YT175F MX484N FM583O MD498E MC492E MN496A ME499E MS500N MA504F MZ508F MM104A NA516F NR520O NP524A NL528E NC540O NZ554O NI558N NE562F NG566F NU570O NF574O MK807E MP580O NO578E OM512A PK586A PW585O PS275A PA591N PG598O PY600S PE604S PH608A PN612O PL616E PT620E PR630N QA634A RE638F RO642E RU643E RW646F BL652N SH654F KN659N LC662N MF663N PM666N VC670N WS882O SM674E ST678F SA682A SN686F RS688E SC690F SL694F SG702A SX534N SK703E SI705E SB090O SO706F ZA710F GS239S SS728F ES724E LK144A SD729F SR740S SJ744E SE752E CH756E SY760A TW158A TJ762A TZ834F TH764A TL626A TG768F TK772O TO776O TT780N TN788F TR792A TM795A TC796N TV798O UG800F UA804E AE784A GB826E US840N UM581O UY858S UZ860A VU548O VE862S VN704A VG092N VI850N WF876O EH732F YE887A ZM894F ZW716F XK000E';
+const CONTINENTS = [['E', 'Europa'], ['S', 'América do Sul'], ['N', 'América do Norte'], ['A', 'Ásia'], ['F', 'África'], ['O', 'Oceania'], ['X', 'Antártida']];
+const WORLD_COUNTRIES = 195;   // países reconhecidos (193 da ONU + 2 observadores)
+const normName = (s) => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+const COUNTRIES = (() => {
+  let dn = null;
+  try { dn = new Intl.DisplayNames(['pt-BR'], { type: 'region' }); } catch (e) {}
+  return COUNTRY_DATA.split(' ')
+    .map((s) => ({ c: s.slice(0, 2), num: s.slice(2, 5), cont: s[5], name: (dn && dn.of(s.slice(0, 2))) || s.slice(0, 2) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+})();
+const COUNTRY_BY = Object.fromEntries(COUNTRIES.map((x) => [x.c, x]));
+const COUNTRY_BY_NUM = Object.fromEntries(COUNTRIES.filter((x) => x.num !== '000').map((x) => [x.num, x.c]));
+const COUNTRY_BY_NAME = Object.fromEntries(COUNTRIES.map((x) => [normName(x.name), x.c]));
+// regiões do mapa sem código ISO próprio
+const MAP_NAME_FIX = { 'Kosovo': 'XK', 'N. Cyprus': 'CY', 'Somaliland': 'SO' };
+// territórios pequenos que não existem no mapa: [lon, lat] para desenhar um ponto
+const SMALL_PLACES = { GI: [-5.35, 36.14], GP: [-61.55, 16.25], MQ: [-61.02, 14.64], RE: [55.53, -21.11], YT: [45.17, -12.83], GF: [-53.13, 3.93],
+  TV: [179.2, -8.52], TK: [-171.85, -9.2], BQ: [-68.25, 12.18], CX: [105.62, -10.49], CC: [96.87, -12.16], SJ: [15.65, 78.22], BV: [3.36, -54.42], UM: [166.6, 19.28] };
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+const flagOf = (c) => String.fromCodePoint(...[...String(c).toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+const countryName = (c) => COUNTRY_BY[c]?.name || c;
+const countryFromInput = (v) => {
+  const t = String(v || '').trim();
+  if (/^[a-z]{2}$/i.test(t) && COUNTRY_BY[t.toUpperCase()]) return t.toUpperCase();
+  return COUNTRY_BY_NAME[normName(t)] || null;
+};
+const tripDays = (t) => (t.end && t.end > t.start ? Math.round((parseKey(t.end) - parseKey(t.start)) / 864e5) + 1 : 1);
+function fmtTripRange(t) {
+  const a = parseKey(t.start), b = t.end && t.end > t.start ? parseKey(t.end) : null;
+  const d = (x) => `${x.getDate()} ${MONTHS_SHORT[x.getMonth()]}`;
+  if (!b) return `${d(a)} ${a.getFullYear()}`;
+  if (a.getFullYear() !== b.getFullYear()) return `${d(a)} ${a.getFullYear()} – ${d(b)} ${b.getFullYear()}`;
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${MONTHS_SHORT[a.getMonth()]} ${a.getFullYear()}`;
+  return `${d(a)} – ${d(b)} ${a.getFullYear()}`;
+}
+const pastTrips = () => (S.trips || []).filter((t) => t.start <= todayKey());
+
+// ---------- Globo ----------
+const GEO_LIBS = [
+  'https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js',
+  'https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js',
+];
+const TOPO_LIB = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js';
+const WORLD_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json';
+
+const GLOBE = {
+  state: 'idle',        // idle → loading → ready | error
+  feats: [], land: null, borders: null, graticule: null, projection: null, ctx: null, size: 0,
+  areaBy: {}, centroidBy: {}, visited: new Set(), counts: {},
+  rot: [40, -18, 0],    // começa mostrando o Brasil/Atlântico
+  playing: !REDUCED_MOTION, inView: false, raf: 0, lastT: 0, lastInteract: 0,
+  dragging: false, moved: false, vel: 0, drag: null, tween: null, hover: null, flash: null, colors: null,
+};
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const old = document.querySelector(`script[data-src="${src}"]`);
+    if (old) { old.dataset.ok ? resolve() : (old.addEventListener('load', resolve), old.addEventListener('error', reject)); return; }
+    const s = document.createElement('script');
+    s.src = src; s.async = true; s.dataset.src = src;
+    s.onload = () => { s.dataset.ok = '1'; resolve(); };
+    s.onerror = () => { s.remove(); reject(new Error('falha ao carregar ' + src)); };
+    document.head.append(s);
+  });
+}
+
+function setGlobeStatus(html) {
+  const st = $('#globe-status');
+  if (!st) return;
+  st.classList.toggle('hidden', !html);
+  if (html) st.innerHTML = html;
+}
+
+function ensureGlobe() {
+  if (GLOBE.state !== 'idle') return;
+  GLOBE.state = 'loading';
+  setGlobeStatus('<span class="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-500 motion-reduce:animate-none dark:border-zinc-700 dark:border-t-emerald-500"></span><span>Carregando globo…</span>');
+  Promise.all([
+    loadScript(GEO_LIBS[0]).then(() => loadScript(GEO_LIBS[1])),
+    loadScript(TOPO_LIB),
+    fetch(WORLD_URL).then((r) => { if (!r.ok) throw new Error('mapa indisponível'); return r.json(); }),
+  ]).then(([, , world]) => setupGlobe(world)).catch(() => {
+    GLOBE.state = 'idle';
+    setGlobeStatus('<span>Não foi possível carregar o globo (sem conexão?).<br />Sua lista de viagens continua funcionando.</span><button id="globe-retry" type="button" class="btn-ghost text-xs">Tentar de novo</button>');
+    const rb = $('#globe-retry');
+    if (rb) rb.onclick = ensureGlobe;
+  });
+}
+
+function setupGlobe(world) {
+  const feats = topojson.feature(world, world.objects.countries).features;
+  for (const f of feats) f.code = COUNTRY_BY_NUM[f.id] || MAP_NAME_FIX[f.properties?.name] || null;
+  GLOBE.feats = feats.filter((f) => f.code);
+  for (const f of GLOBE.feats) {
+    f.bounds = d3.geoBounds(f);
+    GLOBE.areaBy[f.code] = (GLOBE.areaBy[f.code] || 0) + d3.geoArea(f);
+  }
+  GLOBE.land = topojson.feature(world, world.objects.land);
+  GLOBE.borders = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+  GLOBE.graticule = d3.geoGraticule10();
+  GLOBE.projection = d3.geoOrthographic().clipAngle(90).precision(0.6);
+  GLOBE.ctx = $('#globe-canvas').getContext('2d');
+  GLOBE.state = 'ready';
+  setGlobeStatus('');
+  refreshGlobeColors();
+  resizeGlobe();
+  drawGlobe();
+  kickGlobe();
+}
+
+/** Centro do maior pedaço do país (a França não é puxada para a Guiana Francesa, por exemplo). */
+function countryCenter(code) {
+  if (GLOBE.centroidBy[code]) return GLOBE.centroidBy[code];
+  if (SMALL_PLACES[code]) return SMALL_PLACES[code];
+  let best = null, bestA = -1;
+  for (const f of GLOBE.feats) {
+    if (f.code !== code) continue;
+    const g = f.geometry;
+    const polys = g.type === 'MultiPolygon' ? g.coordinates.map((c) => ({ type: 'Polygon', coordinates: c })) : [g];
+    for (const p of polys) { const a = d3.geoArea(p); if (a > bestA) { bestA = a; best = p; } }
+  }
+  const c = best ? d3.geoCentroid(best) : null;
+  if (c) GLOBE.centroidBy[code] = c;
+  return c;
+}
+
+const rgbaOf = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+function refreshGlobeColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const tri = (v) => cs.getPropertyValue(v).trim().split(/[\s,]+/).map(Number);
+  const dark = document.documentElement.classList.contains('dark');
+  GLOBE.colors = {
+    dark,
+    acc: tri('--acc-500'),
+    accHi: tri(dark ? '--acc-300' : '--acc-700'),
+    ocean0: dark ? '#26262b' : '#fafafa',
+    ocean1: dark ? '#0e0e10' : '#e4e4e7',
+    land: dark ? '#3b3b42' : '#cfcfd6',
+    landHover: dark ? '#55555e' : '#b4b4bd',
+    border: dark ? 'rgba(20,20,22,0.85)' : 'rgba(255,255,255,0.95)',
+    grat: dark ? 'rgba(255,255,255,0.045)' : 'rgba(24,24,27,0.05)',
+  };
+}
+
+function resizeGlobe() {
+  const wrap = $('#globe-wrap'), cv = $('#globe-canvas');
+  if (!wrap || !cv || !GLOBE.projection) return;
+  const size = wrap.clientWidth;
+  if (!size) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(size * dpr);
+  cv.height = Math.round(size * dpr);
+  GLOBE.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  GLOBE.size = size;
+  GLOBE.projection.translate([size / 2, size / 2]).scale(size / 2 - Math.max(10, size * 0.06));
+  GLOBE.hover = null;
+  showGlobeTip(null);
+}
+
+/** Território que não aparece no tamanho atual do globo → vira um ponto. */
+const isTinyOnGlobe = (code) => !GLOBE.areaBy[code] || GLOBE.areaBy[code] * GLOBE.projection.scale() ** 2 < 14;
+const isFrontSide = (ll) => d3.geoDistance(ll, [-GLOBE.rot[0], -GLOBE.rot[1]]) < Math.PI / 2 - 0.02;
+
+function drawGlobe() {
+  const G = GLOBE, ctx = G.ctx, P = G.projection, C = G.colors, size = G.size;
+  if (G.state !== 'ready' || !ctx || !size) return;
+  P.rotate(G.rot);
+  const path = d3.geoPath(P, ctx);
+  const r = P.scale(), cx = size / 2, cy = size / 2, TAU = Math.PI * 2;
+  ctx.clearRect(0, 0, size, size);
+
+  // halo na cor do tema
+  const halo = ctx.createRadialGradient(cx, cy, r * 0.94, cx, cy, r * 1.13);
+  halo.addColorStop(0, rgbaOf(C.acc, C.dark ? 0.32 : 0.22));
+  halo.addColorStop(1, rgbaOf(C.acc, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.13, 0, TAU); ctx.fill();
+
+  // oceano
+  const oc = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r);
+  oc.addColorStop(0, C.ocean0); oc.addColorStop(1, C.ocean1);
+  ctx.beginPath(); path({ type: 'Sphere' }); ctx.fillStyle = oc; ctx.fill();
+
+  ctx.beginPath(); path(G.graticule); ctx.strokeStyle = C.grat; ctx.lineWidth = 0.6; ctx.stroke();
+
+  // terra (não visitada)
+  ctx.beginPath(); path(G.land); ctx.fillStyle = C.land; ctx.fill();
+
+  const hover = G.flash && G.flash.until > performance.now() ? G.flash.code : G.hover;
+  if (hover && !G.visited.has(hover)) {
+    ctx.beginPath(); for (const f of G.feats) if (f.code === hover) path(f);
+    ctx.fillStyle = C.landHover; ctx.fill();
+  }
+
+  // países visitados
+  ctx.beginPath(); for (const f of G.feats) if (G.visited.has(f.code)) path(f);
+  ctx.fillStyle = rgbaOf(C.acc); ctx.fill();
+  if (hover && G.visited.has(hover)) {
+    ctx.beginPath(); for (const f of G.feats) if (f.code === hover) path(f);
+    ctx.fillStyle = rgbaOf(C.accHi); ctx.fill();
+  }
+
+  ctx.beginPath(); path(G.borders); ctx.strokeStyle = C.border; ctx.lineWidth = 0.5; ctx.stroke();
+
+  // territórios pequenos visitados: ponto com anel
+  for (const code of G.visited) {
+    if (!isTinyOnGlobe(code)) continue;
+    const ll = countryCenter(code);
+    if (!ll || !isFrontSide(ll)) continue;
+    const [px, py] = P(ll);
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, TAU); ctx.fillStyle = rgbaOf(C.acc, 0.22); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, 3.2, 0, TAU); ctx.fillStyle = rgbaOf(code === hover ? C.accHi : C.acc); ctx.fill();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = C.dark ? '#18181b' : '#ffffff'; ctx.stroke();
+  }
+
+  // luz e sombra para dar volume
+  const sh = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.45, 0, cx, cy, r * 1.02);
+  sh.addColorStop(0, `rgba(255,255,255,${C.dark ? 0.07 : 0.28})`);
+  sh.addColorStop(0.5, 'rgba(255,255,255,0)');
+  sh.addColorStop(1, `rgba(0,0,0,${C.dark ? 0.38 : 0.12})`);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fillStyle = sh; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.strokeStyle = rgbaOf(C.acc, C.dark ? 0.35 : 0.3); ctx.lineWidth = 1; ctx.stroke();
+}
+
+const globeShouldRun = () => GLOBE.state === 'ready' && GLOBE.inView && !document.hidden && currentTab() === 'evolucao';
+const globeAnimating = () => GLOBE.dragging || GLOBE.tween || Math.abs(GLOBE.vel) > 0.0005 || GLOBE.playing || (GLOBE.flash && GLOBE.flash.until > performance.now());
+function kickGlobe() {
+  if (!GLOBE.raf && globeShouldRun()) { GLOBE.lastT = 0; GLOBE.raf = requestAnimationFrame(globeTick); }
+}
+function globeTick(t) {
+  const G = GLOBE;
+  G.raf = 0;
+  if (!globeShouldRun()) return;
+  const dt = G.lastT ? Math.min(64, t - G.lastT) : 16;
+  G.lastT = t;
+  if (G.tween) {
+    const k = Math.min(1, (t - G.tween.t0) / G.tween.dur), e = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+    G.rot = [G.tween.from[0] + G.tween.d[0] * e, G.tween.from[1] + G.tween.d[1] * e, 0];
+    if (k >= 1) G.tween = null;
+  } else if (!G.dragging) {
+    if (Math.abs(G.vel) > 0.0005) { G.rot[0] += G.vel * dt; G.vel *= Math.pow(0.93, dt / 16); }
+    else if (G.playing && t - G.lastInteract > 2500) G.rot[0] += dt * 0.006;   // ~6°/s
+  }
+  drawGlobe();
+  if (globeAnimating()) G.raf = requestAnimationFrame(globeTick);
+}
+
+/** Gira o globo até o país (e o destaca por um instante). */
+function rotateGlobeTo(code) {
+  if (GLOBE.state !== 'ready') return;
+  const ll = countryCenter(code);
+  if (!ll) return;
+  const to = [-ll[0], Math.max(-60, Math.min(60, -ll[1]))];
+  const from = [...GLOBE.rot];
+  const d = [((to[0] - from[0]) % 360 + 540) % 360 - 180, to[1] - from[1]];
+  GLOBE.vel = 0;
+  GLOBE.lastInteract = performance.now();
+  GLOBE.flash = { code, until: performance.now() + 2600 };
+  if (REDUCED_MOTION) { GLOBE.rot = [to[0], to[1], 0]; GLOBE.tween = null; drawGlobe(); }
+  else GLOBE.tween = { from, d, t0: performance.now(), dur: 1100 };
+  kickGlobe();
+}
+
+/** País sob o ponteiro (x, y em px dentro do canvas). */
+function globePick(x, y) {
+  const G = GLOBE, P = G.projection;
+  if (G.state !== 'ready') return null;
+  const r = P.scale(), cx = G.size / 2, cy = G.size / 2;
+  if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) return null;
+  // pontos de territórios pequenos primeiro (alvo de toque maior)
+  for (const code of G.visited) {
+    if (!isTinyOnGlobe(code)) continue;
+    const ll = countryCenter(code);
+    if (!ll || !isFrontSide(ll)) continue;
+    const [px, py] = P(ll);
+    if ((x - px) ** 2 + (y - py) ** 2 < 100) return code;
+  }
+  const ll = P.invert([x, y]);
+  if (!ll) return null;
+  const [lon, lat] = ll;
+  for (const f of G.feats) {
+    const [[w, s], [e, n]] = f.bounds;
+    if (lat < s || lat > n) continue;
+    if (w <= e ? (lon < w || lon > e) : (lon < w && lon > e)) continue;
+    if (d3.geoContains(f, ll)) return f.code;
+  }
+  return null;
+}
+
+function showGlobeTip(code, x, y) {
+  const tip = $('#globe-tip');
+  if (!tip) return;
+  if (!code) { tip.classList.add('hidden'); return; }
+  const n = GLOBE.counts[code] || 0;
+  tip.replaceChildren();
+  const h = document.createElement('p');
+  h.className = 'font-semibold text-zinc-900 dark:text-zinc-100';
+  h.textContent = `${flagOf(code)} ${countryName(code)}`;
+  const s = document.createElement('p');
+  s.className = 'mt-0.5 text-[11px] ' + (n ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500');
+  s.textContent = n ? `Visitado · ${n} ${n === 1 ? 'viagem' : 'viagens'}` : 'Clique para registrar uma viagem';
+  tip.append(h, s);
+  tip.classList.remove('hidden');
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  const left = Math.min(GLOBE.size - tw - 4, Math.max(4, x + 14));
+  const top = y + 14 + th > GLOBE.size ? y - th - 10 : y + 14;
+  tip.style.translate = `${left}px ${top}px`;
+}
+
+function initGlobeInteractions() {
+  const wrap = $('#globe-wrap');
+  if (!wrap || wrap.dataset.bound) return;
+  wrap.dataset.bound = '1';
+  const pos = (e) => { const b = wrap.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  let hoverRaf = 0;
+
+  wrap.addEventListener('pointerdown', (e) => {
+    if (GLOBE.state !== 'ready' || e.button > 0) return;
+    const [x, y] = pos(e);
+    GLOBE.dragging = true; GLOBE.moved = false; GLOBE.vel = 0; GLOBE.tween = null;
+    GLOBE.drag = { x, y, rot: [...GLOBE.rot], lx: x, lt: performance.now() };
+    wrap.setPointerCapture(e.pointerId);
+    kickGlobe();
+  });
+  wrap.addEventListener('pointermove', (e) => {
+    if (GLOBE.state !== 'ready') return;
+    const [x, y] = pos(e);
+    if (GLOBE.dragging) {
+      const D = GLOBE.drag, k = 70 / GLOBE.projection.scale();
+      if (Math.abs(x - D.x) + Math.abs(y - D.y) > 4) GLOBE.moved = true;
+      GLOBE.rot = [D.rot[0] + (x - D.x) * k, Math.max(-60, Math.min(60, D.rot[1] - (y - D.y) * k)), 0];
+      const now = performance.now(), dt = Math.max(1, now - D.lt);
+      GLOBE.vel = ((x - D.lx) * k) / dt;
+      D.lx = x; D.lt = now;
+      showGlobeTip(null);
+      return;
+    }
+    if (e.pointerType !== 'mouse') return;
+    if (hoverRaf) return;
+    hoverRaf = requestAnimationFrame(() => {
+      hoverRaf = 0;
+      const code = globePick(x, y);
+      if (code !== GLOBE.hover) { GLOBE.hover = code; if (!GLOBE.raf) drawGlobe(); }
+      showGlobeTip(code, x, y);
+    });
+  });
+  const end = (e, cancelled) => {
+    if (!GLOBE.dragging) return;
+    GLOBE.dragging = false;
+    GLOBE.lastInteract = performance.now();
+    if (performance.now() - GLOBE.drag.lt > 80) GLOBE.vel = 0;   // soltou parado: sem inércia
+    if (!cancelled && !GLOBE.moved) {
+      GLOBE.vel = 0;
+      const [x, y] = pos(e);
+      const code = globePick(x, y);
+      if (code) openTripForm({ code });
+    }
+    kickGlobe();
+  };
+  wrap.addEventListener('pointerup', (e) => end(e, false));
+  wrap.addEventListener('pointercancel', (e) => end(e, true));
+  wrap.addEventListener('pointerleave', () => {
+    if (GLOBE.dragging) return;
+    GLOBE.hover = null; showGlobeTip(null);
+    if (!GLOBE.raf) drawGlobe();
+  });
+
+  // Carrega o globo só quando o card aparece na tela; pausa a animação fora dela
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([en]) => {
+      GLOBE.inView = en.isIntersecting;
+      if (en.isIntersecting) { ensureGlobe(); kickGlobe(); }
+    }, { rootMargin: '120px' }).observe(wrap);
+  } else { GLOBE.inView = true; ensureGlobe(); }
+
+  let rsRaf = 0;
+  new ResizeObserver(() => {
+    cancelAnimationFrame(rsRaf);
+    rsRaf = requestAnimationFrame(() => { if (GLOBE.state === 'ready') { resizeGlobe(); drawGlobe(); } });
+  }).observe(wrap);
+
+  // Troca de tema/cor de destaque → repinta na hora
+  new MutationObserver(() => { if (GLOBE.state === 'ready') { refreshGlobeColors(); drawGlobe(); } })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-accent'] });
+
+  const play = $('#globe-play');
+  const paintPlay = () => {
+    play.setAttribute('aria-pressed', String(GLOBE.playing));
+    play.textContent = GLOBE.playing ? '⏸ Pausar rotação' : '▶ Girar globo';
+  };
+  play.onclick = () => { GLOBE.playing = !GLOBE.playing; GLOBE.lastInteract = 0; paintPlay(); kickGlobe(); };
+  paintPlay();
+}
+
+// ---------- Formulário de viagem ----------
+let tripEditId = null;
+function openTripForm({ code = null, id = null } = {}) {
+  const form = $('#trip-form');
+  if (!form) return;
+  const t = id ? (S.trips || []).find((x) => x.id === id) : null;
+  tripEditId = t ? t.id : null;
+  form.reset();
+  $('#trip-country-msg').textContent = '';
+  $('#trip-end-msg').textContent = '';
+  $('#trip-country').setCustomValidity('');
+  $('#trip-end').setCustomValidity('');
+  const c = t ? t.c : code;
+  if (c) $('#trip-country').value = countryName(c);
+  if (t) {
+    $('#trip-city').value = t.city || '';
+    $('#trip-start').value = t.start;
+    $('#trip-end').value = t.end || '';
+    $('#trip-note').value = t.note || '';
+  }
+  $('#trip-form-title').textContent = t ? `Editar viagem · ${flagOf(t.c)} ${countryName(t.c)}` : c ? `Nova viagem · ${flagOf(c)} ${countryName(c)}` : 'Nova viagem';
+  $('#trip-submit').textContent = t ? 'Salvar alterações' : 'Salvar viagem';
+  form.classList.remove('hidden');
+  $('#trip-add-btn').setAttribute('aria-expanded', 'true');
+  form.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'nearest' });
+  (c ? $('#trip-start') : $('#trip-country')).focus({ preventScroll: true });
+  if (c) updateTripCountryMsg();
+}
+function closeTripForm() {
+  const form = $('#trip-form');
+  if (!form) return;
+  form.classList.add('hidden');
+  form.reset();
+  tripEditId = null;
+  $('#trip-add-btn').setAttribute('aria-expanded', 'false');
+}
+function updateTripCountryMsg() {
+  const code = countryFromInput($('#trip-country').value);
+  const msg = $('#trip-country-msg');
+  if (!code) { msg.textContent = ''; return; }
+  const n = pastTrips().filter((t) => t.c === code && t.id !== tripEditId).length;
+  msg.className = 'min-h-[1rem] text-[11px] ' + (n ? 'text-zinc-500' : 'text-emerald-700 dark:text-emerald-400');
+  msg.textContent = n ? `${flagOf(code)} Você já esteve aqui ${n === 1 ? '1 vez' : n + ' vezes'}.` : `${flagOf(code)} País novo para a sua coleção!`;
+}
+function initTripForm() {
+  const form = $('#trip-form');
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = '1';
+  const dl = $('#trip-countries');
+  for (const x of COUNTRIES) { const o = document.createElement('option'); o.value = x.name; dl.append(o); }
+
+  const country = $('#trip-country'), start = $('#trip-start'), end = $('#trip-end');
+  country.addEventListener('input', () => { country.setCustomValidity(''); updateTripCountryMsg(); });
+  country.addEventListener('blur', () => {
+    if (country.value.trim() && !countryFromInput(country.value)) {
+      const msg = $('#trip-country-msg');
+      msg.className = 'min-h-[1rem] text-[11px] text-rose-600 dark:text-rose-400';
+      msg.textContent = 'Escolha um país da lista.';
+    }
+  });
+  const clearEnd = () => { end.setCustomValidity(''); $('#trip-end-msg').textContent = ''; };
+  end.addEventListener('input', clearEnd);
+  start.addEventListener('input', () => { clearEnd(); if (start.value) end.min = start.value; });
+
+  $('#trip-add-btn').onclick = () => (form.classList.contains('hidden') || tripEditId ? openTripForm() : closeTripForm());
+  $('#trip-cancel').onclick = closeTripForm;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = countryFromInput(country.value);
+    if (!code) {
+      country.setCustomValidity('Escolha um país da lista.');
+      const msg = $('#trip-country-msg');
+      msg.className = 'min-h-[1rem] text-[11px] text-rose-600 dark:text-rose-400';
+      msg.textContent = 'Escolha um país da lista.';
+      country.focus();
+      return;
+    }
+    if (!start.value) { start.reportValidity(); return; }
+    if (end.value && end.value < start.value) {
+      end.setCustomValidity('A volta precisa ser depois da ida.');
+      $('#trip-end-msg').textContent = 'A volta precisa ser depois da ida.';
+      end.focus();
+      return;
+    }
+    const data = { c: code, city: $('#trip-city').value.trim(), start: start.value, end: end.value || '', note: $('#trip-note').value.trim() };
+    S.trips ||= [];
+    const old = tripEditId && S.trips.find((t) => t.id === tripEditId);
+    if (old) Object.assign(old, data);
+    else S.trips.push({ id: uid(), ...data });
+    closeTripForm();
+    commit(renderTravel);
+    rotateGlobeTo(code);
+  });
+}
+
+function removeTrip(id) {
+  const t = (S.trips || []).find((x) => x.id === id);
+  if (!t || !confirm(`Remover a viagem para ${countryName(t.c)} (${fmtTripRange(t)})?`)) return;
+  S.trips = S.trips.filter((x) => x.id !== id);
+  if (tripEditId === id) closeTripForm();
+  commit(renderTravel);
+}
+
+// ---------- Render ----------
+function renderTravel() {
+  const card = $('#travel-card'), panel = $('#view-evolucao');
+  if (!card || !panel || panel.classList.contains('hidden')) return;
+  initTripForm();
+  initGlobeInteractions();
+
+  const today = todayKey();
+  const trips = [...(S.trips || [])].sort((a, b) => (a.start < b.start ? 1 : a.start > b.start ? -1 : 0));
+  const past = trips.filter((t) => t.start <= today);
+  const counts = {};
+  for (const t of past) counts[t.c] = (counts[t.c] || 0) + 1;
+  const visited = new Set(Object.keys(counts));
+  GLOBE.visited = visited;
+  GLOBE.counts = counts;
+  if (GLOBE.state === 'ready' && !GLOBE.raf) drawGlobe();
+  kickGlobe();
+
+  // 1ª visita de cada país = a viagem mais antiga para lá
+  const firstVisit = {};
+  for (const t of [...past].reverse()) if (!firstVisit[t.c]) firstVisit[t.c] = t.id;
+
+  const contCount = {};
+  for (const c of visited) { const k = COUNTRY_BY[c]?.cont || 'X'; contCount[k] = (contCount[k] || 0) + 1; }
+  const nCont = Object.keys(contCount).length;
+  const nC = visited.size;
+  const pct = Math.min(100, (nC / WORLD_COUNTRIES) * 100);
+  const daysAway = past.reduce((s, t) => s + tripDays(t), 0);
+  const planned = trips.length - past.length;
+
+  // Números
+  const stats = $('#travel-stats');
+  stats.replaceChildren();
+  const statItems = [
+    { label: 'Países', val: String(nC), sub: nC === 1 ? 'país visitado' : 'países visitados', hero: true },
+    { label: 'Do mundo', val: `${pct < 10 && pct > 0 ? pct.toFixed(1).replace('.', ',') : Math.round(pct)}%`, sub: `de ${WORLD_COUNTRIES} países`, bar: pct },
+    { label: 'Continentes', val: `${nCont}/7`, sub: nCont ? CONTINENTS.filter(([k]) => contCount[k]).map(([, n]) => n).join(', ') : 'nenhum ainda' },
+    { label: 'Viagens', val: String(past.length), sub: `${daysAway} ${daysAway === 1 ? 'dia' : 'dias'} pelo mundo${planned ? ` · ${planned} planejada${planned > 1 ? 's' : ''}` : ''}` },
+  ];
+  for (const s of statItems) {
+    const el = document.createElement('div');
+    el.className = 'rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800/80 dark:bg-zinc-800/30';
+    const l = document.createElement('p'); l.className = 'eyebrow'; l.textContent = s.label;
+    const v = document.createElement('p');
+    v.className = 'mt-1 text-lg font-bold tabular-nums ' + (s.hero ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-zinc-100');
+    v.textContent = s.val;
+    const sb = document.createElement('p'); sb.className = 'mt-0.5 truncate text-[11px] text-zinc-500'; sb.textContent = s.sub; sb.title = s.sub;
+    el.append(l, v);
+    if (s.bar != null) {
+      const tr = document.createElement('div'); tr.className = 'track mt-1.5 !h-1.5';
+      const fi = document.createElement('div'); fi.className = 'fill'; fi.style.width = `${Math.max(s.bar ? 2 : 0, s.bar)}%`;
+      tr.append(fi); el.append(tr);
+    }
+    el.append(sb);
+    stats.append(el);
+  }
+
+  // Continentes
+  const conts = $('#travel-continents');
+  conts.replaceChildren();
+  for (const [k, n] of CONTINENTS) {
+    if (k === 'X' && !contCount.X) continue;
+    const ch = document.createElement('span');
+    const on = !!contCount[k];
+    ch.className = 'rounded-full border px-2.5 py-0.5 text-[11px] font-medium ' + (on
+      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+      : 'border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500');
+    ch.textContent = on ? `${n} · ${contCount[k]}` : n;
+    conts.append(ch);
+  }
+
+  const cv = $('#globe-canvas');
+  if (cv) cv.setAttribute('aria-label', nC ? `Globo com ${nC} ${nC === 1 ? 'país visitado' : 'países visitados'}: ${[...visited].map(countryName).sort((a, b) => a.localeCompare(b, 'pt-BR')).join(', ')}` : 'Globo sem países visitados ainda');
+
+  // Lista de viagens por ano
+  $('#trip-count').textContent = trips.length ? `${trips.length} ${trips.length === 1 ? 'viagem' : 'viagens'}` : '';
+  const list = $('#trip-list');
+  list.replaceChildren();
+  if (!trips.length) {
+    const empty = document.createElement('div');
+    empty.className = 'rounded-xl border border-dashed border-zinc-300 p-6 text-center text-xs text-zinc-500 dark:border-zinc-700';
+    empty.innerHTML = '<p class="text-2xl">🌍</p><p class="mt-2 font-semibold text-zinc-700 dark:text-zinc-300">Seu mapa ainda está em branco</p><p class="mt-1">Toque em um país no globo ou use “+ Adicionar viagem” para começar a pintar o mundo.</p>';
+    list.append(empty);
+    return;
+  }
+  const byYear = new Map();
+  for (const t of trips) {
+    const y = t.start.slice(0, 4);
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(t);
+  }
+  for (const [y, ts] of byYear) {
+    const group = document.createElement('div');
+    const head = document.createElement('div');
+    head.className = 'mb-2 flex items-baseline justify-between gap-2 border-b border-zinc-100 pb-1.5 dark:border-zinc-800';
+    const yt = document.createElement('p'); yt.className = 'text-sm font-bold tabular-nums text-zinc-900 dark:text-zinc-100'; yt.textContent = y;
+    const ys = document.createElement('p'); ys.className = 'text-[11px] text-zinc-500';
+    const yc = new Set(ts.map((t) => t.c)).size;
+    const yNew = ts.filter((t) => firstVisit[t.c] === t.id).length;
+    ys.textContent = `${yc} ${yc === 1 ? 'país' : 'países'} · ${ts.length} ${ts.length === 1 ? 'viagem' : 'viagens'}${yNew ? ` · ${yNew} ${yNew === 1 ? 'novo' : 'novos'}` : ''}`;
+    head.append(yt, ys);
+    const ul = document.createElement('ul');
+    ul.className = 'space-y-1.5';
+    for (const t of ts) {
+      const li = document.createElement('li');
+      li.className = 'group flex items-center gap-1 rounded-xl border border-zinc-200/70 bg-white transition hover:border-emerald-500/40 dark:border-zinc-800 dark:bg-zinc-800/20';
+      const main = document.createElement('button');
+      main.type = 'button';
+      main.className = 'flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40';
+      main.title = 'Ver no globo';
+      main.onclick = () => { rotateGlobeTo(t.c); $('#globe-wrap')?.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'center' }); };
+      const fl = document.createElement('span');
+      fl.className = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-2xl leading-none dark:bg-zinc-800';
+      fl.textContent = flagOf(t.c);
+      fl.setAttribute('aria-hidden', 'true');
+      const txt = document.createElement('span');
+      txt.className = 'min-w-0 flex-1';
+      const nm = document.createElement('span');
+      nm.className = 'flex flex-wrap items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100';
+      const nmText = document.createElement('span'); nmText.textContent = countryName(t.c);
+      nm.append(nmText);
+      const badge = (label, cls) => { const b = document.createElement('span'); b.className = 'rounded px-1.5 py-0.5 text-[10px] font-semibold ' + cls; b.textContent = label; nm.append(b); };
+      const ongoing = t.start <= today && (t.end || t.start) >= today;
+      if (t.start > today) badge('Planejada', 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300');
+      else if (ongoing && t.end && t.end > t.start) badge('Agora', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300');
+      if (firstVisit[t.c] === t.id) badge('1ª vez', 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400');
+      const sub = document.createElement('span');
+      sub.className = 'mt-0.5 block truncate text-xs text-zinc-500';
+      const days = tripDays(t);
+      sub.textContent = [t.city, fmtTripRange(t), `${days} ${days === 1 ? 'dia' : 'dias'}`].filter(Boolean).join(' · ');
+      txt.append(nm, sub);
+      if (t.note) {
+        const nt = document.createElement('span');
+        nt.className = 'mt-0.5 block truncate text-[11px] italic text-zinc-400';
+        nt.textContent = `“${t.note}”`;
+        txt.append(nt);
+      }
+      main.append(fl, txt);
+      const acts = document.createElement('span');
+      acts.className = 'flex shrink-0 items-center pr-1.5';
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'btn-ghost h-8 w-8 p-0 text-xs';
+      edit.setAttribute('aria-label', `Editar viagem para ${countryName(t.c)}`);
+      edit.title = 'Editar';
+      edit.textContent = '✏️';
+      edit.onclick = () => openTripForm({ id: t.id });
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn-ghost h-8 w-8 p-0 text-base hover:!text-rose-600';
+      del.setAttribute('aria-label', `Remover viagem para ${countryName(t.c)}`);
+      del.title = 'Remover';
+      del.textContent = '×';
+      del.onclick = () => removeTrip(t.id);
+      acts.append(edit, del);
+      li.append(main, acts);
+      ul.append(li);
+    }
+    group.append(head, ul);
+    list.append(group);
+  }
+}
+
 // ---------- Abas ----------
 function currentTab() {
   const h = location.hash.replace(/^#/, '');
@@ -8907,7 +9662,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !documen
 // Cards recolhíveis: ▾ no título; o que fica recolhido é lembrado neste aparelho
 const COLLAPSIBLE = { improve: '#improve-list', tasks: '#task-list', pending: '#pending-list', study: '#study-today', goals: '#goal-list',
   heat: '#heatmap', sleep: '#sleep-input', checkin: '#checkin', metrics: '#metric-list', projects: '#project-list',
-  money: '#exp-stats', insights: '#insight-list', month: '#month-card', evotoday: '#evo-today-body', evocharts: '#evo-chart-host' };
+  money: '#exp-stats', insights: '#insight-list', month: '#month-card', evotoday: '#evo-today-body', evocharts: '#evo-chart-host', travel: '#travel-stats' };
 let collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('evolution-collapsed')) || []; } catch (e) { return []; } })());
 for (const [key, sel] of Object.entries(COLLAPSIBLE)) {
   const sec = $(sel)?.closest('section');
