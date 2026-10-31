@@ -1574,8 +1574,13 @@ function stampChanges() {
 rememberSigs();
 
 function save() {
+  if (!booted) {
+    rememberSigs();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+    return;
+  }
   const changed = stampChanges();
-  if (changed && booted) delete S.pristine;
+  if (changed) delete S.pristine;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
   if (changed) scheduleSync();
 }
@@ -9322,6 +9327,7 @@ function dropPending(id) {
 }
 function removeTask(id) {
   S.tasks = S.tasks.filter((t) => t.id !== id);
+  S.deletedTasks = [...new Set([...(S.deletedTasks || []), id])];
   if (editingTask === id) editingTask = null;
   resync();
   commit(renderTasks, renderProgress);
@@ -9863,6 +9869,7 @@ let authBusy = false, authError = '', authInfo = '';
 function syncPayload() {
   const lists = Object.fromEntries(LISTS.flatMap((l) => [[l, S[l]], [l + 'U', S[l + 'U'] || 0]]));
   return { version: 1, resetAt: S.resetAt || 0, startDate: S.startDate, ...lists,
+           ...(S.deletedTasks?.length ? { deletedTasks: S.deletedTasks } : {}),
            days: S.days, weeks: S.weeks, months: S.months,
            settings: { studyGoalH: S.settings.studyGoalH, currency: S.settings.currency, accent: S.settings.accent }, settingsU: S.settingsU || 0 };
 }
@@ -9896,8 +9903,25 @@ function mergeRemote(r) {
       if (!L[k] || (rec.u || 0) > (L[k].u || 0)) { L[k] = rec; changed = true; }
     }
   }
+  const delTasks = new Set([...(S.deletedTasks || []), ...(r.deletedTasks || [])]);
+  if (delTasks.size !== (S.deletedTasks || []).length) { S.deletedTasks = [...delTasks]; changed = true; }
   for (const l of LISTS) {
-    if (Array.isArray(r[l]) && (r[l + 'U'] || 0) > (S[l + 'U'] || 0)) { S[l] = r[l]; S[l + 'U'] = r[l + 'U']; changed = true; }
+    if (!Array.isArray(r[l])) continue;
+    if (l === 'tasks') {
+      const rNewer = (r.tasksU || 0) > (S.tasksU || 0);
+      const base = (rNewer ? r.tasks : S.tasks).filter((t) => t && !delTasks.has(t.id));
+      const other = rNewer ? S.tasks : r.tasks;
+      const seen = new Set(base.map((t) => t.id));
+      const extraOnce = (other || []).filter((t) => t && t.once && !seen.has(t.id) && !delTasks.has(t.id));
+      const merged = extraOnce.length ? [...base, ...extraOnce] : base;
+      if (rNewer || extraOnce.length || merged.length !== S.tasks.length) {
+        S.tasks = merged;
+        S.tasksU = Math.max(S.tasksU || 0, r.tasksU || 0);
+        changed = true;
+      }
+      continue;
+    }
+    if ((r[l + 'U'] || 0) > (S[l + 'U'] || 0)) { S[l] = r[l]; S[l + 'U'] = r[l + 'U']; changed = true; }
   }
   if ((r.settingsU || 0) > (S.settingsU || 0)) {
     S.settings.studyGoalH = r.settings?.studyGoalH ?? S.settings.studyGoalH;
