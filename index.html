@@ -9834,6 +9834,25 @@ $('#import-file').onchange = async (e) => {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
+    if (Array.isArray(data) && data.every((t) => t && typeof t === 'object' && t.id && t.title)) {
+      const existingIds = new Set(S.tasks.map((t) => t.id));
+      let added = 0;
+      if (!S.deletedTasks || typeof S.deletedTasks !== 'object') S.deletedTasks = {};
+      data.forEach((t) => {
+        delete S.deletedTasks[t.id];
+        if (!existingIds.has(t.id)) {
+          S.tasks.push(t);
+          existingIds.add(t.id);
+          added++;
+        }
+      });
+      S.tasksU = Date.now();
+      resync();
+      save();
+      renderAll();
+      alert(`${added} tarefa(s) pontual(is) restaurada(s) com sucesso (${data.length} no arquivo)!`);
+      return;
+    }
     if (data.version !== 1 || !Array.isArray(data.tasks) || typeof data.days !== 'object') throw new Error();
     if (!confirm('Substituir todos os dados atuais por este backup?')) return;
     const { pristine, ...clean } = data;
