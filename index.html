@@ -258,8 +258,8 @@
         <button role="tab" data-tab="evolucao" class="rounded-lg px-4 py-1.5 transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">Evolução</button>
         <button role="tab" data-tab="meses" class="rounded-lg px-4 py-1.5 transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">Meses</button>
       </nav>
-      <!-- Dia em edição: volta até 30 dias para registrar o que esqueceu -->
-      <div id="daynav" class="flex flex-wrap items-center gap-2 text-sm" title="Esqueceu de marcar? Volte até 30 dias">
+      <!-- Dia em edição: volta até 30 dias para registrar o que esqueceu ou avança para amanhã -->
+      <div id="daynav" class="flex flex-wrap items-center gap-2 text-sm" title="Volte até 30 dias ou avance para planejar amanhã">
         <div class="inline-flex items-center gap-1 rounded-xl bg-zinc-100 px-1.5 py-1 dark:bg-[#1F1F1F]">
           <button id="day-prev" class="btn-ghost h-7 w-7 p-0" aria-label="Dia anterior">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -269,6 +269,7 @@
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
           </button>
         </div>
+        <button id="day-tomorrow" type="button" class="rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-900 dark:border-[#272727] dark:bg-[#1F1F1F] dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100" title="Selecionar o dia de amanhã para já preparar as atividades">Amanhã →</button>
         <div id="top-skip-bar" class="flex flex-wrap items-center gap-1 rounded-xl bg-zinc-50 px-2.5 py-1 text-xs text-zinc-500 dark:bg-[#1F1F1F]"></div>
       </div>
     </div>
@@ -1598,10 +1599,12 @@ function day(k = todayKey()) {
 }
 const peek = (k) => S.days[k];
 
-/* Dia em edição: hoje por padrão; dá para voltar até MAX_BACK dias e registrar o que faltou. */
+/* Dia em edição: hoje por padrão; dá para voltar até MAX_BACK dias ou avançar até MAX_AHEAD (amanhã). */
 const MAX_BACK = 30;
+const MAX_AHEAD = 1;
 let selKey = todayKey();
 const isToday = () => selKey === todayKey();
+const isFuture = (k = selKey) => k > todayKey();
 /** Dia anulado pelo usuário (viagem, feriado, imprevisto): fica fora das médias e métricas gerais. */
 const isAnulado = (k) => !!peek(k)?.off;
 /** Leitura do dia em edição — não cria registro para dias passados só por olhar. */
@@ -2112,6 +2115,7 @@ function renderOne() {
   const d = rday();
   const input = $('#one-input');
   if (document.activeElement !== input) input.value = d.oneThing;
+  input.placeholder = isFuture() ? 'Se eu fizer só uma coisa amanhã, será…' : 'Se eu fizer só uma coisa hoje, será…';
   paintCheck($('#one-check'), d.oneDone);
   $('#one-check').classList.replace('h-5', 'h-6');
   $('#one-check').classList.replace('w-5', 'w-6');
@@ -2599,7 +2603,9 @@ function renderSkipBar(now) {
 
 function renderTasks() {
   const d = rday(), now = parseKey(selKey), voided = isAnulado(selKey);
-  $('#tasks-title').textContent = isToday() ? 'Hábitos de hoje' : `Hábitos · ${fmtDay.format(now).replace(/\./g, '')}`;
+  $('#tasks-title').textContent = isToday() ? 'Hábitos de hoje' : isFuture() ? `Amanhã · ${fmtDay.format(now).replace(/\./g, '')}` : `Hábitos · ${fmtDay.format(now).replace(/\./g, '')}`;
+  const tInput = $('#task-input');
+  if (tInput) tInput.placeholder = isFuture() ? 'Nova tarefa para amanhã (pontual; vira hábito no ⚙)…' : 'Nova tarefa (pontual; vira hábito no ⚙)…';
   renderSkipBar(now);
   const ul = $('#task-list');
   ul.replaceChildren();
@@ -4994,16 +5000,32 @@ function removeProject(pid) {
 
 // ---------- Dia em edição ----------
 function renderDayNav() {
-  const tk = todayKey(), minK = keyOf(addDays(new Date(), -MAX_BACK));
-  if (selKey > tk || selKey < minK) selKey = tk;
+  const tk = todayKey(), minK = keyOf(addDays(new Date(), -MAX_BACK)), maxK = keyOf(addDays(new Date(), MAX_AHEAD));
+  if (selKey > maxK || selKey < minK) selKey = tk;
   const date = parseKey(selKey);
   const back = daysBetween(selKey, tk);
-  $('#day-label').textContent = back === 0 ? 'Hoje' : back === 1 ? 'Ontem' : cap(fmtDay.format(date).replace(/\./g, ''));
+  $('#day-label').textContent = back === 0 ? 'Hoje' : back === 1 ? 'Ontem' : back === -1 ? 'Amanhã' : cap(fmtDay.format(date).replace(/\./g, ''));
   $('#day-prev').disabled = selKey <= minK;
-  $('#day-next').disabled = selKey >= tk;
-  $('#past-banner').classList.toggle('hidden', back === 0);
-  $('#past-text').textContent = back === 0 ? '' :
-    `Editando ${new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date)}: foco, hábitos, sono, estudo manual, reflexão e métricas vão para esse dia.`;
+  $('#day-next').disabled = selKey >= maxK;
+  $('#day-next').title = selKey === tk ? 'Planejar amanhã' : 'Próximo dia';
+  const tmrBtn = $('#day-tomorrow');
+  if (tmrBtn) {
+    const onTomorrow = selKey === maxK;
+    tmrBtn.textContent = onTomorrow ? '← Hoje' : 'Amanhã →';
+    tmrBtn.title = onTomorrow ? 'Voltar para o dia de hoje' : 'Selecionar o dia de amanhã para já preparar as atividades';
+    tmrBtn.className = 'rounded-xl border px-2.5 py-1 text-xs font-medium transition ' + (onTomorrow
+      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:border-emerald-400/50 dark:text-emerald-300'
+      : 'border-zinc-200/80 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:text-zinc-900 dark:border-[#272727] dark:bg-[#1F1F1F] dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100');
+  }
+  const banner = $('#past-banner');
+  banner.classList.toggle('hidden', back === 0);
+  banner.className = back === 0 ? 'hidden' : back < 0
+    ? 'rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-800 dark:text-emerald-300'
+    : 'rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-300';
+  const fullDate = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  $('#past-text').textContent = back === 0 ? '' : back < 0
+    ? `Planejando amanhã (${fullDate}): defina o foco único e adicione as tarefas pontuais que já vão entrar prontas no dia.`
+    : `Editando ${fullDate}: foco, hábitos, sono, estudo manual, reflexão e métricas vão para esse dia.`;
   fillSkipBar($('#top-skip-bar'), date);
 }
 function setSelDay(k) {
@@ -6731,7 +6753,7 @@ function renderMonthDetail() {
       const li = el('li', 'flex items-center justify-between gap-2 rounded-lg border border-zinc-200/60 bg-white/60 px-2.5 py-1.5 dark:border-zinc-800/70 dark:bg-zinc-900/40');
       const left = el('div', 'min-w-0 flex-1');
       left.append(el('span', 'mr-2 font-mono text-xs text-zinc-500', dayLbl(t.once)), el('span', 'break-words font-medium text-zinc-800 dark:text-zinc-200', t.title));
-      const status = t.once >= tk && !wentPending(t) ? (peek(t.once)?.done?.includes(t.id) ? ['feita', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'] : ['hoje', 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'])
+      const status = t.once >= tk && !wentPending(t) ? (peek(t.once)?.done?.includes(t.id) ? ['feita', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'] : [t.once > tk ? 'amanhã' : 'hoje', 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'])
         : !wentPending(t) ? ['feita no dia', 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300']
         : t.lateK ? [`+${daysBetween(t.once, t.lateK)}d`, 'bg-amber-500/15 text-amber-700 dark:text-amber-400']
         : t.dropK ? ['descartada', 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800']
@@ -9787,6 +9809,10 @@ $('#mr-done').onclick = () => {
 // Dia em edição
 $('#day-prev').onclick = () => setSelDay(keyOf(addDays(parseKey(selKey), -1)));
 $('#day-next').onclick = () => setSelDay(keyOf(addDays(parseKey(selKey), 1)));
+$('#day-tomorrow').onclick = () => {
+  const tmr = keyOf(addDays(new Date(), 1));
+  setSelDay(selKey === tmr ? todayKey() : tmr);
+};
 $('#past-back').onclick = () => setSelDay(todayKey());
 
 // Nova métrica
