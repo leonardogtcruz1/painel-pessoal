@@ -1709,16 +1709,6 @@ function resync() {
 /* =========================================================
    MÉTRICAS
    ========================================================= */
-/**
- * Conclusão de um dia (0–1), ou null quando é "dia livre" ou anulado.
- * Dia sem registro com hábitos previstos conta 0 — você não abriu o painel.
- */
-function completion(k) {
-  if (dayOff(parseKey(k))) return null;
-  const d = peek(k);
-  if (d) return dayScore(d);
-  return tasksFor(parseKey(k)).length ? 0 : null;
-}
 /** Sábado, domingo e feriados são opcionais (a menos que tenham tarefa pontual); dias anulados ficam sempre fora. */
 const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
 const autoDayOff = (date) => (isWeekend(date) || !!holidayName(date)) && !S.tasks.some((t) => t.once === keyOf(date));
@@ -1741,14 +1731,49 @@ function holidays(y) {
   return (holidayCache[y] = map);
 }
 const holidayName = (date) => holidays(date.getFullYear())[keyOf(date)] || null;
+/**
+ * Conclusão de um dia (0–1), ou null quando é "dia livre" ou anulado.
+ * Dia sem registro com hábitos previstos conta 0 — você não abriu o painel.
+ * Finais de semana e feriados são opcionais (bônus): se não fizer nada, não penaliza (retorna null);
+ * mas se completar alguma tarefa, conta como bônus e soma progresso.
+ */
+function completion(k) {
+  if (isAnulado(k)) return null;
+  const date = parseKey(k);
+  const d = peek(k);
+  if (autoDayOff(date)) {
+    if (!d) return null;
+    const score = dayScore(d, true);
+    return (score && score > 0) ? score : null;
+  }
+  if (d) return dayScore(d);
+  return tasksFor(date).length ? 0 : null;
+}
 /** Hábitos completos valem 1; hábitos com quantidade valem a fração feita (14/20 pág = 0,7); hábitos anulados não contam. */
-function dayScore(d) {
-  if (!d.total) return null;
+function dayScore(d, isAutoOff = false) {
   const offSet = new Set(d.offTasks || []);
   const done = new Set((d.done || []).filter((id) => !offSet.has(id)));
+  // No fim de semana / dia opcional: hábitos semanais (d.wk) também contam como tarefas concluídas
+  if (isAutoOff) {
+    for (const id of (d.wk || [])) done.add(id);
+  }
   let s = done.size;
   for (const [id, v] of Object.entries(d.qty || {})) if (!offSet.has(id) && !done.has(id) && d.tgt?.[id]) s += Math.min(1, v / d.tgt[id]);
   for (const id of d.half || []) if (!offSet.has(id) && !done.has(id)) s += 0.5;   // hábito de marcar feito pela metade
+  if (isAutoOff && s <= 0 && d.oneDone) s += 1;   // One Thing feita no fim de semana também conta como progresso
+
+  if (isAutoOff) {
+    if (s <= 0) return null;
+    // Dia opcional/fim de semana: apenas o que foi feito/iniciado entra no denominador, funcionando puramente como bônus
+    let touched = done.size;
+    for (const [id, v] of Object.entries(d.qty || {})) if (!offSet.has(id) && !done.has(id) && d.tgt?.[id] && v > 0) touched++;
+    for (const id of d.half || []) if (!offSet.has(id) && !done.has(id)) touched++;
+    if (!touched && d.oneDone) touched = 1;
+    const denom = Math.max(1, touched);
+    return Math.min(1, s / denom);
+  }
+
+  if (!d.total) return null;
   return Math.min(s, d.total) / d.total;
 }
 /** Minutos que um hábito vale num dia: pela unidade (min/hora) ou "cada vez vale X min" (`t.projectMin`). */
@@ -1840,7 +1865,7 @@ function studyStreak() {
   while (keyOf(d) >= S.startDate) {
     const k = keyOf(d);
     if (studyOf(peek(k)) > 0) { n++; d = addDays(d, -1); }
-    else if (isAnulado(k)) { d = addDays(d, -1); } // dia anulado não quebra a ofensiva
+    else if (isAnulado(k) || autoDayOff(parseKey(k))) { d = addDays(d, -1); } // dia anulado ou fim de semana opcional não quebra a ofensiva
     else break;
   }
   return n;
@@ -1850,7 +1875,7 @@ function bestStreak() {
   const keys = Object.keys(S.days).filter((k) => !isAnulado(k) && studyOf(S.days[k]) > 0).sort();
   let best = 0, run = 0, prev = null;
   const onlyOffBetween = (a, b) => {
-    for (let d = addDays(parseKey(a), 1); keyOf(d) < b; d = addDays(d, 1)) if (!isAnulado(keyOf(d))) return false;
+    for (let d = addDays(parseKey(a), 1); keyOf(d) < b; d = addDays(d, 1)) if (!isAnulado(keyOf(d)) && !autoDayOff(d)) return false;
     return true;
   };
   for (const k of keys) {
@@ -2926,7 +2951,10 @@ function renderKPIs() {
   document.documentElement.classList.toggle('all-done', today === 1);
   const voidedTodayN = (d.offTasks || []).filter((id) => tasksFor(now).some((t) => t.id === id)).length;
   const activeN = n - voidedTodayN;
+  const isAutoOff = autoDayOff(now);
+  const doneTotal = (d.done?.length || 0) + (d.wk?.length || 0) + (d.oneDone ? 1 : 0);
   $('#kpi-today-sub').textContent = isAnulado(k) ? 'dia anulado · não conta' : !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
+    : isAutoOff ? (today === 1 ? 'tudo feito 🎉 (bônus)' : `${doneTotal} ${doneTotal === 1 ? 'tarefa feita' : 'tarefas feitas'} · bônus`)
     : today === 1 ? `tudo feito 🎉${voidedTodayN ? ` (${voidedTodayN} ${voidedTodayN === 1 ? 'anulada' : 'anuladas'})` : ''}` : `${d.done.length} de ${activeN} hábitos${voidedTodayN ? ` (${voidedTodayN} ${voidedTodayN === 1 ? 'anulada' : 'anuladas'})` : ''}`;
 
   const week = averageBetween(addDays(now, -6), now);
@@ -2945,7 +2973,7 @@ function renderKPIs() {
   countTo($('#kpi-streak'), String(streak));
   $('#kpi-streak-unit').textContent = streak === 1 ? 'dia' : 'dias';
   const studiedToday = studyOf(d) > 0;
-  $('#kpi-streak-sub').textContent = streak && !studiedToday && !isAnulado(k) ? 'estude hoje para manter' : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
+  $('#kpi-streak-sub').textContent = streak && !studiedToday && !isAnulado(k) ? (autoDayOff(now) ? 'fim de semana · opcional' : 'estude hoje para manter') : `recorde · ${best} ${best === 1 ? 'dia' : 'dias'}`;
 }
 
 // ---------- Heatmap semanal ----------
@@ -2975,7 +3003,7 @@ function renderHeatmap() {
     sq.type = 'button';
     sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${k < S.startDate ? 'day-x cursor-default' : off ? 'day-off cursor-pointer' : HEAT[lvl] + ' cursor-pointer'} ` +
       (k === selKey ? 'ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900' : k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
-    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${off ? 'dia anulado (não conta)' : p == null ? 'dia livre' : rec ? fmtPct(p) : 'sem registro'}${rec?.offTasks?.length ? ` (${rec.offTasks.length} ${rec.offTasks.length === 1 ? 'anulada' : 'anuladas'})` : ''}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${off ? 'dia anulado (não conta)' : p == null ? (autoDayOff(date) ? `${holidayName(date) || 'fim de semana'} · opcional` : 'dia livre') : rec ? (autoDayOff(date) ? `${fmtPct(p)} · bônus` : fmtPct(p)) : 'sem registro'}${rec?.offTasks?.length ? ` (${rec.offTasks.length} ${rec.offTasks.length === 1 ? 'anulada' : 'anuladas'})` : ''}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
     if (k >= S.startDate) sq.onclick = () => setSelDay(k);
     const lbl = document.createElement('span');
     lbl.className = 'text-xs font-medium uppercase ' + (k === tk ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
@@ -6231,8 +6259,8 @@ function renderYearGrid(y) {
     else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: '' });
     else {
       const p = completion(k);
-      if (p == null) rows.push({ value: 'dia livre', label: 'sem hábitos previstos' });
-      else rows.push({ value: fmtPct(p), label: 'hábitos', color: 'var(--c-habit)', box: true });
+      if (p == null) rows.push({ value: autoDayOff(date) ? 'opcional' : 'dia livre', label: autoDayOff(date) ? (holidayName(date) || 'fim de semana') : 'sem hábitos previstos' });
+      else rows.push({ value: fmtPct(p), label: autoDayOff(date) ? 'hábitos (bônus)' : 'hábitos', color: 'var(--c-habit)', box: true });
       if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
       if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
     }
