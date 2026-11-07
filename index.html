@@ -1743,38 +1743,23 @@ function completion(k) {
   const d = peek(k);
   if (autoDayOff(date)) {
     if (!d) return null;
-    const score = dayScore(d, true);
+    const score = dayScore(d);
     return (score && score > 0) ? score : null;
   }
   if (d) return dayScore(d);
   return tasksFor(date).length ? 0 : null;
 }
 /** Hábitos completos valem 1; hábitos com quantidade valem a fração feita (14/20 pág = 0,7); hábitos anulados não contam. */
-function dayScore(d, isAutoOff = false) {
+function dayScore(d) {
   const offSet = new Set(d.offTasks || []);
   const done = new Set((d.done || []).filter((id) => !offSet.has(id)));
-  // No fim de semana / dia opcional: hábitos semanais (d.wk) também contam como tarefas concluídas
-  if (isAutoOff) {
-    for (const id of (d.wk || [])) done.add(id);
-  }
   let s = done.size;
   for (const [id, v] of Object.entries(d.qty || {})) if (!offSet.has(id) && !done.has(id) && d.tgt?.[id]) s += Math.min(1, v / d.tgt[id]);
   for (const id of d.half || []) if (!offSet.has(id) && !done.has(id)) s += 0.5;   // hábito de marcar feito pela metade
-  if (isAutoOff && s <= 0 && d.oneDone) s += 1;   // One Thing feita no fim de semana também conta como progresso
 
-  if (isAutoOff) {
-    if (s <= 0) return null;
-    // Dia opcional/fim de semana: apenas o que foi feito/iniciado entra no denominador, funcionando puramente como bônus
-    let touched = done.size;
-    for (const [id, v] of Object.entries(d.qty || {})) if (!offSet.has(id) && !done.has(id) && d.tgt?.[id] && v > 0) touched++;
-    for (const id of d.half || []) if (!offSet.has(id) && !done.has(id)) touched++;
-    if (!touched && d.oneDone) touched = 1;
-    const denom = Math.max(1, touched);
-    return Math.min(1, s / denom);
-  }
-
-  if (!d.total) return null;
-  return Math.min(s, d.total) / d.total;
+  const total = d.total || Math.max(1, s);
+  if (!total) return null;
+  return Math.min(s, total) / total;
 }
 /** Minutos que um hábito vale num dia: pela unidade (min/hora) ou "cada vez vale X min" (`t.projectMin`). */
 function habitMinutes(t, rec) {
@@ -2952,9 +2937,8 @@ function renderKPIs() {
   const voidedTodayN = (d.offTasks || []).filter((id) => tasksFor(now).some((t) => t.id === id)).length;
   const activeN = n - voidedTodayN;
   const isAutoOff = autoDayOff(now);
-  const doneTotal = (d.done?.length || 0) + (d.wk?.length || 0) + (d.oneDone ? 1 : 0);
   $('#kpi-today-sub').textContent = isAnulado(k) ? 'dia anulado · não conta' : !S.tasks.length ? 'sem hábitos' : today == null ? (dayOff(now) ? `${holidayName(now) || 'fim de semana'} · opcional` : 'dia livre')
-    : isAutoOff ? (today === 1 ? 'tudo feito 🎉 (bônus)' : `${doneTotal} ${doneTotal === 1 ? 'tarefa feita' : 'tarefas feitas'} · bônus`)
+    : isAutoOff ? (today === 1 ? 'tudo feito 🎉 (bônus)' : `${d.done.length} de ${activeN} hábitos · bônus`)
     : today === 1 ? `tudo feito 🎉${voidedTodayN ? ` (${voidedTodayN} ${voidedTodayN === 1 ? 'anulada' : 'anuladas'})` : ''}` : `${d.done.length} de ${activeN} hábitos${voidedTodayN ? ` (${voidedTodayN} ${voidedTodayN === 1 ? 'anulada' : 'anuladas'})` : ''}`;
 
   const week = averageBetween(addDays(now, -6), now);
