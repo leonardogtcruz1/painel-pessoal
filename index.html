@@ -6500,15 +6500,43 @@ function renderMonthCards(ys) {
     for (let i = 0; i < lead; i++) cal.append(document.createElement('span'));
     for (const d of ms.days) {
       const c = document.createElement('span');
-      let cls = 'aspect-square rounded-[3px] ';
+      const isWk = autoDayOff(d.date) || isWeekend(d.date);
+      let cls = 'aspect-square rounded-[3px] flex items-center justify-center relative ';
       if (d.off) cls += 'day-off';
       else if (d.future) cls += 'bg-zinc-50 dark:bg-zinc-900';
       else if (d.k < S.startDate) cls += 'day-x';
+      else if (isWk && d.p == null) cls += 'day-weekend';
       else if (d.free) cls += 'border border-zinc-200 dark:border-zinc-700';
       else cls += HEAT[heatLevel(d.p ?? 0)];
       if (d.k === tk) cls += ' ring-1 ring-zinc-900 dark:ring-zinc-100';
       c.className = cls;
-      c.title = `${d.date.getDate()} · ${d.off ? 'dia anulado' : d.k < S.startDate ? 'antes do 1º uso' : d.future ? 'ainda não chegou' : d.free ? 'dia livre' : d.p == null ? 'sem dados' : fmtPct(d.p)}`;
+
+      if (isWk && !d.off && !d.future && d.k >= S.startDate) {
+        if (d.p == null) {
+          c.innerHTML = '<span class="text-[8px] sm:text-[9px] leading-none select-none opacity-80" aria-hidden="true">☕</span>';
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'absolute right-0.5 top-0.5 text-[6px] sm:text-[7px] leading-none select-none opacity-90';
+          badge.textContent = '☕';
+          badge.setAttribute('aria-hidden', 'true');
+          c.append(badge);
+        }
+      }
+
+      const holiday = holidayName(d.date);
+      const isWkRest = isWk && d.p == null && !d.off && !d.future && d.k >= S.startDate;
+      const isWkBonus = isWk && d.p != null && !d.off && !d.future && d.k >= S.startDate;
+
+      c.title = `${d.date.getDate()} · ` + (
+        d.off ? 'dia anulado'
+        : d.k < S.startDate ? 'antes do 1º uso'
+        : d.future ? 'ainda não chegou'
+        : isWkRest ? `${holiday || 'fim de semana'} ☕ (descanso · opcional)`
+        : isWkBonus ? `${fmtPct(d.p)} (bônus de fim de semana 🎉)`
+        : d.free ? 'dia livre'
+        : d.p == null ? 'sem dados'
+        : fmtPct(d.p)
+      );
       cal.append(c);
     }
 
