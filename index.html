@@ -1726,21 +1726,79 @@ function resync() {
 const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
 const autoDayOff = (date) => (isWeekend(date) || !!holidayName(date)) && !S.tasks.some((t) => t.once === keyOf(date));
 const dayOff = (date) => isAnulado(keyOf(date)) || autoDayOff(date);
-/** Feriados nacionais (inclui Carnaval e Corpus Christi), calculados por ano a partir da Páscoa. */
+/** Feriados nacionais do Brasil e feriados públicos da Irlanda (Bank Holidays), calculados por ano. */
 const holidayCache = {};
 function holidays(y) {
   if (holidayCache[y]) return holidayCache[y];
+
+  // Helper para segunda-feira (usado nos Bank Holidays irlandeses)
+  const firstMonday = (year, monthIdx) => {
+    const d = new Date(year, monthIdx, 1);
+    const diff = (8 - d.getDay()) % 7;
+    return new Date(year, monthIdx, 1 + diff);
+  };
+  const lastMonday = (year, monthIdx) => {
+    const d = new Date(year, monthIdx + 1, 0);
+    const diff = (d.getDay() + 6) % 7;
+    return new Date(year, monthIdx, d.getDate() - diff);
+  };
+  // St. Brigid's Day (desde 2023): primeira segunda-feira de fevereiro, ou 1º de fev se for sexta-feira
+  const stBrigid = (year) => {
+    const feb1 = new Date(year, 1, 1);
+    if (feb1.getDay() === 5) return feb1;
+    return firstMonday(year, 1);
+  };
+
   // Páscoa (algoritmo de Meeus/Jones/Butcher)
   const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
   const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
   const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
   const easter = new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1);
-  const map = {
-    [`${y}-01-01`]: 'Confraternização Universal', [`${y}-04-21`]: 'Tiradentes', [`${y}-05-01`]: 'Dia do Trabalho',
-    [`${y}-09-07`]: 'Independência', [`${y}-10-12`]: 'Nossa Senhora Aparecida', [`${y}-11-02`]: 'Finados',
-    [`${y}-11-15`]: 'Proclamação da República', [`${y}-11-20`]: 'Consciência Negra', [`${y}-12-25`]: 'Natal',
+
+  // Feriados Brasil (BR)
+  const br = {
+    [`${y}-01-01`]: 'Confraternização Universal',
+    [`${y}-04-21`]: 'Tiradentes',
+    [`${y}-05-01`]: 'Dia do Trabalho',
+    [`${y}-09-07`]: 'Independência',
+    [`${y}-10-12`]: 'Nossa Senhora Aparecida',
+    [`${y}-11-02`]: 'Finados',
+    [`${y}-11-15`]: 'Proclamação da República',
+    [`${y}-11-20`]: 'Consciência Negra',
+    [`${y}-12-25`]: 'Natal',
   };
-  for (const [off, name] of [[-48, 'Carnaval'], [-47, 'Carnaval'], [-2, 'Sexta-feira Santa'], [60, 'Corpus Christi']]) map[keyOf(addDays(easter, off))] = name;
+  for (const [off, name] of [[-48, 'Carnaval'], [-47, 'Carnaval'], [-2, 'Sexta-feira Santa'], [60, 'Corpus Christi']]) {
+    br[keyOf(addDays(easter, off))] = name;
+  }
+
+  // Feriados Irlanda (IE - Public / Bank Holidays)
+  const ie = {
+    [`${y}-01-01`]: "New Year's Day",
+    [keyOf(stBrigid(y))]: "St. Brigid's Day",
+    [`${y}-03-17`]: "St. Patrick's Day",
+    [keyOf(addDays(easter, 1))]: 'Easter Monday',
+    [keyOf(firstMonday(y, 4))]: 'May Bank Holiday',
+    [keyOf(firstMonday(y, 5))]: 'June Bank Holiday',
+    [keyOf(firstMonday(y, 7))]: 'August Bank Holiday',
+    [keyOf(lastMonday(y, 9))]: 'October Bank Holiday',
+    [`${y}-12-25`]: 'Christmas Day',
+    [`${y}-12-26`]: "St. Stephen's Day",
+  };
+
+  const map = {};
+  const allKeys = new Set([...Object.keys(br), ...Object.keys(ie)]);
+  for (const key of allKeys) {
+    const hasBr = br[key];
+    const hasIe = ie[key];
+    if (hasBr && hasIe) {
+      map[key] = hasBr === hasIe ? `${hasBr} (BR / IE)` : `${hasBr} / ${hasIe} (BR / IE)`;
+    } else if (hasBr) {
+      map[key] = `${hasBr} (BR)`;
+    } else if (hasIe) {
+      map[key] = `${hasIe} (IE)`;
+    }
+  }
+
   return (holidayCache[y] = map);
 }
 const holidayName = (date) => holidays(date.getFullYear())[keyOf(date)] || null;
