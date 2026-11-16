@@ -143,6 +143,15 @@
       background: linear-gradient(to top right, transparent calc(50% - 0.75px), var(--c-axis) calc(50% - 0.75px), var(--c-axis) calc(50% + 0.75px), transparent calc(50% + 0.75px));
       opacity: 0.55;
     }
+    /* Fim de semana (descanso/opcional): borda pontilhada e tom suave de pausa, sem parecer dia perdido */
+    .day-weekend {
+      border: 1px dashed var(--c-axis);
+      background-color: rgba(113, 113, 122, 0.08);
+      color: var(--c-axis);
+    }
+    html.dark .day-weekend {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
     /* Fundo editorial plano em camadas (sem gradientes no fundo) */
     body {
       background-color: #f4f4f5;
@@ -525,7 +534,7 @@
             <span id="heat-sub" class="text-xs text-zinc-500"></span>
           </div>
           <div id="heatmap" class="mt-4 grid grid-cols-7 gap-2"></div>
-          <div class="mt-4 flex items-center justify-end gap-1 text-xs text-zinc-500">
+          <div class="mt-4 flex flex-wrap items-center justify-end gap-1 text-xs text-zinc-500">
             <span class="mr-1">menos</span>
             <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
@@ -533,6 +542,7 @@
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-500 dark:bg-emerald-600"></span>
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
             <span class="ml-1">mais</span>
+            <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-weekend flex items-center justify-center text-[8px] leading-none">☕</span>fim de semana</span>
           </div>
         </section>
 
@@ -976,7 +986,7 @@
         <div>
           <div class="flex items-center justify-between">
             <p class="eyebrow">Completude diária</p>
-            <div class="flex items-center gap-1 text-xs text-zinc-500">
+            <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-500">
               <span class="mr-1">0%</span>
               <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
               <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
@@ -985,6 +995,7 @@
               <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
               <span class="ml-1">100%</span>
               <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-off"></span>anulado</span>
+              <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-weekend flex items-center justify-center text-[8px] leading-none">☕</span>fim de semana</span>
             </div>
           </div>
           <div id="contrib" class="mt-4 overflow-x-auto pb-1"></div>
@@ -996,10 +1007,11 @@
         <div>
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <p class="text-sm font-semibold">Evolução do mês <span id="chart-month-sub" class="font-normal text-zinc-500"></span></p>
-            <div class="flex items-center gap-3 text-xs text-zinc-500">
+            <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
               <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Conclusão do dia</span>
               <span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>
               <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-off"></span>Anulado</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-weekend flex items-center justify-center text-[8px] leading-none">☕</span>Fim de semana</span>
             </div>
           </div>
           <div id="chart-month" class="relative mt-3 h-48"></div>
@@ -1282,7 +1294,7 @@
       <section class="card">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold">O ano em dias</h2>
-          <div class="flex items-center gap-1 text-xs text-zinc-500">
+          <div class="flex flex-wrap items-center gap-1 text-xs text-zinc-500">
             <span class="mr-1">0%</span>
             <span class="h-2.5 w-2.5 rounded-[3px] bg-zinc-100 dark:bg-zinc-800"></span>
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-100 dark:bg-emerald-950"></span>
@@ -1291,6 +1303,7 @@
             <span class="h-2.5 w-2.5 rounded-[3px] bg-emerald-600 dark:bg-emerald-400"></span>
             <span class="ml-1">100%</span>
             <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-off"></span>anulado</span>
+            <span class="ml-2 flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[3px] day-weekend flex items-center justify-center text-[8px] leading-none">☕</span>fim de semana</span>
           </div>
         </div>
         <div id="year-grid" class="mt-4 overflow-x-auto pb-2"></div>
@@ -2980,14 +2993,32 @@ function renderHeatmap() {
     const off = isAnulado(k), p = completion(k), rec = peek(k);
     if (off) voidedCount++;
     if (p != null && p >= 0.5) consistent++;
+    const isWk = autoDayOff(date) || isWeekend(date);
     const lvl = p == null ? 0 : heatLevel(p);
     const col = document.createElement('div');
     col.className = 'flex flex-col items-center gap-1.5';
     const sq = document.createElement('button');
     sq.type = 'button';
-    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition ${k < S.startDate ? 'day-x cursor-default' : off ? 'day-off cursor-pointer' : HEAT[lvl] + ' cursor-pointer'} ` +
+    const baseCls = k < S.startDate ? 'day-x cursor-default' : off ? 'day-off cursor-pointer' : (isWk && p == null ? 'day-weekend cursor-pointer' : HEAT[lvl] + ' cursor-pointer');
+    sq.className = `relative aspect-square w-full max-w-[44px] rounded-md transition flex items-center justify-center ${baseCls} ` +
       (k === selKey ? 'ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900' : k === tk ? 'ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900' : '');
-    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso` : `${fmt.format(date)} · ${off ? 'dia anulado (não conta)' : p == null ? (autoDayOff(date) ? `${holidayName(date) || 'fim de semana'} · opcional` : 'dia livre') : rec ? (autoDayOff(date) ? `${fmtPct(p)} · bônus` : fmtPct(p)) : 'sem registro'}${rec?.offTasks?.length ? ` (${rec.offTasks.length} ${rec.offTasks.length === 1 ? 'anulada' : 'anuladas'})` : ''}${rec?.oneDone ? ' · One Thing ✓' : ''}`;
+    if (isWk && !off && k >= S.startDate) {
+      if (p == null) {
+        sq.innerHTML = '<span class="text-xs select-none opacity-80" aria-hidden="true">☕</span>';
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'absolute right-0.5 top-0.5 text-[9px] leading-none select-none opacity-90';
+        badge.textContent = '☕';
+        badge.setAttribute('aria-hidden', 'true');
+        sq.append(badge);
+      }
+    }
+    sq.title = k < S.startDate ? `${fmt.format(date)} · antes do 1º uso`
+      : off ? `${fmt.format(date)} · dia anulado (não conta)`
+      : isWk ? (p == null ? `${fmt.format(date)} · ${holidayName(date) || 'fim de semana'} ☕ (descanso · opcional)` : `${fmt.format(date)} · ${fmtPct(p)} (bônus de fim de semana 🎉)`)
+      : (p == null ? `${fmt.format(date)} · dia livre` : rec ? fmtPct(p) : 'sem registro')
+      + (rec?.offTasks?.length ? ` (${rec.offTasks.length} ${rec.offTasks.length === 1 ? 'anulada' : 'anuladas'})` : '')
+      + (rec?.oneDone ? ' · One Thing ✓' : '');
     if (k >= S.startDate) sq.onclick = () => setSelDay(k);
     const lbl = document.createElement('span');
     lbl.className = 'text-xs font-medium uppercase ' + (k === tk ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500');
@@ -5483,16 +5514,29 @@ function renderContrib(ms) {
       const info = ms.days[date.getDate() - 1];
       const k = info.k;
       const canToggle = k >= S.startDate;
-      let cls = 'h-8 w-8 rounded-md outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-emerald-500 ' + (canToggle ? 'cursor-pointer ' : '');
+      const isWk = autoDayOff(date) || isWeekend(date);
+      let cls = 'relative h-8 w-8 rounded-md outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-emerald-500 flex items-center justify-center ' + (canToggle ? 'cursor-pointer ' : '');
       if (info.off) cls += 'day-off';
       else if (info.future) cls += 'border border-dashed border-zinc-200 dark:border-zinc-800';
       else if (k < S.startDate) cls += 'day-x';
+      else if (isWk && info.p == null) cls += 'day-weekend';
       else if (info.free) cls += 'border border-zinc-200 dark:border-zinc-800';
       else cls += HEAT[info.p == null ? 0 : heatLevel(info.p)];
       if (k === tk) cls += ' ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-zinc-100/80 dark:ring-offset-zinc-900';
       cell.className = cls;
+      if (isWk && !info.off && !info.future && k >= S.startDate) {
+        if (info.p == null) {
+          cell.innerHTML = '<span class="text-[11px] select-none opacity-80" aria-hidden="true">☕</span>';
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'absolute right-0.5 top-0.5 text-[8px] leading-none select-none opacity-90';
+          badge.textContent = '☕';
+          badge.setAttribute('aria-hidden', 'true');
+          cell.append(badge);
+        }
+      }
       cell.tabIndex = 0;
-      cell.setAttribute('aria-label', `${fmtDay.format(date)}: ${info.off ? 'dia anulado' : info.free ? 'dia livre' : info.p == null ? 'sem registro' : fmtPct(info.p)}`);
+      cell.setAttribute('aria-label', `${fmtDay.format(date)}: ${info.off ? 'dia anulado' : isWk && info.p == null ? 'fim de semana (descanso)' : info.free ? 'dia livre' : info.p == null ? 'sem registro' : fmtPct(info.p)}`);
       if (canToggle) {
         cell.onclick = () => { hideTip(); toggleDayOff(k); };
         cell.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hideTip(); toggleDayOff(k); } };
@@ -5502,11 +5546,17 @@ function renderContrib(ms) {
         if (info.off) rows.push({ value: 'dia anulado', label: 'clique para reativar' });
         else if (info.future) rows.push({ value: 'ainda não chegou', label: canToggle ? 'clique para anular' : '' });
         else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: 'não conta' });
+        else if (isWk && info.p == null) rows.push({ value: `${holidayName(date) || 'fim de semana'} ☕`, label: 'descanso · opcional (não conta como falta)' });
         else if (info.free) rows.push({ value: 'dia livre', label: 'clique para anular' });
         else if (info.p == null) rows.push({ value: 'sem registro', label: 'clique para anular' });
         else {
           const offN = rec?.offTasks?.length || 0;
-          rows.push({ value: fmtPct(info.p), label: `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0}${offN ? ` · ${offN} anulada(s)` : ''})`, color: 'var(--c-habit)', box: true });
+          rows.push({
+            value: isWk ? `${fmtPct(info.p)} 🎉` : fmtPct(info.p),
+            label: isWk ? `bônus de fim de semana (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0})` : `hábitos (${Math.min(rec?.done.length || 0, rec?.total || 0)}/${rec?.total || 0}${offN ? ` · ${offN} anulada(s)` : ''})`,
+            color: 'var(--c-habit)',
+            box: true
+          });
           if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
           if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
           if (rec?.sleep != null) rows.push({ value: fmtSleep(rec.sleep), label: 'de sono' });
@@ -5927,15 +5977,68 @@ function columnChart(host, cfg) {
         opacity: 0.7
       }));
     } else {
-      cfg.series.forEach((s, j) => {
-        const v = s.values[i];
-        if (v == null) return;
-        const x = cx(i) - groupW / 2 + j * (bw + gap);
-        const h = v > 0 ? Math.max(2, (Math.min(max, v) / max) * ph) : 2;
-        const col = s.colorOf ? s.colorOf(v, i) : s.color;
-        const op = v > 0 ? (s.opacityOf ? s.opacityOf(v, i) : 1) : 0.35;
-        svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: col, opacity: op }));
-      });
+      const isWeekendDay = cfg.isWeekend && cfg.isWeekend(i);
+      const hasAnyVal = cfg.series.some((s) => s.values[i] != null && s.values[i] > 0);
+
+      if (isWeekendDay && !hasAnyVal) {
+        // Fim de semana sem hábitos obrigatórios (dia de descanso/opcional)
+        // Desenha o símbolo de fim de semana em vez de um espaço vazio que parece dia perdido
+        const vx = cx(i) - groupW / 2;
+        const pillH = Math.min(22, Math.max(16, ph * 0.16));
+        const pillY = m.t + ph - pillH;
+
+        svg.append(svgEl('rect', {
+          x: vx, y: pillY, width: groupW, height: pillH, rx: Math.min(3, groupW / 2),
+          fill: 'var(--c-hover)',
+          stroke: 'var(--c-axis)',
+          'stroke-width': 1,
+          'stroke-dasharray': '2 2',
+          opacity: 0.65
+        }));
+
+        const iconSize = Math.min(12, Math.max(8, groupW - 2));
+        if (iconSize >= 8) {
+          const iconX = cx(i) - iconSize / 2;
+          const iconY = pillY + (pillH - iconSize) / 2;
+          const iconGroup = svgEl('g', {
+            transform: `translate(${iconX}, ${iconY}) scale(${iconSize / 24})`,
+            stroke: 'var(--c-axis)',
+            fill: 'none',
+            'stroke-width': 2,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+            opacity: 0.8
+          });
+          iconGroup.append(
+            svgEl('path', { d: 'M18 8h1a4 4 0 0 1 0 8h-1' }),
+            svgEl('path', { d: 'M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z' }),
+            svgEl('line', { x1: 6, y1: 1, x2: 6, y2: 4 }),
+            svgEl('line', { x1: 10, y1: 1, x2: 10, y2: 4 }),
+            svgEl('line', { x1: 14, y1: 1, x2: 14, y2: 4 })
+          );
+          svg.append(iconGroup);
+        }
+      } else {
+        cfg.series.forEach((s, j) => {
+          const v = s.values[i];
+          if (v == null) return;
+          const x = cx(i) - groupW / 2 + j * (bw + gap);
+          const h = v > 0 ? Math.max(2, (Math.min(max, v) / max) * ph) : 2;
+          const col = s.colorOf ? s.colorOf(v, i) : s.color;
+          const op = v > 0 ? (s.opacityOf ? s.opacityOf(v, i) : 1) : 0.35;
+          svg.append(svgEl('path', { d: barPath(x, m.t + ph - h, bw, h, 4), fill: col, opacity: op }));
+          if (isWeekendDay && v > 0 && j === 0) {
+            svg.append(svgEl('circle', {
+              cx: x + bw / 2,
+              cy: Math.max(m.t + 4, m.t + ph - h - 5),
+              r: Math.min(2.5, bw / 2),
+              fill: 'var(--c-goal)',
+              stroke: 'var(--c-surface)',
+              'stroke-width': 1
+            }));
+          }
+        });
+      }
     }
     if (cfg.showX(i)) {
       const t = svgEl('text', { x: cx(i), y: H - 5, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--c-axis)', class: 'tabular-nums' });
@@ -6002,6 +6105,7 @@ function renderCharts() {
     series: [{ values: daily, color: 'var(--c-habit)' }],
     line: { values: running, color: 'var(--c-avg)' },
     isVoided: (i) => ms.days[i]?.off,
+    isWeekend: (i) => autoDayOff(ms.days[i].date) || isWeekend(ms.days[i].date),
     xLabel: (i) => String(i + 1),
     showX: (i) => i === 0 || i === ms.daysIn - 1 || ((i + 1) % 5 === 0 && ms.daysIn - (i + 1) >= 3),
     tip: (i) => {
@@ -6015,9 +6119,20 @@ function renderCharts() {
           ]
         };
       }
-      if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+      const isWk = autoDayOff(d.date) || isWeekend(d.date);
+      if (d.p == null) {
+        if (isWk) {
+          return {
+            title: fmtDay.format(d.date),
+            rows: [
+              { value: `${holidayName(d.date) || 'fim de semana'} ☕`, label: 'descanso · opcional (não conta como falta)', color: 'var(--c-axis)', box: true }
+            ]
+          };
+        }
+        return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+      }
       return { title: fmtDay.format(d.date), rows: [
-        { value: fmtPct(d.p), label: 'conclusão do dia', color: 'var(--c-habit)', box: true },
+        { value: isWk ? `${fmtPct(d.p)} 🎉` : fmtPct(d.p), label: isWk ? 'conclusão (bônus de fim de semana)' : 'conclusão do dia', color: 'var(--c-habit)', box: true },
         { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
       ] };
     },
@@ -6219,13 +6334,17 @@ function renderYearGrid(y) {
       const date = addDays(first, 7 * w + r), k = keyOf(date);
       const cell = document.createElement('span');
       if (date.getFullYear() !== y) { grid.append(cell); continue; }
-      let cls = 'rounded-[3px] ';
+      const isWk = autoDayOff(date) || isWeekend(date);
+      let cls = 'rounded-[3px] flex items-center justify-center relative ';
       if (isAnulado(k)) cls += 'day-off';
       else if (k > tk) cls += 'bg-zinc-50 dark:bg-zinc-900';
       else if (k < S.startDate) { cls += 'day-x'; cell.title = 'antes do 1º uso'; }
       else {
         const p = completion(k);
-        cls += p == null ? 'border border-zinc-200 dark:border-zinc-700' : HEAT[heatLevel(p)];
+        cls += p == null ? (isWk ? 'day-weekend' : 'border border-zinc-200 dark:border-zinc-700') : HEAT[heatLevel(p)];
+      }
+      if (isWk && !isAnulado(k) && k <= tk && k >= S.startDate && completion(k) == null) {
+        cell.innerHTML = '<span class="text-[8px] select-none opacity-80" aria-hidden="true">☕</span>';
       }
       if (k === tk) cls += ' ring-1 ring-zinc-900 dark:ring-zinc-100';
       cell.className = cls;
@@ -6238,13 +6357,14 @@ function renderYearGrid(y) {
     const k = e.target.dataset?.k;
     if (!k) return;
     const date = parseKey(k), rec = peek(k), rows = [];
+    const isWk = autoDayOff(date) || isWeekend(date);
     if (isAnulado(k)) rows.push({ value: 'dia anulado', label: 'não entra nas métricas' });
     else if (k > todayKey()) rows.push({ value: 'ainda não chegou', label: '' });
     else if (k < S.startDate) rows.push({ value: 'antes do 1º uso', label: '' });
     else {
       const p = completion(k);
-      if (p == null) rows.push({ value: autoDayOff(date) ? 'opcional' : 'dia livre', label: autoDayOff(date) ? (holidayName(date) || 'fim de semana') : 'sem hábitos previstos' });
-      else rows.push({ value: fmtPct(p), label: autoDayOff(date) ? 'hábitos (bônus)' : 'hábitos', color: 'var(--c-habit)', box: true });
+      if (p == null) rows.push({ value: isWk ? `${holidayName(date) || 'fim de semana'} ☕` : 'dia livre', label: isWk ? 'descanso · opcional (não conta como falta)' : 'sem hábitos previstos' });
+      else rows.push({ value: isWk ? `${fmtPct(p)} 🎉` : fmtPct(p), label: isWk ? 'hábitos (bônus de fim de semana)' : 'hábitos', color: 'var(--c-habit)', box: true });
       if (rec?.oneDone) rows.push({ value: '✓', label: 'One Thing' });
       if (studyOf(rec)) rows.push({ value: fmtMin(studyOf(rec)), label: 'de estudo' });
     }
@@ -6498,7 +6618,8 @@ function renderMonthDetail() {
   dailyLegend.innerHTML =
     '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background:var(--c-habit)"></span>Conclusão do dia</span>' +
     '<span class="flex items-center gap-1.5"><span class="h-0.5 w-3 rounded-full" style="background:var(--c-avg)"></span>Média acumulada</span>' +
-    '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-off"></span>Anulado</span>';
+    '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-off"></span>Anulado</span>' +
+    '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm day-weekend flex items-center justify-center text-[8px] leading-none">☕</span>Fim de semana</span>';
   const dailyPanel = panel('Ritmo diário no mês', `Conclusão diária de hábitos e evolução da média ao longo dos dias${ms.voided ? ` · ${ms.voided} ${ms.voided === 1 ? 'anulado' : 'anulados'}` : ''}`, dailyLegend);
   const dailyChartHost = el('div', 'relative mt-3 h-44 w-full');
   dailyPanel.append(dailyChartHost);
@@ -6980,6 +7101,7 @@ function renderMonthDetail() {
       series: [{ values: daily, color: 'var(--c-habit)' }],
       line: { values: running, color: 'var(--c-avg)' },
       isVoided: (i) => ms.days[i]?.off,
+      isWeekend: (i) => autoDayOff(ms.days[i].date) || isWeekend(ms.days[i].date),
       xLabel: (i) => String(i + 1),
       showX: showXDay,
       tip: (i) => {
@@ -6993,9 +7115,20 @@ function renderMonthDetail() {
             ]
           };
         }
-        if (d.p == null) return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+        const isWk = autoDayOff(d.date) || isWeekend(d.date);
+        if (d.p == null) {
+          if (isWk) {
+            return {
+              title: fmtDay.format(d.date),
+              rows: [
+                { value: `${holidayName(d.date) || 'fim de semana'} ☕`, label: 'descanso · opcional (não conta como falta)', color: 'var(--c-axis)', box: true }
+              ]
+            };
+          }
+          return { title: fmtDay.format(d.date), rows: [{ value: d.future ? 'ainda não chegou' : d.free ? 'dia livre' : 'sem registro', label: '' }] };
+        }
         const rows = [
-          { value: fmtPct(d.p), label: 'hábitos do dia', color: 'var(--c-habit)', box: true },
+          { value: isWk ? `${fmtPct(d.p)} 🎉` : fmtPct(d.p), label: isWk ? 'bônus de fim de semana' : 'hábitos do dia', color: 'var(--c-habit)', box: true },
           { value: `${Math.round(running[i])}%`, label: 'média acumulada', color: 'var(--c-avg)' },
         ];
         if (r?.oneThing) rows.push({ value: r.oneDone ? '✓' : '○', label: 'One Thing' });
