@@ -7491,6 +7491,8 @@ function updateExpense(id, patch) {
   if (!e) return;
   if (patch.amount > 0) e.amount = patch.amount;
   if (patch.cat) e.cat = patch.cat;
+  if (patch.kind === 'in') e.kind = 'in';
+  else if (patch.kind === 'out') delete e.kind;
   e.note = (patch.note || '').trim();
   const obs = (patch.obs || '').trim();
   if (obs) e.obs = obs; else delete e.obs;
@@ -7526,12 +7528,23 @@ function buildExpenseRow(e, opts = {}) {
 
   if (opts.editing) {
     li.className = 'py-3';
+    let curKind = isIncome(e) ? 'in' : 'out';
+    let curCat = e.cat;
+
     const box = document.createElement('form');
-    box.className = 'space-y-2 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 dark:border-zinc-700 dark:bg-zinc-800/40';
+    box.className = 'space-y-2.5 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3.5 dark:border-zinc-700 dark:bg-zinc-800/40';
+
+    // 1. Tipo (Gasto / Ganho) + Valor com Moeda
     const top = document.createElement('div');
-    top.className = 'flex flex-wrap items-center gap-2';
+    top.className = 'flex flex-wrap items-center justify-between gap-2';
+
+    const kindSeg = document.createElement('div');
+    kindSeg.className = 'inline-flex rounded-lg bg-zinc-200/70 p-0.5 text-xs font-medium dark:bg-zinc-700';
+
+    const amtWrap = document.createElement('div');
+    amtWrap.className = 'flex items-center gap-1.5';
     const curBadge = document.createElement('span');
-    curBadge.className = 'text-xs font-medium text-zinc-500';
+    curBadge.className = 'text-xs font-semibold text-zinc-500';
     curBadge.textContent = curOf(e);
     const amtIn = document.createElement('input');
     amtIn.className = 'field !w-28 tabular-nums text-xs';
@@ -7539,19 +7552,77 @@ function buildExpenseRow(e, opts = {}) {
     amtIn.inputMode = 'decimal';
     amtIn.value = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(e.amount);
     amtIn.setAttribute('aria-label', 'Valor');
-    const catSel = document.createElement('select');
-    catSel.className = 'field !w-auto min-w-0 flex-1 text-xs';
-    catSel.setAttribute('aria-label', 'Categoria');
-    for (const [cid, , cname] of inc ? INC_CATS : EXP_CATS) catSel.append(new Option(cname, cid));
-    catSel.value = e.cat;
-    top.append(curBadge, amtIn, catSel);
+    amtWrap.append(curBadge, amtIn);
 
+    top.append(kindSeg, amtWrap);
+
+    // 2. Seletor visual de categoria (chips com ícones)
+    const catSection = document.createElement('div');
+    catSection.className = 'space-y-1.5';
+    const catLabel = document.createElement('div');
+    catLabel.className = 'flex items-center justify-between text-xs text-zinc-500';
+    catLabel.innerHTML = '<span>Categoria:</span>';
+    const catSelName = document.createElement('span');
+    catSelName.className = 'font-medium text-zinc-700 dark:text-zinc-300';
+    catLabel.append(catSelName);
+
+    const catsWrap = document.createElement('div');
+    catsWrap.className = 'flex flex-wrap gap-1.5';
+
+    function renderCats() {
+      const list = curKind === 'in' ? INC_CATS : EXP_CATS;
+      if (!list.some(([cid]) => cid === curCat)) curCat = list[0][0];
+      const found = list.find(([cid]) => cid === curCat) || list[0];
+      catSelName.textContent = found[2];
+
+      catsWrap.replaceChildren();
+      for (const [cid, , cname] of list) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const on = curCat === cid;
+        b.className = 'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition ' + (on
+          ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 shadow-sm'
+          : 'border-zinc-200 bg-white/60 text-zinc-600 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400 dark:hover:border-zinc-500');
+        b.innerHTML = catIcon(cid);
+        b.append(cname);
+        b.setAttribute('aria-pressed', String(on));
+        b.onclick = () => { curCat = cid; renderCats(); };
+        catsWrap.append(b);
+      }
+    }
+
+    function renderKindButtons() {
+      kindSeg.replaceChildren();
+      for (const [kv, kl] of [['out', '− Gasto'], ['in', '+ Ganho']]) {
+        const kb = document.createElement('button');
+        kb.type = 'button';
+        kb.className = 'rounded-md px-2.5 py-1 transition ' + (curKind === kv ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200');
+        kb.textContent = kl;
+        kb.setAttribute('aria-pressed', String(curKind === kv));
+        kb.onclick = () => {
+          if (curKind !== kv) {
+            curKind = kv;
+            renderKindButtons();
+            renderCats();
+            noteIn.placeholder = curKind === 'in' ? 'De onde veio? (opcional)' : 'O quê? (opcional)';
+            obsIn.placeholder = curKind === 'in'
+              ? 'Observação sobre o ganho (ex: cliente, projeto, referência...)'
+              : 'Observação sobre o gasto (ex: detalhes do que comprou, motivo...)';
+          }
+        };
+        kindSeg.append(kb);
+      }
+    }
+
+    catSection.append(catLabel, catsWrap);
+
+    // 3. Descrição e Observação
     const noteIn = document.createElement('input');
     noteIn.className = 'field w-full text-xs';
     noteIn.type = 'text';
     noteIn.maxLength = 80;
     noteIn.value = e.note || '';
-    noteIn.placeholder = inc ? 'De onde veio? (opcional)' : 'O quê? (opcional)';
+    noteIn.placeholder = curKind === 'in' ? 'De onde veio? (opcional)' : 'O quê? (opcional)';
     noteIn.setAttribute('aria-label', 'Descrição');
 
     const obsIn = document.createElement('textarea');
@@ -7559,11 +7630,15 @@ function buildExpenseRow(e, opts = {}) {
     obsIn.rows = 2;
     obsIn.maxLength = 300;
     obsIn.value = e.obs || '';
-    obsIn.placeholder = inc
+    obsIn.placeholder = curKind === 'in'
       ? 'Observação sobre o ganho (ex: cliente, projeto, referência...)'
       : 'Observação sobre o gasto (ex: detalhes do que comprou, motivo...)';
     obsIn.setAttribute('aria-label', 'Observação');
 
+    renderKindButtons();
+    renderCats();
+
+    // 4. Rodapé: erro e botões
     const foot = document.createElement('div');
     foot.className = 'flex flex-wrap items-center justify-between gap-2 pt-0.5';
     const errEl = document.createElement('span');
@@ -7586,16 +7661,16 @@ function buildExpenseRow(e, opts = {}) {
       ev.preventDefault();
       const amount = parseMoney(amtIn.value);
       if (!(amount > 0)) { errEl.textContent = 'Informe um valor maior que zero.'; amtIn.focus(); return; }
-      opts.onSave?.({ amount, cat: catSel.value, note: noteIn.value, obs: obsIn.value });
+      opts.onSave?.({ amount, kind: curKind, cat: curCat, note: noteIn.value, obs: obsIn.value });
     };
     box.onsubmit = submitEdit;
     box.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape') { ev.preventDefault(); opts.onCancel?.(); }
       else if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) submitEdit(ev);
     });
-    box.append(top, noteIn, obsIn, foot);
+
+    box.append(top, catSection, noteIn, obsIn, foot);
     li.append(box);
-    requestAnimationFrame(() => obsIn.focus());
     return li;
   }
 
