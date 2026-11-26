@@ -37,7 +37,7 @@
           // "emerald" é a cor de destaque escolhida nas configurações (variáveis --acc-*)
           emerald: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((n) => [n, `rgb(var(--acc-${n}) / <alpha-value>)`])),
           // "ok" = verde fixo para coisas boas (saldo positivo, no ritmo…), independente da paleta
-          ok: { 400: '#34d399', 600: '#059669' },
+          ok: { 50: '#ecfdf5', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 950: '#022c22' },
         },
       } },
     };
@@ -121,7 +121,7 @@
     html, body { overflow-x: hidden; overscroll-behavior-x: none; }
     @supports (overflow: clip) { html, body { overflow-x: clip; } }
     /* Modo público: desfoca números e textos pessoais (hábitos e navegação continuam visíveis) */
-    html.private :is(#metric-list, #rv-metrics, #rv-wins, #rv-improves, #rv-refl, #mr-refl, #mr-stats, #journal-list,
+    html.private :is(#metric-list, #rv-metrics, #rv-wins, #rv-improves, #rv-refl, #mr-refl, #mr-stats, #mr-weekly-rollup, #evo-monthly-rollup, #journal-list,
       #win, #improve, #insight-list, #month-detail, #checkin textarea, #checkin input, #checkin-summary, #project-list .text-xs, #exp-stats, #exp-cats-chart, #exp-trend, #exp-list) {
       filter: blur(10px);
       user-select: none;
@@ -220,6 +220,50 @@
     html[data-accent="rosa"] { --c-goal: #a855f7; }      html.dark[data-accent="rosa"] { --c-goal: #c084fc; }
     html[data-accent="vermelho"] { --c-goal: #f97316; }  html.dark[data-accent="vermelho"] { --c-goal: #fb923c; }
     html[data-accent="laranja"] { --c-goal: #eab308; }   html.dark[data-accent="laranja"] { --c-goal: #facc15; }
+    /* Acordeão moderno das reflexões semanais na visão mensal */
+    .evo-accordion details > summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+    .evo-accordion details > summary::before {
+      content: "";
+      inline-size: 1em;
+      block-size: 1em;
+      flex-shrink: 0;
+      background-color: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat center / contain;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat center / contain;
+      rotate: -90deg;
+    }
+    .evo-accordion details[open] > summary::before {
+      rotate: 0deg;
+    }
+    .evo-accordion details::details-content {
+      interpolate-size: allow-keywords;
+      overflow: clip;
+      contain: layout;
+    }
+    .evo-accordion details:not([open])::details-content {
+      block-size: 0;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .evo-accordion details > summary::before {
+        transition: rotate 0.2s ease-out;
+      }
+      .evo-accordion details::details-content {
+        transition: block-size, content-visibility, display;
+        transition-duration: 0.28s;
+        transition-timing-function: ease-in-out;
+        transition-behavior: allow-discrete;
+      }
+    }
+    [command="--toggle-all"][aria-expanded="true"] .evo-expand-lbl,
+    [command="--toggle-all"][aria-expanded="false"] .evo-collapse-lbl {
+      display: none;
+    }
     details > summary::-webkit-details-marker { display: none; }
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
     input[type=number] { -moz-appearance: textfield; }
@@ -388,6 +432,7 @@
           <p class="text-xs text-zinc-500">De 1 a 5: quanto você avançou em cada uma — vale mesmo para as que não foram concluídas.</p>
           <ul id="mr-rate" class="mt-3 space-y-2"></ul>
         </div>
+        <div id="mr-weekly-rollup" class="mt-5 hidden border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
         <div id="mr-refl" class="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800"></div>
         <div class="mt-5 flex justify-end">
           <button id="mr-done" class="btn-primary">Concluir reflexão do mês</button>
@@ -1084,9 +1129,18 @@
         <div id="evo-kpis" class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
           <!-- Injetado por JS: Hábitos, Metas, Estudo, Sono, Dias 100% -->
         </div>
+
+        <!-- Ponte Semana -> Grande Reflexão do Mês (exibido no modo Semanal) -->
+        <div id="evo-month-bridge" class="mt-3 hidden border-t border-zinc-100 pt-3 dark:border-zinc-800"></div>
       </section>
 
-      <!-- 2. Editor Principal (O que evoluí x O que pequei x Onde melhorei x Plano) -->
+      <!-- 1.5. Termômetro de Evolução vs Regressão -->
+      <section id="evo-scorecard" class="card space-y-4"></section>
+
+      <!-- 1.8. Culminação das Reflexões Semanais do Mês (exibido no modo Mensal) -->
+      <section id="evo-monthly-rollup" class="card hidden space-y-4"></section>
+
+      <!-- 2. Editor Principal (O que evoluí x O que pequei x Onde evoluí vs regredi x Plano) -->
       <div id="evo-editor" class="space-y-4">
         <!-- Injetado por JS -->
       </div>
@@ -3994,14 +4048,29 @@ function reflectionHints(cur, prev, goals, studyGoalMin, weeks = 1) {
   if (prev.habitAvg != null && cur.habitAvg != null) {
     const d = Math.round((cur.habitAvg - prev.habitAvg) * 100);
     if (d >= 5) H.better.push(`Hábitos: ${fmtPct(prev.habitAvg)} → ${fmtPct(cur.habitAvg)} (+${d} pts)`);
+    else if (d <= -5) H.sins.push(`Queda em hábitos: ${fmtPct(prev.habitAvg)} → ${fmtPct(cur.habitAvg)} (${d} pts)`);
   }
   for (const { t, a } of cur.habits) {
     const b = prev.habits.find((x) => x.t.id === t.id)?.a;
-    if (b != null && a - b >= 0.15) H.better.push(`${q(t.title)}: ${fmtPct(b)} → ${hLabel(t, a)}`);
+    if (b != null) {
+      const diffPts = Math.round((a - b) * 100);
+      if (a - b >= 0.15) H.better.push(`${q(t.title)}: ${fmtPct(b)} → ${hLabel(t, a)} (+${diffPts} pts)`);
+      else if (a - b <= -0.15) {
+        H.sins.push(`Queda em ${q(t.title)}: ${fmtPct(b)} → ${fmtPct(a)} (${diffPts} pts)`);
+        H.improve.push(`Recuperar ritmo em ${q(t.title)} (caiu de ${fmtPct(b)} para ${fmtPct(a)})`);
+      }
+    }
   }
   if (prev.study > 0 && cur.study >= prev.study * 1.15) H.better.push(`Estudo: ${fmtMin(prev.study)} → ${fmtMin(cur.study)}`);
-  if (prev.sleepAvg != null && cur.sleepAvg != null && cur.sleepAvg - prev.sleepAvg >= 0.25) H.better.push(`Sono médio: ${fmtSleep(prev.sleepAvg)} → ${fmtSleep(cur.sleepAvg)}`);
-  if (prev.energyAvg != null && cur.energyAvg != null && cur.energyAvg - prev.energyAvg >= 0.3) H.better.push(`Energia média: ${fmtNum(+prev.energyAvg.toFixed(1))} → ${fmtNum(+cur.energyAvg.toFixed(1))}`);
+  else if (prev.study >= 60 && cur.study <= prev.study * 0.8) H.sins.push(`Estudo caiu: ${fmtMin(prev.study)} → ${fmtMin(cur.study)}`);
+  if (prev.sleepAvg != null && cur.sleepAvg != null) {
+    if (cur.sleepAvg - prev.sleepAvg >= 0.25) H.better.push(`Sono médio: ${fmtSleep(prev.sleepAvg)} → ${fmtSleep(cur.sleepAvg)}`);
+    else if (cur.sleepAvg - prev.sleepAvg <= -0.35) H.sins.push(`Sono médio caiu: ${fmtSleep(prev.sleepAvg)} → ${fmtSleep(cur.sleepAvg)}`);
+  }
+  if (prev.energyAvg != null && cur.energyAvg != null) {
+    if (cur.energyAvg - prev.energyAvg >= 0.3) H.better.push(`Energia média: ${fmtNum(+prev.energyAvg.toFixed(1))} → ${fmtNum(+cur.energyAvg.toFixed(1))}`);
+    else if (cur.energyAvg - prev.energyAvg <= -0.4) H.sins.push(`Energia média caiu: ${fmtNum(+prev.energyAvg.toFixed(1))} → ${fmtNum(+cur.energyAvg.toFixed(1))}`);
+  }
   for (const x of cur.metrics) {
     if (x.before != null && x.before !== x.after && x.st.good(x.after - x.before)) H.better.push(`${x.m.name} evoluiu ${signed(x.m, x.after - x.before)}`);
   }
@@ -4287,6 +4356,66 @@ function renderMonthReview() {
     }
     li.append(t, btns);
     ru.append(li);
+  }
+
+  // Culminação das reflexões semanais + atalho para a Grande Reflexão Mensal
+  const mrRollupHost = $('#mr-weekly-rollup');
+  if (mrRollupHost) {
+    const rollup = collectMonthWeeklyReflections(y, m);
+    const sc = computeEvolutionScorecard(cur, prev, {
+      curGoalsDone: ms.mTotal ? ms.mDone : ms.goalsDone,
+      curGoalsTotal: ms.mTotal ? ms.mTotal : ms.goalsTotal,
+      prevLabel: new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(pm[0], pm[1], 1)),
+    });
+    mrRollupHost.replaceChildren();
+    mrRollupHost.classList.remove('hidden');
+
+    const rBox = document.createElement('div');
+    rBox.className = 'rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5 space-y-2.5 dark:border-zinc-800 dark:bg-zinc-800/30';
+
+    const rTop = document.createElement('div');
+    rTop.className = 'flex flex-wrap items-center justify-between gap-2';
+    const rLeft = document.createElement('div');
+    rLeft.className = 'flex flex-wrap items-center gap-2';
+    const rTitle = document.createElement('p');
+    rTitle.className = 'text-xs font-semibold text-zinc-800 dark:text-zinc-200';
+    rTitle.textContent = `Culminação semanal: ${rollup.reflectedCount}/${rollup.totalWeeks} semanas refletidas`;
+    rLeft.append(rTitle);
+    if (sc.score != null) {
+      const st = sc.verdict === 'up' ? 'up' : sc.verdict === 'down' ? 'down' : 'flat';
+      rLeft.append(deltaPill(`Saldo ${sc.score > 0 ? '+' : ''}${sc.score} pts`, st));
+    }
+
+    const openEvoBtn = document.createElement('button');
+    openEvoBtn.type = 'button';
+    openEvoBtn.className = 'btn-ghost text-xs font-semibold text-emerald-600 dark:text-emerald-400';
+    openEvoBtn.textContent = 'Abrir Grande Reflexão Mensal →';
+    openEvoBtn.onclick = () => {
+      mreviewManual = false;
+      mreview = null;
+      $('#mreview-card').classList.add('hidden');
+      evoMode = 'mes';
+      evoMonth = { y, m };
+      setTab('evolucao');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    rTop.append(rLeft, openEvoBtn);
+    rBox.append(rTop);
+
+    if (rollup.reflectedCount > 0) {
+      const preview = document.createElement('div');
+      preview.className = 'flex flex-wrap gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400';
+      for (const w of rollup.weeks) {
+        if (!w.hasRefl) continue;
+        const tag = document.createElement('span');
+        tag.className = 'rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 dark:border-zinc-700 dark:bg-zinc-900/50';
+        const firstLine = w.winsLines[0] || w.sinsLines[0] || w.focus || 'Refletida';
+        tag.textContent = `S${w.idx}: ${firstLine.slice(0, 48)}${firstLine.length > 48 ? '…' : ''}`;
+        preview.append(tag);
+      }
+      rBox.append(preview);
+    }
+    mrRollupHost.append(rBox);
   }
 
   const goals = [...(S.months[mk]?.goals || [])];
@@ -5834,9 +5963,10 @@ function renderJournal() {
     for (const mk of Object.keys(S.months)) {
       const mRec = S.months[mk], R = mRec.refl;
       const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim();
+      const summary = (R?.summary || '').trim(), nextFocus = (R?.nextFocus || '').trim();
       const imp = (R?.improve || []).map((x) => (typeof x === 'string' ? x : x.text)).join(' ');
-      if (!wins && !sins && !better && !imp) continue;
-      if (q && ![wins, sins, better, imp, mk].some((t) => (t || '').toLowerCase().includes(q))) continue;
+      if (!wins && !sins && !better && !imp && !summary && !nextFocus) continue;
+      if (q && ![wins, sins, better, imp, summary, nextFocus, mk].some((t) => (t || '').toLowerCase().includes(q))) continue;
       const [y, m] = mk.split('-').map(Number);
       const mDate = new Date(y, m - 1, 1);
       entries.push({
@@ -5923,9 +6053,16 @@ function renderJournal() {
       if (tg.length) part('Tags', tg.map((t) => '#' + t).join(' '));
     } else {
       const R = it.R;
-      part('🚀 O que evoluí', R?.wins, 'text-emerald-600 dark:text-emerald-400');
+      if (it.type === 'month' && R?.rating) {
+        part('⭐ Nota do mês', `${R.rating}/5`);
+      }
+      part('🚀 O que evoluí', R?.wins, 'text-ok-600 dark:text-ok-400');
       part('⚠️ O que pequei', R?.sins, 'text-rose-600 dark:text-rose-400');
-      part('📈 Onde melhorei vs anterior', R?.better, 'text-indigo-600 dark:text-indigo-400');
+      part('⚖️ Onde evoluí vs regredi', R?.better, 'text-indigo-600 dark:text-indigo-400');
+      if (it.type === 'month') {
+        part('🧭 Síntese do mês', R?.summary);
+        part('🎯 Grande foco do próximo mês', R?.nextFocus);
+      }
       if (R?.improve?.length) {
         part('🎯 Plano de Ação', R.improve.map((x) => (typeof x === 'string' ? x : x.text)).filter(Boolean).map((t) => '• ' + t).join('\n'));
       }
@@ -7122,18 +7259,34 @@ function renderMonthDetail() {
   // ---------- 8. Reflexões (do mês e das semanas) ----------
   const R = S.months[mk]?.refl;
   const reflParts = (r) => [
+    r?.rating && ['Nota do mês', `${r.rating}/5`],
     r?.wins?.trim() && ['Conquistas', r.wins.trim()],
     r?.sins?.trim() && ['Onde pequei', r.sins.trim()],
-    r?.better?.trim() && ['Onde melhorei', r.better.trim()],
+    r?.better?.trim() && ['Evolução vs regressão', r.better.trim()],
+    r?.summary?.trim() && ['Síntese geral do mês', r.summary.trim()],
+    r?.nextFocus?.trim() && ['Foco do próximo mês', r.nextFocus.trim()],
     r?.improve?.length && ['Melhorar', r.improve.map((x) => (typeof x === 'string' ? x : x.text)).filter(Boolean)],
   ].filter(Boolean);
   const mParts = reflParts(R);
-  const openReflBtn = el('button', 'btn-ghost text-xs', mParts.length ? 'Editar reflexão do mês' : 'Escrever reflexão do mês');
-  openReflBtn.onclick = () => { mreviewManual = true; mreview = { y, m }; renderMonthReview(); $('#mreview-card').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const openReflBtn = el('button', 'btn-ghost text-xs text-emerald-600 dark:text-emerald-400 font-semibold', mParts.length ? 'Abrir Grande Reflexão Mensal →' : 'Escrever Grande Reflexão Mensal →');
+  openReflBtn.onclick = () => {
+    evoMode = 'mes';
+    evoMonth = { y, m };
+    setTab('evolucao');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  const reflPanel = panel('Reflexões do período', 'Síntese mensal e revisões de cada semana', openReflBtn);
+  const reflSub = dh != null
+    ? `Síntese mensal e revisões de cada semana · Hábitos ${dh > 0 ? '+' : ''}${dh} pts vs mês anterior`
+    : 'Síntese mensal e revisões de cada semana';
+  const reflPanel = panel('Reflexões do período', reflSub, openReflBtn);
   const mReflWrap = el('div', 'mt-3');
-  mReflWrap.append(el('p', 'eyebrow', 'Reflexão do mês'));
+  const mHeadRow = el('div', 'flex flex-wrap items-center gap-2');
+  mHeadRow.append(el('p', 'eyebrow', 'Reflexão do mês'));
+  if (dh != null) {
+    mHeadRow.append(deltaPill(`${dh > 0 ? '+' : ''}${dh} pts hábitos`, dh > 2 ? 'up' : dh < -2 ? 'down' : 'flat'));
+  }
+  mReflWrap.append(mHeadRow);
   if (!mParts.length) {
     mReflWrap.append(el('p', 'mt-1.5 text-xs text-zinc-500', 'Reflexão do mês ainda não escrita.'));
   } else {
@@ -7947,6 +8100,344 @@ let evoWeek = weekStart(new Date());
 let evoMonth = { y: new Date().getFullYear(), m: new Date().getMonth() };
 let evoFeedFilter = 'tudo'; // 'tudo' | 'semanas' | 'meses'
 let evoFeedSearch = '';
+let evoRollupView = 'temas'; // 'temas' | 'semanas'
+
+function splitReflLines(str) {
+  return String(str || '')
+    .split('\n')
+    .map((l) => l.trim().replace(/^[•\-*]\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function deltaPill(text, status = 'flat', extraCls = '') {
+  const s = document.createElement('span');
+  const tone = status === 'up'
+    ? 'bg-ok-600/10 text-ok-700 dark:bg-ok-400/15 dark:text-ok-400'
+    : status === 'down'
+    ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400'
+    : 'bg-zinc-200/70 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400';
+  const arrow = status === 'up' ? '▲ ' : status === 'down' ? '▼ ' : '= ';
+  s.className = `inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums ${tone} ${extraCls}`.trim();
+  s.textContent = arrow + text;
+  return s;
+}
+
+/**
+ * Coleta todas as semanas de um mês (y, m) com suas reflexões, justificativas e deltas,
+ * agregando vitórias, deslizes recorrentes, evoluções e planos de ação para culminar na reflexão mensal.
+ */
+function collectMonthWeeklyReflections(y, m) {
+  const first = new Date(y, m, 1);
+  const tk = todayKey();
+  const weeks = [];
+  let idx = 0;
+
+  for (let w = weekStart(first); w.getMonth() === m || w < first; w = addDays(w, 7)) {
+    const wk = keyOf(w), we = addDays(w, 6), wek = keyOf(we);
+    if (wek < S.startDate || wk > tk) continue;
+    idx++;
+    const sum = weekSummary(w);
+    const prevWs = addDays(w, -7);
+    const prevSum = keyOf(addDays(w, -1)) >= S.startDate ? weekSummary(prevWs) : null;
+    const W = S.weeks[wk];
+    const R = W?.refl;
+    const winsLines = splitReflLines(R?.wins);
+    const sinsLines = splitReflLines(R?.sins);
+    const betterLines = splitReflLines(R?.better);
+    const improveItems = (R?.improve || [])
+      .map((x) => (typeof x === 'string' ? { id: x, text: x } : x))
+      .filter((x) => x && x.text && x.text.trim());
+    const focus = (W?.review || '').trim();
+    const whyItems = weekWhy(wk);
+    const hasRefl = !!(winsLines.length || sinsLines.length || betterLines.length || improveItems.length || focus || whyItems.length);
+    const deltaHabit = (sum.habit != null && prevSum?.habit != null)
+      ? Math.round((sum.habit - prevSum.habit) * 100)
+      : null;
+
+    weeks.push({
+      idx,
+      ws: w,
+      wk,
+      we,
+      range: fmtRange(w),
+      partial: w.getMonth() !== m || we.getMonth() !== m,
+      rec: W,
+      sum,
+      deltaHabit,
+      winsLines,
+      sinsLines,
+      betterLines,
+      improveItems,
+      focus,
+      whyItems,
+      hasRefl,
+      done: !!W?.reviewDone,
+    });
+  }
+
+  const allWins = [];
+  const allSins = [];
+  const allBetter = [];
+  const allFocus = [];
+  const sinFreq = new Map();
+  const impMap = new Map();
+
+  const normKey = (t) => t.toLowerCase().replace(/^\[s\d+\]\s*/i, '').replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+
+  for (const w of weeks) {
+    for (const text of w.winsLines) allWins.push({ text, weekIdx: w.idx, wk: w.wk, range: w.range });
+    for (const text of w.sinsLines) {
+      allSins.push({ text, weekIdx: w.idx, wk: w.wk, range: w.range });
+      const nk = normKey(text);
+      if (nk) {
+        if (!sinFreq.has(nk)) sinFreq.set(nk, new Set());
+        sinFreq.get(nk).add(w.idx);
+      }
+    }
+    for (const text of w.betterLines) allBetter.push({ text, weekIdx: w.idx, wk: w.wk, range: w.range });
+    if (w.focus) allFocus.push({ text: w.focus, weekIdx: w.idx, wk: w.wk, range: w.range });
+    for (const it of w.improveItems) {
+      const nk = normKey(it.text) || it.text.toLowerCase();
+      if (!impMap.has(nk)) {
+        impMap.set(nk, { text: it.text.trim(), count: 1, weekIdxs: [w.idx], weekIdx: w.idx, wk: w.wk, range: w.range });
+      } else {
+        const cur = impMap.get(nk);
+        if (!cur.weekIdxs.includes(w.idx)) {
+          cur.weekIdxs.push(w.idx);
+          cur.count = cur.weekIdxs.length;
+        }
+      }
+    }
+  }
+
+  for (const s of allSins) {
+    const nk = normKey(s.text);
+    const set = nk ? sinFreq.get(nk) : null;
+    s.repeatCount = set ? set.size : 1;
+  }
+
+  const allImprove = [...impMap.values()].sort((a, b) => b.count - a.count || a.weekIdx - b.weekIdx);
+  const repeatedSins = [...sinFreq.entries()].filter(([, set]) => set.size >= 2).length;
+  const reflectedCount = weeks.filter((w) => w.hasRefl).length;
+  const doneCount = weeks.filter((w) => w.done).length;
+
+  const scoredWeeks = weeks.filter((w) => w.sum.habit != null);
+  let intraMonth = null;
+  if (scoredWeeks.length >= 2) {
+    const firstWeek = scoredWeeks[0];
+    const lastWeek = scoredWeeks[scoredWeeks.length - 1];
+    const sorted = [...scoredWeeks].sort((a, b) => b.sum.habit - a.sum.habit);
+    intraMonth = {
+      firstWeek,
+      lastWeek,
+      habitDiff: Math.round((lastWeek.sum.habit - firstWeek.sum.habit) * 100),
+      bestWeek: sorted[0],
+      worstWeek: sorted[sorted.length - 1],
+    };
+  }
+
+  return {
+    weeks,
+    allWins,
+    allSins,
+    allBetter,
+    allImprove,
+    allFocus,
+    repeatedSins,
+    reflectedCount,
+    doneCount,
+    totalWeeks: weeks.length,
+    intraMonth,
+  };
+}
+
+/**
+ * Calcula o placar completo de Evolução vs Regressão comparando o período `cur` contra `prev`.
+ */
+function computeEvolutionScorecard(cur, prev, opts = {}) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const rows = [];
+
+  const pushRow = (id, label, weight, curVal, prevVal, curText, prevText, deltaText, status, norm) => {
+    rows.push({ id, label, weight, curVal, prevVal, curText, prevText, deltaText, status, norm });
+  };
+
+  // 1. Hábitos (média)
+  {
+    const c = cur?.habitAvg, p = prev?.habitAvg;
+    if (c != null && p != null) {
+      const diffPts = Math.round((c - p) * 100);
+      const status = diffPts > 2 ? 'up' : diffPts < -2 ? 'down' : 'flat';
+      const norm = Math.abs(diffPts) <= 2 ? 0 : clamp(diffPts / 25, -1, 1);
+      pushRow('habits', 'Hábitos (média)', 0.35, c, p, fmtPct(c), fmtPct(p), `${diffPts > 0 ? '+' : ''}${diffPts} pts`, status, norm);
+    } else {
+      pushRow('habits', 'Hábitos (média)', 0.35, c, p, c != null ? fmtPct(c) : '—', p != null ? fmtPct(p) : '—', '', 'none', 0);
+    }
+  }
+
+  // 2. Metas (%)
+  {
+    const ct = opts.curGoalsTotal || 0, cd = opts.curGoalsDone || 0;
+    const pt = opts.prevGoalsTotal || 0, pd = opts.prevGoalsDone || 0;
+    const cPct = ct ? cd / ct : null, pPct = pt ? pd / pt : null;
+    if (cPct != null && pPct != null) {
+      const diffPts = Math.round((cPct - pPct) * 100);
+      const status = diffPts > 3 ? 'up' : diffPts < -3 ? 'down' : 'flat';
+      const norm = Math.abs(diffPts) <= 3 ? 0 : clamp(diffPts / 30, -1, 1);
+      pushRow('goals', 'Metas batidas', 0.25, cPct, pPct, `${cd}/${ct} (${fmtPct(cPct)})`, `${pd}/${pt} (${fmtPct(pPct)})`, `${diffPts > 0 ? '+' : ''}${diffPts} pts`, status, norm);
+    } else {
+      pushRow('goals', 'Metas batidas', 0.25, cPct, pPct, ct ? `${cd}/${ct} (${fmtPct(cPct)})` : '—', pt ? `${pd}/${pt}` : '—', '', 'none', 0);
+    }
+  }
+
+  // 3. Estudo
+  {
+    const c = cur?.study || 0;
+    const p = opts.isPartialCurrent && opts.prevStudyPace != null ? opts.prevStudyPace : (prev?.study || 0);
+    if (p > 0 || c > 0) {
+      if (p > 0) {
+        const diffMin = c - p;
+        const pct = Math.round((diffMin / p) * 100);
+        const significant = Math.abs(diffMin) >= 20 && Math.abs(pct) >= 10;
+        const status = !significant ? 'flat' : diffMin > 0 ? 'up' : 'down';
+        const norm = !significant ? 0 : clamp((diffMin / p) / 0.4, -1, 1);
+        const signedMin = `${diffMin > 0 ? '+' : '−'}${fmtMin(Math.abs(diffMin))}`;
+        pushRow('study', 'Estudo total', 0.20, c, p, fmtMin(c), fmtMin(p), `${signedMin} (${pct > 0 ? '+' : ''}${pct}%)`, status, norm);
+      } else {
+        pushRow('study', 'Estudo total', 0.20, c, 0, fmtMin(c), '0 min', '', 'none', 0);
+      }
+    } else {
+      pushRow('study', 'Estudo total', 0.20, 0, 0, '0 min', '0 min', '', 'none', 0);
+    }
+  }
+
+  // 4. Sono médio
+  {
+    const c = cur?.sleepAvg, p = prev?.sleepAvg;
+    if (c != null && p != null) {
+      const diffH = c - p;
+      const absMin = Math.round(Math.abs(diffH) * 60);
+      const status = Math.abs(diffH) < 0.25 ? 'flat' : diffH > 0 ? 'up' : 'down';
+      const norm = Math.abs(diffH) < 0.25 ? 0 : clamp(diffH / 1.0, -1, 1);
+      const dTxt = `${diffH > 0 ? '+' : diffH < 0 ? '−' : ''}${fmtMin(absMin)}`;
+      pushRow('sleep', 'Sono médio', 0.10, c, p, fmtSleep(c), fmtSleep(p), dTxt, status, norm);
+    } else {
+      pushRow('sleep', 'Sono médio', 0.10, c, p, c != null ? fmtSleep(c) : '—', p != null ? fmtSleep(p) : '—', '', 'none', 0);
+    }
+  }
+
+  // 5. Dias 100%
+  {
+    const c = cur?.perfect || 0;
+    const p = opts.isPartialCurrent && opts.prevPerfectPace != null ? opts.prevPerfectPace : (prev?.perfect ?? null);
+    if (p != null && (prev?.days > 0 || opts.prevHasData)) {
+      const diff = c - p;
+      const status = Math.abs(diff) < 1 ? 'flat' : diff > 0 ? 'up' : 'down';
+      const norm = Math.abs(diff) < 1 ? 0 : clamp(diff / 4, -1, 1);
+      pushRow('perfect', 'Dias 100%', 0.10, c, p, String(c), String(p), `${diff > 0 ? '+' : ''}${diff} ${Math.abs(diff) === 1 ? 'dia' : 'dias'}`, status, norm);
+    } else {
+      pushRow('perfect', 'Dias 100%', 0.10, c, null, String(c), '—', '', 'none', 0);
+    }
+  }
+
+  // 6. Extras informativos (Energia & Retenção)
+  const extraRows = [];
+  if (cur?.energyAvg != null && prev?.energyAvg != null) {
+    const diff = +(cur.energyAvg - prev.energyAvg).toFixed(1);
+    const status = Math.abs(diff) < 0.2 ? 'flat' : diff > 0 ? 'up' : 'down';
+    extraRows.push({
+      id: 'energy',
+      label: 'Energia média',
+      curText: `${fmtNum(+cur.energyAvg.toFixed(1))}/5`,
+      prevText: `${fmtNum(+prev.energyAvg.toFixed(1))}/5`,
+      deltaText: `${diff > 0 ? '+' : ''}${fmtNum(diff)}`,
+      status,
+    });
+  }
+  if ((cur?.retention?.n || 0) >= 2 && (prev?.retention?.n || 0) >= 2) {
+    const cR = cur.retention.rate, pR = prev.retention.rate;
+    const diffPts = Math.round((cR - pR) * 100);
+    const status = Math.abs(diffPts) < 5 ? 'flat' : diffPts > 0 ? 'up' : 'down';
+    extraRows.push({
+      id: 'retention',
+      label: 'Retenção de estudos',
+      curText: fmtPct(cR),
+      prevText: fmtPct(pR),
+      deltaText: `${diffPts > 0 ? '+' : ''}${diffPts} pts`,
+      status,
+    });
+  }
+
+  // Hábitos individuais que subiram/caíram (>= 5 pts)
+  const habitsUp = [];
+  const habitsDown = [];
+  for (const { t, a } of (cur?.habits || [])) {
+    const b = prev?.habits?.find((x) => x.t.id === t.id)?.a;
+    if (b == null) continue;
+    const diff = Math.round((a - b) * 100);
+    const item = { title: t.title, beforeText: fmtPct(b), afterText: fmtPct(a), deltaText: `${diff > 0 ? '+' : ''}${diff} pts`, diff };
+    if (diff >= 5) habitsUp.push(item);
+    else if (diff <= -5) habitsDown.push(item);
+  }
+  habitsUp.sort((a, b) => b.diff - a.diff);
+  habitsDown.sort((a, b) => a.diff - b.diff);
+
+  // Métricas de resultado (S.metrics)
+  const metricsUp = [];
+  const metricsDown = [];
+  for (const x of (cur?.metrics || [])) {
+    if (x.before == null || x.before === x.after) continue;
+    const good = x.st.good(x.after - x.before);
+    const item = {
+      title: x.m.name,
+      beforeText: fmtAmt(x.m.unit, x.before, mkey(x.m)),
+      afterText: fmtVal(x.m, x.after),
+      deltaText: signed(x.m, x.after - x.before),
+    };
+    if (good) metricsUp.push(item);
+    else metricsDown.push(item);
+  }
+
+  const comparedRows = [...rows.filter((r) => r.status !== 'none'), ...extraRows];
+  const coreCompared = rows.filter((r) => r.status !== 'none');
+  let score = null;
+  if (coreCompared.length) {
+    const wSum = coreCompared.reduce((acc, r) => acc + r.weight, 0);
+    const weighted = coreCompared.reduce((acc, r) => acc + r.norm * r.weight, 0);
+    score = Math.round((weighted / wSum) * 100);
+  }
+
+  const improvedCount = comparedRows.filter((r) => r.status === 'up').length;
+  const regressedCount = comparedRows.filter((r) => r.status === 'down').length;
+  const flatCount = comparedRows.filter((r) => r.status === 'flat').length;
+  const comparedCount = comparedRows.length;
+
+  let verdict = 'base';
+  if (comparedCount > 0) {
+    if (score >= 8) verdict = 'up';
+    else if (score <= -8) verdict = 'down';
+    else verdict = 'flat';
+  }
+
+  return {
+    rows,
+    extraRows,
+    byId: Object.fromEntries(rows.map((r) => [r.id, r])),
+    habitsUp,
+    habitsDown,
+    metricsUp,
+    metricsDown,
+    score,
+    verdict,
+    improvedCount,
+    regressedCount,
+    flatCount,
+    comparedCount,
+    isPartialCurrent: !!opts.isPartialCurrent,
+    elapsedDays: opts.elapsedDays || 0,
+    prevLabel: opts.prevLabel || 'período anterior',
+  };
+}
 
 function updateEvoSaveIndicator() {
   const el = $('#evo-save-status');
@@ -7958,14 +8449,71 @@ function updateEvoSaveIndicator() {
   }, 1800);
 }
 
+function wireEvoAccordionListeners() {
+  if (window.__evoAccordionWired) return;
+  window.__evoAccordionWired = true;
+
+  const toggleAllIn = (target, trigger) => {
+    if (!target) return;
+    const expand = trigger.getAttribute('aria-expanded') !== 'true';
+    for (const details of target.querySelectorAll(':scope > details')) {
+      details.open = expand;
+    }
+    trigger.setAttribute('aria-expanded', String(expand));
+  };
+
+  document.addEventListener('command', (event) => {
+    if (event.command !== '--toggle-all') return;
+    toggleAllIn(event.target, event.source);
+  }, { capture: true });
+
+  document.addEventListener('toggle', (event) => {
+    const dt = event.target;
+    if (!(dt instanceof HTMLDetailsElement) || !dt.matches('.evo-accordion > details')) return;
+    const accordion = dt.parentElement;
+    if (!accordion?.id) return;
+    const button = document.querySelector(`[command="--toggle-all"][commandfor="${CSS.escape(accordion.id)}"]`);
+    if (!button) return;
+    const items = accordion.querySelectorAll(':scope > details');
+    button.setAttribute('aria-expanded', String(Array.prototype.every.call(items, (d) => d.open)));
+  }, { capture: true });
+
+  if (!Object.hasOwn(HTMLButtonElement.prototype, 'commandForElement')) {
+    document.addEventListener('click', (event) => {
+      const btn = event.target.closest?.('[command="--toggle-all"][commandfor]');
+      if (!btn) return;
+      const target = document.getElementById(btn.getAttribute('commandfor'));
+      toggleAllIn(target, btn);
+    });
+  }
+}
+
 function renderEvolutionTodayWidget() {
   const box = $('#evo-today-body');
   if (!box) return;
-  const ws = weekStart(new Date()), wk = keyOf(ws);
+  const now = new Date();
+  const ws = weekStart(now), wk = keyOf(ws);
   const W = S.weeks[wk], R = W?.refl;
   const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim();
+  const curSum = weekSummary(ws), prevSum = weekSummary(addDays(ws, -7));
+  const deltaH = curSum.habit != null && prevSum.habit != null ? Math.round((curSum.habit - prevSum.habit) * 100) : null;
+  const mRollup = collectMonthWeeklyReflections(now.getFullYear(), now.getMonth());
+  const daysInM = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const showMonthLink = mRollup.reflectedCount > 0 || now.getDate() >= daysInM - 4;
 
   box.replaceChildren();
+
+  if (deltaH != null) {
+    const trendBar = document.createElement('div');
+    trendBar.className = 'mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-zinc-50 px-2.5 py-1.5 dark:bg-zinc-800/40';
+    const lbl = document.createElement('span');
+    lbl.className = 'text-[11px] font-medium text-zinc-500';
+    lbl.textContent = `Hábitos vs sem. passada (${fmtPct(curSum.habit)})`;
+    const status = deltaH > 2 ? 'up' : deltaH < -2 ? 'down' : 'flat';
+    trendBar.append(lbl, deltaPill(`${deltaH > 0 ? '+' : ''}${deltaH} pts`, status));
+    box.append(trendBar);
+  }
+
   if (!wins && !sins) {
     const wrap = document.createElement('div');
     wrap.className = 'rounded-xl border border-dashed border-zinc-200/80 bg-zinc-50/50 p-3 text-center dark:border-zinc-800 dark:bg-zinc-800/20';
@@ -7984,41 +8532,56 @@ function renderEvolutionTodayWidget() {
     };
     wrap.append(p, btn);
     box.append(wrap);
-    return;
-  }
-
-  const list = document.createElement('div');
-  list.className = 'space-y-1.5';
-  if (wins) {
-    const row = document.createElement('div');
-    row.className = 'flex items-start gap-1.5 text-xs';
-    const tag = document.createElement('span');
-    tag.className = 'shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400';
-    tag.textContent = '🚀 Evoluí';
-    const txt = document.createElement('span');
-    txt.className = 'line-clamp-2 text-zinc-700 dark:text-zinc-300';
-    txt.textContent = wins.split('\n')[0].replace(/^[•\-*]\s*/, '');
-    row.append(tag, txt);
-    list.append(row);
-  }
-  if (sins) {
-    const row = document.createElement('div');
-    row.className = 'flex items-start gap-1.5 text-xs';
-    const tag = document.createElement('span');
-    tag.className = 'shrink-0 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-400';
-    tag.textContent = '⚠️ Pequei';
-    const txt = document.createElement('span');
-    txt.className = 'line-clamp-2 text-zinc-700 dark:text-zinc-300';
-    txt.textContent = sins.split('\n')[0].replace(/^[•\-*]\s*/, '');
-    row.append(tag, txt);
-    list.append(row);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'space-y-1.5';
+    if (wins) {
+      const row = document.createElement('div');
+      row.className = 'flex items-start gap-1.5 text-xs';
+      const tag = document.createElement('span');
+      tag.className = 'shrink-0 rounded bg-ok-600/10 px-1.5 py-0.5 text-[10px] font-bold text-ok-700 dark:bg-ok-400/15 dark:text-ok-400';
+      tag.textContent = '▲ Evoluí';
+      const txt = document.createElement('span');
+      txt.className = 'line-clamp-2 text-zinc-700 dark:text-zinc-300';
+      txt.textContent = wins.split('\n')[0].replace(/^[•\-*]\s*/, '');
+      row.append(tag, txt);
+      list.append(row);
+    }
+    if (sins) {
+      const row = document.createElement('div');
+      row.className = 'flex items-start gap-1.5 text-xs';
+      const tag = document.createElement('span');
+      tag.className = 'shrink-0 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-400';
+      tag.textContent = '▼ Pequei';
+      const txt = document.createElement('span');
+      txt.className = 'line-clamp-2 text-zinc-700 dark:text-zinc-300';
+      txt.textContent = sins.split('\n')[0].replace(/^[•\-*]\s*/, '');
+      row.append(tag, txt);
+      list.append(row);
+    }
+    box.append(list);
   }
 
   const foot = document.createElement('div');
-  foot.className = 'mt-2.5 flex items-center justify-between border-t border-zinc-100 pt-2 text-[11px] dark:border-zinc-800';
+  foot.className = 'mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2 text-[11px] dark:border-zinc-800';
   const st = document.createElement('span');
   st.className = 'text-zinc-400';
-  st.textContent = W?.reviewDone ? '✓ Semana concluída' : 'Semana em aberto';
+  st.textContent = W?.reviewDone ? '✓ Semana concluída' : `${mRollup.reflectedCount}/${mRollup.totalWeeks} sem. no mês`;
+  const actions = document.createElement('div');
+  actions.className = 'flex items-center gap-2.5';
+  if (showMonthLink) {
+    const mBtn = document.createElement('button');
+    mBtn.type = 'button';
+    mBtn.className = 'font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100';
+    mBtn.textContent = '🗓️ Visão do mês';
+    mBtn.onclick = () => {
+      evoMode = 'mes';
+      evoMonth = { y: now.getFullYear(), m: now.getMonth() };
+      setTab('evolucao');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    actions.append(mBtn);
+  }
   const edit = document.createElement('button');
   edit.type = 'button';
   edit.className = 'font-semibold text-emerald-600 hover:underline dark:text-emerald-400';
@@ -8029,12 +8592,671 @@ function renderEvolutionTodayWidget() {
     setTab('evolucao');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  foot.append(st, edit);
+  actions.append(edit);
+  foot.append(st, actions);
+  box.append(foot);
+}
 
-  box.append(list, foot);
+function renderEvolutionScorecard(scorecard, isWeek, monthRollup) {
+  const host = $('#evo-scorecard');
+  if (!host) return;
+  host.replaceChildren();
+
+  const verdictMeta = {
+    up: {
+      badge: '▲ EVOLUIU',
+      title: isWeek ? 'Semana em evolução clara' : 'Mês em evolução clara',
+      wrapCls: 'border-ok-600/30 bg-ok-50/50 dark:border-ok-500/30 dark:bg-ok-950/25',
+      badgeCls: 'bg-ok-600 text-white dark:bg-ok-500 dark:text-zinc-950',
+      scoreCls: 'text-ok-700 dark:text-ok-400',
+    },
+    down: {
+      badge: '▼ REGREDIU',
+      title: isWeek ? 'Semana com queda — hora de corrigir a rota' : 'Mês com regressão — ajuste os gargalos',
+      wrapCls: 'border-rose-500/30 bg-rose-50/50 dark:border-rose-500/30 dark:bg-rose-950/20',
+      badgeCls: 'bg-rose-600 text-white dark:bg-rose-500 dark:text-white',
+      scoreCls: 'text-rose-700 dark:text-rose-400',
+    },
+    flat: {
+      badge: '● ESTÁVEL',
+      title: isWeek ? 'Ritmo mantido em relação à semana anterior' : 'Ritmo mantido em relação ao mês anterior',
+      wrapCls: 'border-indigo-500/25 bg-indigo-50/40 dark:border-indigo-500/25 dark:bg-indigo-950/20',
+      badgeCls: 'bg-indigo-600 text-white dark:bg-indigo-500 dark:text-white',
+      scoreCls: 'text-indigo-700 dark:text-indigo-300',
+    },
+    base: {
+      badge: '◎ PERÍODO BASE',
+      title: 'Construindo referência inicial de comparação',
+      wrapCls: 'border-zinc-200/80 bg-zinc-50/60 dark:border-zinc-800 dark:bg-zinc-800/30',
+      badgeCls: 'bg-zinc-700 text-white dark:bg-zinc-200 dark:text-zinc-900',
+      scoreCls: 'text-zinc-700 dark:text-zinc-300',
+    },
+  }[scorecard.verdict];
+
+  // 1. Banner do Veredito + Medidor Bipolar
+  const banner = document.createElement('div');
+  banner.className = `rounded-xl border p-4 ${verdictMeta.wrapCls}`;
+
+  const top = document.createElement('div');
+  top.className = 'flex flex-wrap items-start justify-between gap-3';
+
+  const left = document.createElement('div');
+  const badgeRow = document.createElement('div');
+  badgeRow.className = 'flex flex-wrap items-center gap-2';
+  const vBadge = document.createElement('span');
+  vBadge.className = `inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide ${verdictMeta.badgeCls}`;
+  vBadge.textContent = verdictMeta.badge;
+  const ey = document.createElement('span');
+  ey.className = 'eyebrow';
+  ey.textContent = `Termômetro de Evolução vs Regressão · vs ${scorecard.prevLabel}`;
+  badgeRow.append(vBadge, ey);
+
+  const h = document.createElement('h3');
+  h.className = 'mt-1.5 text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100';
+  h.textContent = verdictMeta.title;
+
+  const summaryP = document.createElement('p');
+  summaryP.className = 'mt-0.5 text-xs text-zinc-600 dark:text-zinc-400';
+  if (scorecard.comparedCount === 0) {
+    summaryP.textContent = 'Sem dados suficientes do período anterior para medir variação. Assim que houver 2 períodos seguidos, o placar calcula cada ganho e queda.';
+  } else {
+    const parts = [];
+    parts.push(`${scorecard.improvedCount} ${scorecard.improvedCount === 1 ? 'indicador evoluiu' : 'indicadores evoluíram'}`);
+    parts.push(`${scorecard.regressedCount} ${scorecard.regressedCount === 1 ? 'regrediu' : 'regrediram'}`);
+    if (scorecard.flatCount) parts.push(`${scorecard.flatCount} ${scorecard.flatCount === 1 ? 'estável' : 'estáveis'}`);
+    summaryP.textContent = parts.join(' · ') + (scorecard.isPartialCurrent ? ` (comparando ritmo até o dia ${scorecard.elapsedDays})` : '');
+  }
+  left.append(badgeRow, h, summaryP);
+
+  const right = document.createElement('div');
+  right.className = 'text-left sm:text-right shrink-0';
+  const scoreLbl = document.createElement('p');
+  scoreLbl.className = 'eyebrow';
+  scoreLbl.textContent = 'Saldo líquido';
+  const scoreVal = document.createElement('p');
+  scoreVal.className = `mt-0.5 text-2xl font-bold tabular-nums num ${verdictMeta.scoreCls}`;
+  scoreVal.textContent = scorecard.score == null ? '—' : `${scorecard.score > 0 ? '+' : ''}${scorecard.score} pts`;
+  right.append(scoreLbl, scoreVal);
+
+  top.append(left, right);
+  banner.append(top);
+
+  // Medidor bipolar: Regredi <- 0 -> Evoluí
+  if (scorecard.score != null) {
+    const meterWrap = document.createElement('div');
+    meterWrap.className = 'mt-3.5 pt-3 border-t border-black/5 dark:border-white/5';
+    const labels = document.createElement('div');
+    labels.className = 'flex items-center justify-between text-[11px] font-medium';
+    const lNeg = document.createElement('span'); lNeg.className = 'text-rose-600 dark:text-rose-400'; lNeg.textContent = '▼ Regredi (-100)';
+    const lMid = document.createElement('span'); lMid.className = 'text-zinc-500'; lMid.textContent = '0 (estável)';
+    const lPos = document.createElement('span'); lPos.className = 'text-ok-600 dark:text-ok-400'; lPos.textContent = 'Evoluí (+100) ▲';
+    labels.append(lNeg, lMid, lPos);
+
+    const track = document.createElement('div');
+    track.className = 'relative mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-800';
+    const centerTick = document.createElement('span');
+    centerTick.className = 'absolute left-1/2 top-0 bottom-0 z-10 w-0.5 -translate-x-1/2 bg-zinc-400 dark:bg-zinc-500';
+    const bar = document.createElement('span');
+    const mag = Math.min(50, Math.abs(scorecard.score) / 2);
+    if (scorecard.score >= 0) {
+      bar.className = 'absolute top-0 bottom-0 rounded-r-full bg-ok-500 transition-[width] duration-500';
+      bar.style.left = '50%';
+      bar.style.width = `${mag}%`;
+    } else {
+      bar.className = 'absolute top-0 bottom-0 rounded-l-full bg-rose-500 transition-[width,left] duration-500';
+      bar.style.left = `${50 - mag}%`;
+      bar.style.width = `${mag}%`;
+    }
+    track.append(centerTick, bar);
+    meterWrap.append(labels, track);
+    banner.append(meterWrap);
+  }
+  host.append(banner);
+
+  // 2. Grade 2 colunas: Onde você evoluiu vs Onde você regrediu
+  const upItems = [];
+  const downItems = [];
+  for (const r of [...scorecard.rows, ...scorecard.extraRows]) {
+    if (r.status === 'up') upItems.push({ label: r.label, from: r.prevText, to: r.curText, delta: r.deltaText, kind: 'Métrica' });
+    else if (r.status === 'down') downItems.push({ label: r.label, from: r.prevText, to: r.curText, delta: r.deltaText, kind: 'Métrica' });
+  }
+  for (const hItem of scorecard.habitsUp) {
+    upItems.push({ label: hItem.title, from: hItem.beforeText, to: hItem.afterText, delta: hItem.deltaText, kind: 'Hábito' });
+  }
+  for (const hItem of scorecard.habitsDown) {
+    downItems.push({ label: hItem.title, from: hItem.beforeText, to: hItem.afterText, delta: hItem.deltaText, kind: 'Hábito' });
+  }
+  for (const mItem of scorecard.metricsUp) {
+    upItems.push({ label: mItem.title, from: mItem.beforeText, to: mItem.afterText, delta: mItem.deltaText, kind: 'Resultado' });
+  }
+  for (const mItem of scorecard.metricsDown) {
+    downItems.push({ label: mItem.title, from: mItem.beforeText, to: mItem.afterText, delta: mItem.deltaText, kind: 'Resultado' });
+  }
+
+  const diffGrid = document.createElement('div');
+  diffGrid.className = 'grid gap-3 md:grid-cols-2';
+
+  const buildDiffCol = (isUp, items) => {
+    const col = document.createElement('div');
+    col.className = 'rounded-xl border p-3.5 ' + (isUp
+      ? 'border-ok-600/20 bg-ok-50/35 dark:border-ok-500/20 dark:bg-ok-950/15'
+      : 'border-rose-500/20 bg-rose-50/35 dark:border-rose-500/20 dark:bg-rose-950/15');
+    const hd = document.createElement('div');
+    hd.className = 'flex items-center justify-between gap-2';
+    const ttl = document.createElement('p');
+    ttl.className = 'text-xs font-bold uppercase tracking-wider ' + (isUp ? 'text-ok-700 dark:text-ok-400' : 'text-rose-700 dark:text-rose-400');
+    ttl.textContent = isUp ? `▲ Onde você evoluiu (${items.length})` : `▼ Onde você regrediu (${items.length})`;
+    hd.append(ttl);
+    col.append(hd);
+
+    if (!items.length) {
+      const empty = document.createElement('p');
+      empty.className = 'mt-2 text-xs text-zinc-500';
+      empty.textContent = isUp
+        ? 'Nenhuma alta relevante detectada ainda neste comparativo.'
+        : 'Nenhuma regressão relevante detectada ✓';
+      col.append(empty);
+      return col;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'mt-2.5 space-y-1.5';
+    for (const it of items) {
+      const li = document.createElement('li');
+      li.className = 'flex items-center justify-between gap-2 rounded-lg border border-zinc-200/70 bg-white/80 px-2.5 py-1.5 text-xs dark:border-zinc-800/80 dark:bg-zinc-900/50';
+      const info = document.createElement('div');
+      info.className = 'min-w-0 flex-1';
+      const nameRow = document.createElement('div');
+      nameRow.className = 'flex items-center gap-1.5';
+      const kind = document.createElement('span');
+      kind.className = 'rounded bg-zinc-100 px-1 py-px text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400';
+      kind.textContent = it.kind;
+      const nm = document.createElement('span');
+      nm.className = 'truncate font-medium text-zinc-800 dark:text-zinc-200';
+      nm.textContent = it.label;
+      nameRow.append(kind, nm);
+      const cmp = document.createElement('p');
+      cmp.className = 'mt-0.5 font-mono text-[11px] text-zinc-500 tabular-nums';
+      cmp.textContent = `${it.from} → ${it.to}`;
+      info.append(nameRow, cmp);
+      li.append(info, deltaPill(it.delta, isUp ? 'up' : 'down'));
+      ul.append(li);
+    }
+    col.append(ul);
+    return col;
+  };
+
+  diffGrid.append(buildDiffCol(true, upItems), buildDiffCol(false, downItems));
+  host.append(diffGrid);
+
+  // 3. Apenas no modo Mensal: Trajetória Semana a Semana dentro do mês
+  if (!isWeek && monthRollup && monthRollup.weeks.length) {
+    const traj = document.createElement('div');
+    traj.className = 'rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-zinc-800/80 dark:bg-zinc-800/25';
+
+    const tHead = document.createElement('div');
+    tHead.className = 'flex flex-wrap items-center justify-between gap-2';
+    const tTitle = document.createElement('p');
+    tTitle.className = 'text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300';
+    tTitle.textContent = 'Trajetória dentro do mês (semana a semana)';
+    tHead.append(tTitle);
+
+    if (monthRollup.intraMonth) {
+      const im = monthRollup.intraMonth;
+      const imBadge = document.createElement('div');
+      imBadge.className = 'flex flex-wrap items-center gap-1.5 text-xs';
+      const spanTxt = document.createElement('span');
+      spanTxt.className = 'text-zinc-500';
+      spanTxt.textContent = `S${im.firstWeek.idx} (${fmtPct(im.firstWeek.sum.habit)}) → S${im.lastWeek.idx} (${fmtPct(im.lastWeek.sum.habit)})`;
+      const st = im.habitDiff > 2 ? 'up' : im.habitDiff < -2 ? 'down' : 'flat';
+      imBadge.append(spanTxt, deltaPill(`${im.habitDiff > 0 ? '+' : ''}${im.habitDiff} pts no mês`, st));
+      tHead.append(imBadge);
+    }
+    traj.append(tHead);
+
+    const wGrid = document.createElement('div');
+    wGrid.className = 'mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5';
+    for (const w of monthRollup.weeks) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'group rounded-lg border border-zinc-200/80 bg-white p-2.5 text-left transition hover:border-emerald-500/60 dark:border-zinc-800 dark:bg-zinc-900/60';
+      card.onclick = () => {
+        evoMode = 'semana';
+        evoWeek = w.ws;
+        renderEvolutionTab();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const topW = document.createElement('div');
+      topW.className = 'flex items-center justify-between gap-1';
+      const sTag = document.createElement('span');
+      sTag.className = 'font-mono text-[11px] font-bold text-zinc-800 dark:text-zinc-200';
+      sTag.textContent = `S${w.idx}`;
+      const reflTag = document.createElement('span');
+      reflTag.className = 'text-[10px] font-medium ' + (w.hasRefl ? 'text-ok-600 dark:text-ok-400' : 'text-zinc-400');
+      reflTag.textContent = w.hasRefl ? '✓ Refletida' : '○ Sem nota';
+      topW.append(sTag, reflTag);
+
+      const rng = document.createElement('p');
+      rng.className = 'mt-0.5 truncate text-[11px] text-zinc-500';
+      rng.textContent = w.range;
+
+      const metricRow = document.createElement('div');
+      metricRow.className = 'mt-1.5 flex items-center justify-between gap-1';
+      const hab = document.createElement('span');
+      hab.className = 'font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100';
+      hab.textContent = w.sum.habit != null ? fmtPct(w.sum.habit) : '—';
+      metricRow.append(hab);
+      if (w.deltaHabit != null) {
+        const dSt = w.deltaHabit > 2 ? 'up' : w.deltaHabit < -2 ? 'down' : 'flat';
+        metricRow.append(deltaPill(`${w.deltaHabit > 0 ? '+' : ''}${w.deltaHabit}`, dSt));
+      }
+
+      const subRow = document.createElement('p');
+      subRow.className = 'mt-1 text-[10px] text-zinc-500';
+      const subParts = [];
+      if (w.sum.goalsTotal) subParts.push(`Metas ${w.sum.goalsDone}/${w.sum.goalsTotal}`);
+      if (w.sum.study) subParts.push(fmtMin(w.sum.study));
+      subRow.textContent = subParts.join(' · ') || 'Toque para abrir';
+
+      card.append(topW, rng, metricRow, subRow);
+      wGrid.append(card);
+    }
+    traj.append(wGrid);
+
+    if (monthRollup.intraMonth && monthRollup.intraMonth.bestWeek.idx !== monthRollup.intraMonth.worstWeek.idx) {
+      const im = monthRollup.intraMonth;
+      const foot = document.createElement('p');
+      foot.className = 'mt-2 text-[11px] text-zinc-500';
+      foot.textContent = `Melhor semana: S${im.bestWeek.idx} (${fmtPct(im.bestWeek.sum.habit)}) · Mais difícil: S${im.worstWeek.idx} (${fmtPct(im.worstWeek.sum.habit)})`;
+      traj.append(foot);
+    }
+    host.append(traj);
+  }
+}
+
+function consolidateWeeksIntoMonth(rec, rollup) {
+  rec.refl ||= blankRefl();
+  const R = rec.refl;
+  let added = 0;
+
+  const appendBlock = (field, entries) => {
+    const existing = splitReflLines(R[field]);
+    const existingSet = new Set(existing.map((x) => x.toLowerCase()));
+    const lines = R[field] ? [R[field].trimEnd()] : [];
+    for (const e of entries) {
+      const formatted = `[S${e.weekIdx}] ${e.text}`;
+      if (existingSet.has(formatted.toLowerCase()) || existingSet.has(e.text.toLowerCase())) continue;
+      lines.push(`• ${formatted}`);
+      existingSet.add(formatted.toLowerCase());
+      added++;
+    }
+    R[field] = lines.filter(Boolean).join('\n');
+  };
+
+  appendBlock('wins', rollup.allWins);
+  appendBlock('sins', rollup.allSins);
+  appendBlock('better', rollup.allBetter);
+
+  R.improve ||= [];
+  const impSet = new Set(R.improve.map((x) => (typeof x === 'string' ? x : x.text).trim().toLowerCase()));
+  for (const it of rollup.allImprove) {
+    if (impSet.has(it.text.toLowerCase())) continue;
+    R.improve.push({ id: uid(), text: it.text });
+    impSet.add(it.text.toLowerCase());
+    added++;
+  }
+
+  return added;
+}
+
+function renderMonthlyWeeklyRollup(rec, rollup, mName, hints, onMutate) {
+  const host = $('#evo-monthly-rollup');
+  if (!host) return;
+  host.replaceChildren();
+  host.classList.remove('hidden');
+  rec.refl ||= blankRefl();
+  const R = rec.refl;
+
+  // Cabeçalho da Culminação
+  const head = document.createElement('div');
+  head.className = 'flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4 dark:border-zinc-800';
+
+  const headLeft = document.createElement('div');
+  const eyWrap = document.createElement('div');
+  eyWrap.className = 'flex flex-wrap items-center gap-2';
+  const dot = document.createElement('span');
+  dot.className = 'h-2 w-2 rounded-full bg-emerald-500';
+  const ey = document.createElement('p');
+  ey.className = 'eyebrow';
+  ey.textContent = 'Culminação das Semanas · Visão Geral do Mês';
+  const progBadge = document.createElement('span');
+  progBadge.className = 'rounded-full bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+  progBadge.textContent = `${rollup.reflectedCount} de ${rollup.totalWeeks} semanas refletidas`;
+  eyWrap.append(dot, ey, progBadge);
+
+  const title = document.createElement('h3');
+  title.className = 'mt-1 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100';
+  title.textContent = `Tudo o que você refletiu nas semanas de ${mName}`;
+
+  const sub = document.createElement('p');
+  sub.className = 'mt-0.5 text-xs text-zinc-500';
+  sub.textContent = 'Suas reflexões semanais convergem aqui. Revise os padrões do mês e consolide tudo na Grande Reflexão Mensal com 1 clique.';
+  headLeft.append(eyWrap, title, sub);
+
+  const headRight = document.createElement('div');
+  headRight.className = 'flex flex-wrap items-center gap-2';
+
+  const viewTabs = document.createElement('div');
+  viewTabs.className = 'inline-flex rounded-xl bg-zinc-100 p-1 text-xs font-semibold dark:bg-[#1F1F1F]';
+  const btnTemas = document.createElement('button');
+  btnTemas.type = 'button';
+  btnTemas.className = 'rounded-lg px-2.5 py-1 transition ' + (evoRollupView === 'temas' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400');
+  btnTemas.textContent = 'Por Tema';
+  btnTemas.onclick = () => { evoRollupView = 'temas'; renderMonthlyWeeklyRollup(rec, rollup, mName, hints, onMutate); };
+
+  const btnSemanas = document.createElement('button');
+  btnSemanas.type = 'button';
+  btnSemanas.className = 'rounded-lg px-2.5 py-1 transition ' + (evoRollupView === 'semanas' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400');
+  btnSemanas.textContent = 'Semana a Semana';
+  btnSemanas.onclick = () => { evoRollupView = 'semanas'; renderMonthlyWeeklyRollup(rec, rollup, mName, hints, onMutate); };
+  viewTabs.append(btnTemas, btnSemanas);
+
+  const consolidateBtn = document.createElement('button');
+  consolidateBtn.type = 'button';
+  consolidateBtn.className = 'btn-primary text-xs py-1.5 px-3';
+  consolidateBtn.textContent = '✨ Consolidar semanas na reflexão mensal';
+  consolidateBtn.disabled = rollup.reflectedCount === 0;
+  if (rollup.reflectedCount === 0) consolidateBtn.title = 'Escreva ao menos uma reflexão semanal neste mês para consolidar.';
+  consolidateBtn.onclick = () => {
+    const added = consolidateWeeksIntoMonth(rec, rollup);
+    save();
+    updateEvoSaveIndicator();
+    consolidateBtn.textContent = added > 0 ? `✓ ${added} itens consolidados!` : '✓ Tudo já está na mensal';
+    setTimeout(() => {
+      onMutate();
+    }, 550);
+  };
+
+  headRight.append(viewTabs, consolidateBtn);
+  head.append(headLeft, headRight);
+  host.append(head);
+
+  if (rollup.reflectedCount === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 p-5 text-center dark:border-zinc-800 dark:bg-zinc-800/20';
+    const ep = document.createElement('p');
+    ep.className = 'text-xs text-zinc-600 dark:text-zinc-400';
+    ep.textContent = 'Nenhuma reflexão semanal foi escrita neste mês ainda. Anote qualquer semana abaixo para vê-la culminar aqui:';
+    const btns = document.createElement('div');
+    btns.className = 'mt-3 flex flex-wrap justify-center gap-2';
+    for (const w of rollup.weeks) {
+      const wb = document.createElement('button');
+      wb.type = 'button';
+      wb.className = 'chip';
+      wb.textContent = `S${w.idx} · ${w.range} →`;
+      wb.onclick = () => { evoMode = 'semana'; evoWeek = w.ws; renderEvolutionTab(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      btns.append(wb);
+    }
+    empty.append(ep, btns);
+    host.append(empty);
+    return;
+  }
+
+  const pullItemToMonth = (field, weekIdx, text) => {
+    const formatted = `[S${weekIdx}] ${text}`;
+    if (field === 'improve') {
+      R.improve ||= [];
+      if (!R.improve.some((x) => (typeof x === 'string' ? x : x.text).trim().toLowerCase() === text.toLowerCase())) {
+        R.improve.push({ id: uid(), text });
+      }
+    } else {
+      const cur = (R[field] || '').trimEnd();
+      if (!(R[field] || '').toLowerCase().includes(text.toLowerCase())) {
+        R[field] = (cur ? cur + '\n' : '') + `• ${formatted}`;
+      }
+    }
+    save();
+    updateEvoSaveIndicator();
+    onMutate();
+  };
+
+  if (evoRollupView === 'temas') {
+    const grid = document.createElement('div');
+    grid.className = 'grid gap-3 md:grid-cols-2';
+
+    const buildThemeCard = (titleTxt, toneCls, entries, field, emptyTxt) => {
+      const card = document.createElement('div');
+      card.className = `rounded-xl border p-3.5 ${toneCls}`;
+      const h = document.createElement('p');
+      h.className = 'text-xs font-bold uppercase tracking-wider';
+      h.textContent = `${titleTxt} (${entries.length})`;
+      card.append(h);
+
+      if (!entries.length) {
+        const em = document.createElement('p');
+        em.className = 'mt-2 text-xs text-zinc-500';
+        em.textContent = emptyTxt;
+        card.append(em);
+        return card;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'mt-2.5 max-h-64 space-y-1.5 overflow-y-auto pr-1';
+      for (const e of entries) {
+        const li = document.createElement('li');
+        li.className = 'flex items-start justify-between gap-2 rounded-lg border border-zinc-200/70 bg-white/80 px-2.5 py-2 text-xs dark:border-zinc-800/80 dark:bg-zinc-900/50';
+
+        const left = document.createElement('div');
+        left.className = 'min-w-0 flex-1 space-y-1';
+
+        const meta = document.createElement('div');
+        meta.className = 'flex flex-wrap items-center gap-1';
+        const sTag = document.createElement('span');
+        sTag.className = 'rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300';
+        sTag.textContent = e.weekIdxs ? e.weekIdxs.map((n) => `S${n}`).join('+') : `S${e.weekIdx}`;
+        meta.append(sTag);
+
+        if ((e.repeatCount && e.repeatCount >= 2) || (e.count && e.count >= 2)) {
+          const nRep = e.repeatCount || e.count;
+          const rep = document.createElement('span');
+          rep.className = 'rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400';
+          rep.textContent = `🔁 Recorrente (${nRep}×)`;
+          meta.append(rep);
+        }
+        if (e.isFocus) {
+          const fTag = document.createElement('span');
+          fTag.className = 'rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300';
+          fTag.textContent = 'Foco';
+          meta.append(fTag);
+        }
+
+        const txt = document.createElement('p');
+        txt.className = 'break-words leading-relaxed text-zinc-800 dark:text-zinc-200';
+        txt.textContent = e.text;
+        left.append(meta, txt);
+
+        const isIncluded = field === 'improve'
+          ? (R.improve || []).some((x) => (typeof x === 'string' ? x : x.text).trim().toLowerCase() === e.text.toLowerCase())
+          : (R[field] || '').toLowerCase().includes(e.text.toLowerCase());
+
+        const pullBtn = document.createElement('button');
+        pullBtn.type = 'button';
+        pullBtn.className = 'shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold transition ' + (isIncluded
+          ? 'border-transparent text-ok-600 dark:text-ok-400'
+          : 'border-zinc-200 text-zinc-600 hover:border-emerald-500 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-300');
+        pullBtn.textContent = isIncluded ? '✓ Na mensal' : '+ Puxar';
+        pullBtn.disabled = isIncluded;
+        pullBtn.onclick = () => pullItemToMonth(field, e.weekIdx, e.text);
+
+        li.append(left, pullBtn);
+        ul.append(li);
+      }
+      card.append(ul);
+      return card;
+    };
+
+    const actionEntries = [
+      ...rollup.allImprove,
+      ...rollup.allFocus.map((f) => ({ ...f, isFocus: true })),
+    ];
+
+    grid.append(
+      buildThemeCard('🚀 Conquistas das semanas', 'border-ok-600/20 bg-ok-50/30 text-ok-700 dark:border-ok-500/20 dark:bg-ok-950/15 dark:text-ok-400', rollup.allWins, 'wins', 'Nenhuma conquista anotada nas semanas ainda.'),
+      buildThemeCard('⚠️ Deslizes das semanas', 'border-rose-500/20 bg-rose-50/30 text-rose-700 dark:border-rose-500/20 dark:bg-rose-950/15 dark:text-rose-400', rollup.allSins, 'sins', 'Nenhum deslize anotado nas semanas.'),
+      buildThemeCard('📈 Evoluções registradas nas semanas', 'border-indigo-500/20 bg-indigo-50/30 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-950/15 dark:text-indigo-300', rollup.allBetter, 'better', 'Nenhuma comparação registrada nas semanas ainda.'),
+      buildThemeCard('🎯 Planos de ação & focos semanais', 'border-amber-500/20 bg-amber-50/30 text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/15 dark:text-amber-400', actionEntries, 'improve', 'Nenhuma ação ou foco semanal registrado ainda.')
+    );
+    host.append(grid);
+  } else {
+    // Visão Semana a Semana com <details> acessível
+    const bar = document.createElement('div');
+    bar.className = 'flex items-center justify-between gap-2';
+    const info = document.createElement('p');
+    info.className = 'text-xs text-zinc-500';
+    info.textContent = 'Toque em qualquer semana para expandir todas as anotações e puxar trechos para a síntese mensal.';
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'btn-ghost text-xs border border-zinc-200 dark:border-zinc-800';
+    toggleBtn.setAttribute('commandfor', 'evo-weeks-accordion');
+    toggleBtn.setAttribute('command', '--toggle-all');
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    toggleBtn.innerHTML = '<span class="evo-expand-lbl">Expandir todas</span><span class="evo-collapse-lbl">Recolher todas</span>';
+    bar.append(info, toggleBtn);
+    host.append(bar);
+
+    const acc = document.createElement('div');
+    acc.id = 'evo-weeks-accordion';
+    acc.className = 'evo-accordion space-y-2';
+
+    for (const w of rollup.weeks) {
+      const det = document.createElement('details');
+      det.className = 'rounded-xl border border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/40';
+      if (w.hasRefl && rollup.reflectedCount <= 2) det.open = true;
+
+      const sumEl = document.createElement('summary');
+      sumEl.className = 'px-3.5 py-2.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 rounded-xl';
+
+      const sumBody = document.createElement('div');
+      sumBody.className = 'flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2';
+
+      const sumLeft = document.createElement('span');
+      sumLeft.className = 'flex flex-wrap items-center gap-2';
+      const wLabel = document.createElement('span');
+      wLabel.textContent = `Semana ${w.idx} · ${w.range}`;
+      sumLeft.append(wLabel);
+      if (w.partial) {
+        const pTag = document.createElement('span');
+        pTag.className = 'rounded bg-zinc-200/70 px-1.5 py-0.5 text-[10px] font-normal text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400';
+        pTag.textContent = 'transição de mês';
+        sumLeft.append(pTag);
+      }
+
+      const sumRight = document.createElement('span');
+      sumRight.className = 'flex flex-wrap items-center gap-1.5 font-mono text-[11px]';
+      if (w.sum.habit != null) {
+        const hSpan = document.createElement('span');
+        hSpan.className = 'rounded bg-zinc-200/60 px-1.5 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+        hSpan.textContent = `Hábitos ${fmtPct(w.sum.habit)}`;
+        sumRight.append(hSpan);
+      }
+      if (w.deltaHabit != null) {
+        const dSt = w.deltaHabit > 2 ? 'up' : w.deltaHabit < -2 ? 'down' : 'flat';
+        sumRight.append(deltaPill(`${w.deltaHabit > 0 ? '+' : ''}${w.deltaHabit} pts`, dSt));
+      }
+      const stSpan = document.createElement('span');
+      stSpan.className = 'rounded px-1.5 py-0.5 font-sans text-[10px] font-semibold ' + (w.hasRefl
+        ? 'bg-ok-600/10 text-ok-700 dark:bg-ok-400/15 dark:text-ok-400'
+        : 'bg-zinc-200/60 text-zinc-500 dark:bg-zinc-800');
+      stSpan.textContent = w.hasRefl ? (w.done ? '✓ Concluída' : '✓ Refletida') : 'Sem reflexão';
+      sumRight.append(stSpan);
+
+      sumBody.append(sumLeft, sumRight);
+      sumEl.append(sumBody);
+      det.append(sumEl);
+
+      const content = document.createElement('div');
+      content.className = 'space-y-3 border-t border-zinc-200/70 px-3.5 py-3 text-xs dark:border-zinc-800';
+
+      if (!w.hasRefl) {
+        const row = document.createElement('div');
+        row.className = 'flex flex-wrap items-center justify-between gap-2 text-zinc-500';
+        row.textContent = 'Nenhuma reflexão registrada para esta semana.';
+        const goBtn = document.createElement('button');
+        goBtn.type = 'button';
+        goBtn.className = 'btn-ghost text-xs text-emerald-600 dark:text-emerald-400';
+        goBtn.textContent = 'Escrever reflexão desta semana →';
+        goBtn.onclick = () => { evoMode = 'semana'; evoWeek = w.ws; renderEvolutionTab(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        row.append(goBtn);
+        content.append(row);
+      } else {
+        const blocks = [
+          ['🚀 Evoluí', w.winsLines, 'text-ok-700 dark:text-ok-400'],
+          ['⚠️ Pequei', w.sinsLines, 'text-rose-700 dark:text-rose-400'],
+          ['📈 Melhorei vs anterior', w.betterLines, 'text-indigo-700 dark:text-indigo-300'],
+          ['🎯 Plano de ação', w.improveItems.map((x) => x.text), 'text-amber-700 dark:text-amber-400'],
+        ];
+        const bGrid = document.createElement('div');
+        bGrid.className = 'grid gap-2.5 sm:grid-cols-2';
+        for (const [lbl, lines, cls] of blocks) {
+          if (!lines.length) continue;
+          const b = document.createElement('div');
+          b.className = 'rounded-lg border border-zinc-200/70 bg-white/80 p-2.5 dark:border-zinc-800 dark:bg-zinc-900/40';
+          const p = document.createElement('p');
+          p.className = `text-[10px] font-bold uppercase tracking-wider ${cls}`;
+          p.textContent = lbl;
+          const ul = document.createElement('ul');
+          ul.className = 'mt-1 list-disc space-y-0.5 pl-4 text-zinc-700 dark:text-zinc-300';
+          for (const line of lines) {
+            const li = document.createElement('li');
+            li.className = 'break-words';
+            li.textContent = line;
+            ul.append(li);
+          }
+          b.append(p, ul);
+          bGrid.append(b);
+        }
+        if (bGrid.children.length) content.append(bGrid);
+
+        if (w.focus) {
+          const fP = document.createElement('p');
+          fP.className = 'text-zinc-600 dark:text-zinc-400';
+          const fBold = document.createElement('strong');
+          fBold.className = 'text-zinc-800 dark:text-zinc-200';
+          fBold.textContent = 'Foco da semana seguinte: ';
+          fP.append(fBold, document.createTextNode(w.focus));
+          content.append(fP);
+        }
+        if (w.whyItems.length) {
+          const wP = document.createElement('p');
+          wP.className = 'text-zinc-500';
+          wP.textContent = `Justificativas das metas: ${w.whyItems.map((x) => x.text).join(' · ')}`;
+          content.append(wP);
+        }
+
+        const footW = document.createElement('div');
+        footW.className = 'flex justify-end';
+        const editW = document.createElement('button');
+        editW.type = 'button';
+        editW.className = 'btn-ghost text-xs text-emerald-600 dark:text-emerald-400';
+        editW.textContent = `Editar Semana ${w.idx} →`;
+        editW.onclick = () => { evoMode = 'semana'; evoWeek = w.ws; renderEvolutionTab(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        footW.append(editW);
+        content.append(footW);
+      }
+
+      det.append(content);
+      acc.append(det);
+    }
+    host.append(acc);
+    // Sincroniza estado inicial do botão Expandir/Recolher
+    const items = acc.querySelectorAll(':scope > details');
+    toggleBtn.setAttribute('aria-expanded', String(items.length > 0 && Array.prototype.every.call(items, (d) => d.open)));
+  }
 }
 
 function renderEvolutionTab() {
+  wireEvoAccordionListeners();
   const panel = $('#view-evolucao');
   if (!panel || panel.classList.contains('hidden')) return;
 
@@ -8055,8 +9277,11 @@ function renderEvolutionTab() {
 
   const prevBtn = $('#evo-prev'), nextBtn = $('#evo-next'), labelEl = $('#evo-period-label'), curBtn = $('#evo-current-btn');
   const doneBtn = $('#evo-done-btn');
+  const bridgeHost = $('#evo-month-bridge');
+  const rollupHost = $('#evo-monthly-rollup');
 
-  let rec = null, isDone = false, hints = null, stats = null;
+  let rec = null, isDone = false, hints = null, scorecard = null, kpiItems = null;
+  let monthRollup = null, mName = '', editorMeta = {};
 
   if (isWeek) {
     const ws = evoWeek, wk = keyOf(ws), we = addDays(ws, 6);
@@ -8079,28 +9304,89 @@ function renderEvolutionTab() {
       commit(renderEvolutionTab, renderReview, renderEvolutionTodayWidget);
     };
 
-    const curSum = weekSummary(ws), prevSum = weekSummary(addDays(ws, -7));
-    const deltaH = curSum.habit != null && prevSum.habit != null ? Math.round((curSum.habit - prevSum.habit) * 100) : null;
-    stats = [
-      { label: 'Hábitos (média)', val: curSum.habit == null ? '—' : fmtPct(curSum.habit), sub: deltaH != null ? `${deltaH > 0 ? '+' : ''}${deltaH} pts vs anterior` : `${curSum.scoredDays} dias avaliados` },
-      { label: 'Metas da semana', val: curSum.goalsTotal ? `${curSum.goalsDone}/${curSum.goalsTotal}` : '—', sub: curSum.goalsTotal ? `${fmtPct(curSum.goalsDone / curSum.goalsTotal)} batidas` : 'sem metas' },
-      { label: 'Estudo total', val: fmtMin(curSum.study), sub: `meta: ${S.settings.studyGoalH || 10}h` },
-      { label: 'Sono médio', val: curSum.sleep == null ? '—' : fmtSleep(curSum.sleep), sub: prevSum.sleep ? `antes: ${fmtSleep(prevSum.sleep)}` : '' },
-      { label: 'Dias 100%', val: String(curSum.perfect), sub: `de ${curSum.scoredDays} dias` },
+    const prevWs = addDays(ws, -7);
+    const curSum = weekSummary(ws), prevSum = weekSummary(prevWs);
+    const curP = periodStats(wk, keyOf(we));
+    const prevP = periodStats(keyOf(prevWs), keyOf(addDays(ws, -1)));
+
+    scorecard = computeEvolutionScorecard(curP, prevP, {
+      curGoalsDone: curSum.goalsDone,
+      curGoalsTotal: curSum.goalsTotal,
+      prevGoalsDone: prevSum.goalsDone,
+      prevGoalsTotal: prevSum.goalsTotal,
+      prevHasData: prevSum.scoredDays > 0,
+      prevLabel: `semana de ${fmtRange(prevWs)}`,
+    });
+
+    kpiItems = [
+      { label: 'Hábitos (média)', val: curSum.habit == null ? '—' : fmtPct(curSum.habit), row: scorecard.byId.habits, fallbackSub: `${curSum.scoredDays} dias avaliados` },
+      { label: 'Metas da semana', val: curSum.goalsTotal ? `${curSum.goalsDone}/${curSum.goalsTotal}` : '—', row: scorecard.byId.goals, fallbackSub: curSum.goalsTotal ? `${fmtPct(curSum.goalsDone / curSum.goalsTotal)} batidas` : 'sem metas' },
+      { label: 'Estudo total', val: fmtMin(curSum.study), row: scorecard.byId.study, fallbackSub: `meta: ${S.settings.studyGoalH || 10}h` },
+      { label: 'Sono médio', val: curSum.sleep == null ? '—' : fmtSleep(curSum.sleep), row: scorecard.byId.sleep, fallbackSub: prevSum.sleep ? `antes: ${fmtSleep(prevSum.sleep)}` : '' },
+      { label: 'Dias 100%', val: String(curSum.perfect), row: scorecard.byId.perfect, fallbackSub: `de ${curSum.scoredDays} dias` },
     ];
 
-    hints = reflectionHints(
-      periodStats(wk, keyOf(we)),
-      periodStats(keyOf(addDays(ws, -7)), keyOf(addDays(ws, -1))),
-      rec.goals || [],
-      (S.settings.studyGoalH || 10) * 60
-    );
+    hints = reflectionHints(curP, prevP, rec.goals || [], (S.settings.studyGoalH || 10) * 60);
+
+    // Ponte Semana -> Mês correspondente (pela quinta-feira da semana, maioria dos dias)
+    if (bridgeHost) {
+      const mid = addDays(ws, 3);
+      const by = mid.getFullYear(), bm = mid.getMonth();
+      const bRollup = collectMonthWeeklyReflections(by, bm);
+      const bmName = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(by, bm, 1)));
+      bridgeHost.replaceChildren();
+      bridgeHost.classList.remove('hidden');
+
+      const row = document.createElement('div');
+      row.className = 'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200/70 bg-zinc-50/70 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-800/30';
+
+      const bLeft = document.createElement('div');
+      bLeft.className = 'flex flex-wrap items-center gap-2';
+      const lbl = document.createElement('span');
+      lbl.className = 'font-medium text-zinc-700 dark:text-zinc-300';
+      lbl.textContent = `🗓️ Culminação de ${bmName}: ${bRollup.reflectedCount}/${bRollup.totalWeeks} semanas refletidas`;
+      bLeft.append(lbl);
+
+      const pills = document.createElement('div');
+      pills.className = 'flex flex-wrap items-center gap-1';
+      for (const w of bRollup.weeks) {
+        const pb = document.createElement('button');
+        pb.type = 'button';
+        const isSel = w.wk === wk;
+        pb.className = 'rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold transition ' + (isSel
+          ? 'bg-emerald-600 text-white'
+          : w.hasRefl
+          ? 'bg-ok-600/15 text-ok-700 hover:bg-ok-600/25 dark:bg-ok-400/15 dark:text-ok-400'
+          : 'bg-zinc-200/70 text-zinc-600 hover:bg-zinc-300/70 dark:bg-zinc-800 dark:text-zinc-400');
+        pb.textContent = `S${w.idx}${w.hasRefl ? ' ✓' : ''}`;
+        pb.title = `Semana de ${w.range}`;
+        pb.onclick = () => { evoWeek = w.ws; renderEvolutionTab(); };
+        pills.append(pb);
+      }
+      bLeft.append(pills);
+
+      const goMonth = document.createElement('button');
+      goMonth.type = 'button';
+      goMonth.className = 'font-semibold text-emerald-600 hover:underline dark:text-emerald-400';
+      goMonth.textContent = `Abrir Grande Reflexão de ${cap(new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(by, bm, 1)))} →`;
+      goMonth.onclick = () => {
+        evoMode = 'mes';
+        evoMonth = { y: by, m: bm };
+        renderEvolutionTab();
+      };
+
+      row.append(bLeft, goMonth);
+      bridgeHost.append(row);
+    }
+    if (rollupHost) rollupHost.classList.add('hidden');
   } else {
+    if (bridgeHost) bridgeHost.classList.add('hidden');
+
     const { y, m } = evoMonth, mk = monthKey(y, m);
     rec = monthRec(mk);
     isDone = !!rec.reflDone;
     const isCurrent = y === curMonthY && m === curMonthM;
-    const mName = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)));
+    mName = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m, 1)));
     labelEl.innerHTML = `<span>${mName}</span>` +
       (isCurrent ? ' <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 ml-1.5">Atual</span>' : '');
 
@@ -8124,20 +9410,42 @@ function renderEvolutionTab() {
     doneBtn.className = isDone ? 'btn-ghost border border-emerald-500/40 text-emerald-700 dark:text-emerald-400 text-xs py-1.5 px-3' : 'btn-primary text-xs py-1.5 px-3';
     doneBtn.onclick = () => {
       rec.reflDone = !rec.reflDone;
-      commit(renderEvolutionTab, renderMonthReview);
+      commit(renderEvolutionTab, renderMonthReview, renderMonthDetail);
     };
 
     const first = keyOf(new Date(y, m, 1)), last = keyOf(new Date(y, m + 1, 0));
     const pm = m ? [y, m - 1] : [y - 1, 11];
-    const curP = periodStats(first, last), prevP = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
+    const prevFirst = keyOf(new Date(pm[0], pm[1], 1)), prevLast = keyOf(new Date(pm[0], pm[1] + 1, 0));
+    const curP = periodStats(first, last), prevP = periodStats(prevFirst, prevLast);
     const ms = monthStats(y, m);
-    const deltaH = curP.habitAvg != null && prevP.habitAvg != null ? Math.round((curP.habitAvg - prevP.habitAvg) * 100) : null;
-    stats = [
-      { label: 'Hábitos (média)', val: curP.habitAvg == null ? '—' : fmtPct(curP.habitAvg), sub: deltaH != null ? `${deltaH > 0 ? '+' : ''}${deltaH} pts vs anterior` : `${curP.days} dias` },
-      { label: 'Metas do mês', val: ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : (ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—'), sub: ms.mTotal ? 'metas do mês' : 'metas semanais' },
-      { label: 'Estudo total', val: fmtMin(curP.study), sub: `${curP.learned} aprendidos` },
-      { label: 'Sono médio', val: curP.sleepAvg == null ? '—' : fmtSleep(curP.sleepAvg), sub: prevP.sleepAvg ? `antes: ${fmtSleep(prevP.sleepAvg)}` : '' },
-      { label: 'Dias 100%', val: String(curP.perfect), sub: `de ${curP.days} dias` },
+    const prevMs = monthStats(pm[0], pm[1]);
+
+    const prevMonthDays = new Date(pm[0], pm[1] + 1, 0).getDate();
+    const elapsedDays = isCurrent ? now.getDate() : 0;
+    const prevPaceP = isCurrent
+      ? periodStats(prevFirst, keyOf(new Date(pm[0], pm[1], Math.min(elapsedDays, prevMonthDays))))
+      : prevP;
+
+    const prevMonthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(pm[0], pm[1], 1));
+    scorecard = computeEvolutionScorecard(curP, prevP, {
+      curGoalsDone: ms.mTotal ? ms.mDone : ms.goalsDone,
+      curGoalsTotal: ms.mTotal ? ms.mTotal : ms.goalsTotal,
+      prevGoalsDone: prevMs.mTotal ? prevMs.mDone : prevMs.goalsDone,
+      prevGoalsTotal: prevMs.mTotal ? prevMs.mTotal : prevMs.goalsTotal,
+      prevStudyPace: isCurrent ? prevPaceP.study : prevP.study,
+      prevPerfectPace: isCurrent ? prevPaceP.perfect : prevP.perfect,
+      isPartialCurrent: isCurrent,
+      elapsedDays,
+      prevHasData: prevP.days > 0,
+      prevLabel: prevMonthLabel,
+    });
+
+    kpiItems = [
+      { label: 'Hábitos (média)', val: curP.habitAvg == null ? '—' : fmtPct(curP.habitAvg), row: scorecard.byId.habits, fallbackSub: `${curP.days} dias` },
+      { label: 'Metas do mês', val: ms.mTotal ? `${ms.mDone}/${ms.mTotal}` : (ms.goalsTotal ? `${ms.goalsDone}/${ms.goalsTotal}` : '—'), row: scorecard.byId.goals, fallbackSub: ms.mTotal ? 'metas do mês' : 'metas semanais' },
+      { label: 'Estudo total', val: fmtMin(curP.study), row: scorecard.byId.study, fallbackSub: `${curP.learned} aprendidos` },
+      { label: 'Sono médio', val: curP.sleepAvg == null ? '—' : fmtSleep(curP.sleepAvg), row: scorecard.byId.sleep, fallbackSub: prevP.sleepAvg ? `antes: ${fmtSleep(prevP.sleepAvg)}` : '' },
+      { label: 'Dias 100%', val: String(curP.perfect), row: scorecard.byId.perfect, fallbackSub: `de ${curP.days} dias` },
     ];
 
     const weeksIn = ms.weeks.filter((w) => w.start.getMonth() === m).length;
@@ -8145,26 +9453,58 @@ function renderEvolutionTab() {
     for (const w of ms.weeks) if (w.start.getMonth() === m) allGoals.push(...(S.weeks[w.wk]?.goals || []));
 
     hints = reflectionHints(curP, prevP, allGoals, (S.settings.studyGoalH || 10) * 60 * weeksIn, weeksIn);
+    monthRollup = collectMonthWeeklyReflections(y, m);
+    const prevMk = monthKey(pm[0], pm[1]);
+    editorMeta = { y, m, mk, mName, prevRating: S.months[prevMk]?.refl?.rating || null, monthRollup };
   }
 
   const kpiHost = $('#evo-kpis');
-  if (kpiHost && stats) {
+  if (kpiHost && kpiItems) {
     kpiHost.replaceChildren();
-    for (const s of stats) {
+    for (const s of kpiItems) {
       const card = document.createElement('div');
       card.className = 'rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800/80 dark:bg-zinc-800/30';
-      card.innerHTML = `<p class="eyebrow">${s.label}</p><p class="mt-1 text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">${s.val}</p><p class="mt-0.5 text-xs text-zinc-500">${s.sub}</p>`;
+      const pLbl = document.createElement('p');
+      pLbl.className = 'eyebrow';
+      pLbl.textContent = s.label;
+
+      const valRow = document.createElement('div');
+      valRow.className = 'mt-1 flex flex-wrap items-baseline justify-between gap-1.5';
+      const pVal = document.createElement('p');
+      pVal.className = 'text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-100';
+      pVal.textContent = s.val;
+      valRow.append(pVal);
+      if (s.row && s.row.status !== 'none' && s.row.deltaText) {
+        valRow.append(deltaPill(s.row.deltaText, s.row.status));
+      }
+
+      const pSub = document.createElement('p');
+      pSub.className = 'mt-0.5 text-xs text-zinc-500';
+      pSub.textContent = s.row && s.row.status !== 'none'
+        ? `antes: ${s.row.prevText}`
+        : s.fallbackSub;
+
+      card.append(pLbl, valRow, pSub);
       kpiHost.append(card);
     }
   }
 
-  renderEvolutionEditor(rec, hints, isWeek);
+  renderEvolutionScorecard(scorecard, isWeek, monthRollup);
+  if (!isWeek && monthRollup) {
+    renderMonthlyWeeklyRollup(rec, monthRollup, mName, hints, () => {
+      renderEvolutionEditor(rec, hints, false, scorecard, editorMeta);
+      renderMonthlyWeeklyRollup(rec, monthRollup, mName, hints, () => renderEvolutionTab());
+      renderEvolutionTimeline();
+      renderMonthDetail();
+    });
+  }
+  renderEvolutionEditor(rec, hints, isWeek, scorecard, editorMeta);
   renderEvolutionCharts();
   renderTravel();
   renderEvolutionTimeline();
 }
 
-function renderEvolutionEditor(rec, hints, isWeek) {
+function renderEvolutionEditor(rec, hints, isWeek, scorecard = null, meta = {}) {
   const host = $('#evo-editor');
   if (!host) return;
   host.replaceChildren();
@@ -8178,13 +9518,20 @@ function renderEvolutionEditor(rec, hints, isWeek) {
   const hintChips = (items, isUsed, onPick) => {
     const w = document.createElement('div');
     w.className = 'mt-2 flex flex-wrap gap-1.5';
-    for (const txt of items) {
+    for (const item of items) {
+      const txt = typeof item === 'string' ? item : item.text;
+      const tone = typeof item === 'string' ? '' : item.tone;
       const used = isUsed(txt);
       const b = document.createElement('button');
       b.type = 'button';
+      const toneBorder = tone === 'down'
+        ? 'border-dashed border-rose-300 text-rose-700 hover:border-rose-500 dark:border-rose-500/40 dark:text-rose-300 bg-rose-50/40 dark:bg-rose-950/20'
+        : tone === 'up'
+        ? 'border-dashed border-ok-500/50 text-ok-700 hover:border-ok-600 dark:border-ok-500/40 dark:text-ok-400 bg-ok-50/40 dark:bg-ok-950/20'
+        : 'border-dashed border-zinc-300 text-zinc-600 hover:border-emerald-500 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-emerald-400 bg-white/50 dark:bg-zinc-800/40';
       b.className = 'rounded-md border px-2 py-1 text-left text-xs leading-snug transition ' + (used
         ? 'border-transparent text-zinc-400 line-through dark:text-zinc-600'
-        : 'border-dashed border-zinc-300 text-zinc-600 hover:border-emerald-500 hover:text-emerald-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-emerald-400 bg-white/50 dark:bg-zinc-800/40');
+        : toneBorder);
       b.textContent = (used ? '✓ ' : '+ ') + txt;
       b.disabled = used;
       b.onclick = () => onPick(txt);
@@ -8195,19 +9542,19 @@ function renderEvolutionEditor(rec, hints, isWeek) {
 
   // 1. O que eu evoluí
   const boxWins = document.createElement('div');
-  boxWins.className = 'card relative overflow-hidden border-emerald-500/30 dark:border-emerald-500/20';
+  boxWins.className = 'card relative overflow-hidden border-ok-600/25 dark:border-ok-500/20';
   boxWins.innerHTML = `
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+        <span class="flex h-2.5 w-2.5 rounded-full bg-ok-500"></span>
         <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🚀 O que eu evoluí</h3>
       </div>
-      <span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Conquistas & Vitórias</span>
+      <span class="rounded-full bg-ok-600/10 px-2 py-0.5 text-[11px] font-semibold text-ok-700 dark:bg-ok-400/15 dark:text-ok-400">Conquistas & Vitórias</span>
     </div>
     <p class="mt-1 text-xs text-zinc-500">Do que você se orgulha? Quais hábitos manteve? Quais pequenas ou grandes vitórias teve neste período?</p>
   `;
   const taWins = document.createElement('textarea');
-  taWins.rows = 4;
+  taWins.rows = isWeek ? 4 : 5;
   taWins.className = 'field mt-2.5 resize-y text-sm leading-relaxed';
   taWins.placeholder = 'Ex.: Consegui ler todos os dias; avancei no projeto; mantive a calma diante do imprevisto…';
   taWins.value = R.wins || '';
@@ -8226,7 +9573,7 @@ function renderEvolutionEditor(rec, hints, isWeek) {
       save();
       updateEvoSaveIndicator();
       renderEvolutionTodayWidget();
-      renderEvolutionEditor(rec, hints, isWeek);
+      renderEvolutionEditor(rec, hints, isWeek, scorecard, meta);
     }));
     boxWins.append(hintWrap);
   }
@@ -8245,7 +9592,7 @@ function renderEvolutionEditor(rec, hints, isWeek) {
     <p class="mt-1 text-xs text-zinc-500">Onde falhou, procrastinou ou foi inconsistente? O que não deu certo? Seja sincero para poder ajustar a rota.</p>
   `;
   const taSins = document.createElement('textarea');
-  taSins.rows = 4;
+  taSins.rows = isWeek ? 4 : 5;
   taSins.className = 'field mt-2.5 resize-y text-sm leading-relaxed';
   taSins.placeholder = 'Ex.: Dormi tarde na quarta e perdi a rotina; procrastinei para começar o estudo; me distraí com…';
   taSins.value = R.sins || '';
@@ -8264,44 +9611,55 @@ function renderEvolutionEditor(rec, hints, isWeek) {
       save();
       updateEvoSaveIndicator();
       renderEvolutionTodayWidget();
-      renderEvolutionEditor(rec, hints, isWeek);
+      renderEvolutionEditor(rec, hints, isWeek, scorecard, meta);
     }));
     boxSins.append(hintWrap);
   }
 
-  // 3. Onde melhorei vs antes
+  // 3. Onde evoluí vs onde regredi
   const boxBetter = document.createElement('div');
   boxBetter.className = 'card relative overflow-hidden';
   boxBetter.innerHTML = `
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <span class="flex h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
-        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">📈 Onde melhorei vs antes</h3>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">⚖️ Onde evoluí vs onde regredi</h3>
       </div>
-      <span class="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Crescimento Real</span>
+      <span class="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Saldo vs Anterior</span>
     </div>
-    <p class="mt-1 text-xs text-zinc-500">O que avançou em relação à semana/mês anterior? Perceber a melhora direta quebra a ilusão de estagnação.</p>
+    <p class="mt-1 text-xs text-zinc-500">Compare honestamente com o período anterior: o que subiu de patamar e o que caiu e precisa de atenção?</p>
   `;
   const taBetter = document.createElement('textarea');
-  taBetter.rows = 3;
+  taBetter.rows = isWeek ? 3 : 4;
   taBetter.className = 'field mt-2.5 resize-y text-sm leading-relaxed';
-  taBetter.placeholder = 'Ex.: Desta vez não deixei o erro de ontem estragar a semana inteira; melhorei a retenção…';
+  taBetter.placeholder = 'Ex.: Evoluí na constância do treino (+15 pts), mas regredi nas horas de sono (7h30 → 6h40)…';
   taBetter.value = R.better || '';
   taBetter.oninput = () => { R.better = taBetter.value; save(); updateEvoSaveIndicator(); };
   boxBetter.append(taBetter);
 
-  const betterHints = hints?.better || [];
-  if (betterHints.length) {
+  const deltaChips = [];
+  if (scorecard) {
+    for (const r of [...scorecard.rows, ...scorecard.extraRows]) {
+      if (r.status === 'up') deltaChips.push({ text: `Evoluí em ${r.label}: ${r.prevText} → ${r.curText} (${r.deltaText})`, tone: 'up' });
+      else if (r.status === 'down') deltaChips.push({ text: `Regredi em ${r.label}: ${r.prevText} → ${r.curText} (${r.deltaText})`, tone: 'down' });
+    }
+    for (const hItem of scorecard.habitsUp) deltaChips.push({ text: `Evoluí em “${hItem.title}”: ${hItem.beforeText} → ${hItem.afterText} (${hItem.deltaText})`, tone: 'up' });
+    for (const hItem of scorecard.habitsDown) deltaChips.push({ text: `Regredi em “${hItem.title}”: ${hItem.beforeText} → ${hItem.afterText} (${hItem.deltaText})`, tone: 'down' });
+  }
+  for (const t of (hints?.better || [])) {
+    if (!deltaChips.some((c) => c.text === t)) deltaChips.push({ text: t, tone: 'up' });
+  }
+  if (deltaChips.length) {
     const hintWrap = document.createElement('div');
     hintWrap.className = 'mt-2.5 border-t border-zinc-100 pt-2 dark:border-zinc-800/80';
-    hintWrap.innerHTML = '<p class="text-[11px] font-medium text-zinc-400">Comparações automáticas vs período anterior:</p>';
-    hintWrap.append(hintChips(betterHints, (t) => (taBetter.value || '').includes(t), (t) => {
+    hintWrap.innerHTML = '<p class="text-[11px] font-medium text-zinc-400">Comparações automáticas (verde = evolução, vermelho = regressão):</p>';
+    hintWrap.append(hintChips(deltaChips, (t) => (taBetter.value || '').includes(t), (t) => {
       const cur = taBetter.value.trimEnd();
       R.better = (cur ? cur + '\n' : '') + '• ' + t;
       taBetter.value = R.better;
       save();
       updateEvoSaveIndicator();
-      renderEvolutionEditor(rec, hints, isWeek);
+      renderEvolutionEditor(rec, hints, isWeek, scorecard, meta);
     }));
     boxBetter.append(hintWrap);
   }
@@ -8320,6 +9678,7 @@ function renderEvolutionEditor(rec, hints, isWeek) {
     <p class="mt-1 text-xs text-zinc-500">Ações concretas para o próximo período. Marque ★ em até 3 para virarem prioridade na página inicial.</p>
   `;
 
+  R.improve ||= [];
   const ulImp = document.createElement('ul');
   ulImp.className = 'mt-2.5 space-y-1';
   if (!R.improve.length) {
@@ -8337,8 +9696,8 @@ function renderEvolutionEditor(rec, hints, isWeek) {
     star.className = 'shrink-0 text-sm leading-none transition ' + (on ? 'text-amber-500 font-bold' : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-500');
     star.textContent = on ? '★' : '☆';
     star.title = on ? 'Tirar das prioridades' : 'Tornar prioridade na página inicial';
-    const srcLabel = isWeek ? `Revisão de ${fmtRange(evoWeek)}` : `Reflexão do mês`;
-    star.onclick = () => { togglePriority(it, srcLabel); renderEvolutionEditor(rec, hints, isWeek); };
+    const srcLabel = isWeek ? `Revisão de ${fmtRange(evoWeek)}` : `Reflexão de ${meta.mName || 'mês'}`;
+    star.onclick = () => { togglePriority(it, srcLabel); renderEvolutionEditor(rec, hints, isWeek, scorecard, meta); };
 
     const t = document.createElement('span');
     t.className = 'min-w-0 flex-1 break-words font-medium text-zinc-800 dark:text-zinc-200';
@@ -8352,7 +9711,7 @@ function renderEvolutionEditor(rec, hints, isWeek) {
     rm.onclick = () => {
       R.improve = R.improve.filter((x) => x.id !== it.id);
       S.priorities = S.priorities.filter((p) => p.id !== it.id);
-      commit(() => renderEvolutionEditor(rec, hints, isWeek), renderPriorities);
+      commit(() => renderEvolutionEditor(rec, hints, isWeek, scorecard, meta), renderPriorities);
     };
 
     li.append(star, t, rm);
@@ -8364,7 +9723,7 @@ function renderEvolutionEditor(rec, hints, isWeek) {
     txt = (txt || '').trim();
     if (!txt) return;
     R.improve.push({ id: uid(), text: txt });
-    commit(() => renderEvolutionEditor(rec, hints, isWeek), renderPriorities);
+    commit(() => renderEvolutionEditor(rec, hints, isWeek, scorecard, meta), renderPriorities);
   };
   const impForm = document.createElement('form');
   impForm.className = 'mt-3 flex gap-2';
@@ -8411,6 +9770,138 @@ function renderEvolutionEditor(rec, hints, isWeek) {
     taFocus.oninput = () => { rec.review = taFocus.value; save(); updateEvoSaveIndicator(); renderGoals(); };
     boxFocus.append(taFocus);
     host.append(boxFocus);
+  } else {
+    // Avaliação 1-5 das metas do mês (se houver)
+    if (rec.goals?.length && meta.mk) {
+      const boxMG = document.createElement('div');
+      boxMG.className = 'card space-y-3';
+      const mgHead = document.createElement('div');
+      mgHead.innerHTML = `
+        <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">🎯 Avaliação das metas do mês</h3>
+        <p class="mt-0.5 text-xs text-zinc-500">De 1 a 5: quanto você avançou em cada meta mensal — vale mesmo para as que não foram concluídas.</p>
+      `;
+      const mgUl = document.createElement('ul');
+      mgUl.className = 'space-y-2';
+      for (const g of rec.goals) {
+        const li = document.createElement('li');
+        li.className = 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-100 px-3 py-2 dark:border-zinc-800';
+        const gt = document.createElement('span');
+        gt.className = 'min-w-0 flex-1 text-xs sm:text-sm font-medium text-zinc-800 dark:text-zinc-200';
+        gt.textContent = `${g.done ? '✓ ' : ''}${g.title}`;
+        const btns = document.createElement('div');
+        btns.className = 'flex gap-1';
+        for (let i = 1; i <= 5; i++) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'h-7 w-7 rounded-md border text-xs font-medium tabular-nums transition ' + (g.rating === i
+            ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+            : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-700');
+          b.textContent = String(i);
+          b.setAttribute('aria-pressed', String(g.rating === i));
+          b.onclick = () => {
+            g.rating = g.rating === i ? null : i;
+            save();
+            updateEvoSaveIndicator();
+            renderEvolutionEditor(rec, hints, false, scorecard, meta);
+            renderMonthReview();
+            renderMonthDetail();
+          };
+          btns.append(b);
+        }
+        li.append(gt, btns);
+        mgUl.append(li);
+      }
+      boxMG.append(mgHead, mgUl);
+      host.append(boxMG);
+    }
+
+    // Grande Síntese do Mês (culminação final)
+    const boxSynth = document.createElement('div');
+    boxSynth.className = 'card space-y-4 border-emerald-500/25 dark:border-emerald-500/20';
+
+    const sHead = document.createElement('div');
+    sHead.className = 'flex flex-wrap items-start justify-between gap-3';
+    const sLeft = document.createElement('div');
+    sLeft.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🧭 Grande Síntese do Mês</h3>
+      </div>
+      <p class="mt-1 text-xs text-zinc-500">Fechamento geral olhando todas as semanas juntas: qual foi a história, a lição principal e a nota deste mês?</p>
+    `;
+
+    // Nota geral do mês (1-5)
+    const rateWrap = document.createElement('div');
+    rateWrap.className = 'flex flex-col items-start sm:items-end gap-1';
+    const rateLabelRow = document.createElement('div');
+    rateLabelRow.className = 'flex items-center gap-2';
+    const rEy = document.createElement('span');
+    rEy.className = 'eyebrow';
+    rEy.textContent = 'Nota do mês';
+    rateLabelRow.append(rEy);
+    if (R.rating && meta.prevRating) {
+      const dr = R.rating - meta.prevRating;
+      const st = dr > 0 ? 'up' : dr < 0 ? 'down' : 'flat';
+      rateLabelRow.append(deltaPill(`${dr > 0 ? '+' : ''}${dr} vs ant.`, st));
+    }
+    const rBtns = document.createElement('div');
+    rBtns.className = 'flex items-center gap-1';
+    const ratingLabels = ['', 'Difícil', 'Abaixo', 'Regular', 'Bom', 'Excelente'];
+    for (let i = 1; i <= 5; i++) {
+      const rb = document.createElement('button');
+      rb.type = 'button';
+      const active = R.rating === i;
+      rb.className = 'h-8 w-8 rounded-lg border text-xs font-bold tabular-nums transition ' + (active
+        ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+        : 'border-zinc-200 text-zinc-600 hover:border-emerald-500 dark:border-zinc-700 dark:text-zinc-300');
+      rb.textContent = String(i);
+      rb.title = `${i}/5 · ${ratingLabels[i]}`;
+      rb.setAttribute('aria-pressed', String(active));
+      rb.onclick = () => {
+        R.rating = active ? null : i;
+        save();
+        updateEvoSaveIndicator();
+        renderEvolutionEditor(rec, hints, false, scorecard, meta);
+        renderEvolutionTimeline();
+        renderMonthDetail();
+      };
+      rBtns.append(rb);
+    }
+    const rText = document.createElement('span');
+    rText.className = 'text-[11px] text-zinc-500';
+    rText.textContent = R.rating ? `${R.rating}/5 · ${ratingLabels[R.rating]}` : 'Avalie de 1 a 5';
+    rateWrap.append(rateLabelRow, rBtns, rText);
+
+    sHead.append(sLeft, rateWrap);
+    boxSynth.append(sHead);
+
+    const sumWrap = document.createElement('div');
+    const sumLbl = document.createElement('label');
+    sumLbl.className = 'eyebrow';
+    sumLbl.textContent = 'Síntese geral & grande lição do mês';
+    const taSum = document.createElement('textarea');
+    taSum.rows = 3;
+    taSum.className = 'field mt-1.5 resize-y text-sm leading-relaxed';
+    taSum.placeholder = 'Ex.: Fechei o mês evoluindo +8 pts em hábitos graças às semanas 3 e 4; o maior gargalo foi o sono nos dias úteis…';
+    taSum.value = R.summary || '';
+    taSum.oninput = () => { R.summary = taSum.value; save(); updateEvoSaveIndicator(); renderEvolutionTimeline(); };
+    sumWrap.append(sumLbl, taSum);
+
+    const nextWrap = document.createElement('div');
+    const nextLbl = document.createElement('label');
+    nextLbl.className = 'eyebrow';
+    nextLbl.textContent = 'Grande foco do próximo mês';
+    const inpNext = document.createElement('input');
+    inpNext.type = 'text';
+    inpNext.maxLength = 180;
+    inpNext.className = 'field mt-1.5 text-sm';
+    inpNext.placeholder = 'Ex.: Proteger 7h30 de sono e consolidar 15h semanais de estudo profundo.';
+    inpNext.value = R.nextFocus || '';
+    inpNext.oninput = () => { R.nextFocus = inpNext.value; save(); updateEvoSaveIndicator(); renderEvolutionTimeline(); };
+    nextWrap.append(nextLbl, inpNext);
+
+    boxSynth.append(sumWrap, nextWrap);
+    host.append(boxSynth);
   }
 }
 
@@ -8449,6 +9940,8 @@ function renderEvolutionTimeline() {
     const W = S.weeks[wk];
     const ws = parseKey(wk);
     const sum = weekSummary(ws);
+    const prevSum = keyOf(addDays(ws, -1)) >= S.startDate ? weekSummary(addDays(ws, -7)) : null;
+    const deltaHabit = (sum.habit != null && prevSum?.habit != null) ? Math.round((sum.habit - prevSum.habit) * 100) : null;
     const R = W?.refl;
     const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim();
     const imp = (R?.improve || []);
@@ -8469,6 +9962,7 @@ function renderEvolutionTimeline() {
       ws,
       rec: W,
       sum,
+      deltaHabit,
       wins,
       sins,
       better,
@@ -8492,18 +9986,24 @@ function renderEvolutionTimeline() {
     const [y, m] = mk.split('-').map(Number);
     const first = keyOf(new Date(y, m - 1, 1)), last = keyOf(new Date(y, m, 0));
     const st = periodStats(first, last);
+    const pm = (m - 1) ? [y, m - 2] : [y - 1, 11];
+    const prevSt = periodStats(keyOf(new Date(pm[0], pm[1], 1)), keyOf(new Date(pm[0], pm[1] + 1, 0)));
+    const deltaHabit = (st.habitAvg != null && prevSt.habitAvg != null) ? Math.round((st.habitAvg - prevSt.habitAvg) * 100) : null;
     const ms = monthStats(y, m - 1);
+    const rollup = collectMonthWeeklyReflections(y, m - 1);
     const R = M?.refl;
     const wins = (R?.wins || '').trim(), sins = (R?.sins || '').trim(), better = (R?.better || '').trim();
+    const summary = (R?.summary || '').trim(), nextFocus = (R?.nextFocus || '').trim();
+    const rating = R?.rating || null;
     const imp = (R?.improve || []);
 
-    const hasContent = !!(wins || sins || better || imp.length || st.days > 0 || ms.mTotal > 0);
+    const hasContent = !!(wins || sins || better || imp.length || summary || nextFocus || rating || st.days > 0 || ms.mTotal > 0);
     if (!hasContent) continue;
 
     if (wins) {
       totalWinsCount += wins.split('\n').map((l) => l.trim()).filter(Boolean).length;
     }
-    if (wins || sins) totalMonthsCount++;
+    if (wins || sins || summary) totalMonthsCount++;
 
     const mLabel = cap(new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1)));
 
@@ -8516,6 +10016,11 @@ function renderEvolutionTimeline() {
       rec: M,
       st,
       ms,
+      deltaHabit,
+      rollup,
+      rating,
+      summary,
+      nextFocus,
       wins,
       sins,
       better,
@@ -8551,7 +10056,7 @@ function renderEvolutionTimeline() {
     if (evoFeedFilter === 'semanas' && it.type !== 'semana') return false;
     if (evoFeedFilter === 'meses' && it.type !== 'mes') return false;
     if (evoFeedSearch) {
-      const haystack = [it.dateLabel, it.wins, it.sins, it.better, ...(it.imp || []).map((x) => x.text), it.review].join(' ').toLowerCase();
+      const haystack = [it.dateLabel, it.wins, it.sins, it.better, it.summary, it.nextFocus, ...(it.imp || []).map((x) => x.text), it.review].join(' ').toLowerCase();
       if (!haystack.includes(evoFeedSearch)) return false;
     }
     return true;
@@ -8586,9 +10091,30 @@ function renderEvolutionTimeline() {
     h.textContent = it.dateLabel;
 
     titleGroup.append(typeBadge, h);
+
+    if (it.deltaHabit != null) {
+      const st = it.deltaHabit > 2 ? 'up' : it.deltaHabit < -2 ? 'down' : 'flat';
+      const labelTxt = it.deltaHabit > 2 ? `Evoluiu +${it.deltaHabit} pts` : it.deltaHabit < -2 ? `Regrediu ${it.deltaHabit} pts` : 'Estável (0 pts)';
+      titleGroup.append(deltaPill(labelTxt, st));
+    }
+
+    if (it.type === 'mes' && it.rating) {
+      const rBadge = document.createElement('span');
+      rBadge.className = 'rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-700 dark:text-amber-400';
+      rBadge.textContent = `⭐ ${it.rating}/5`;
+      titleGroup.append(rBadge);
+    }
+
+    if (it.type === 'mes' && it.rollup && it.rollup.totalWeeks) {
+      const cBadge = document.createElement('span');
+      cBadge.className = 'rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300';
+      cBadge.textContent = `${it.rollup.reflectedCount}/${it.rollup.totalWeeks} sem.`;
+      titleGroup.append(cBadge);
+    }
+
     if (it.isDone) {
       const doneBadge = document.createElement('span');
-      doneBadge.className = 'rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400';
+      doneBadge.className = 'rounded bg-ok-600/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok-700 dark:bg-ok-400/15 dark:text-ok-400';
       doneBadge.textContent = '✓ Concluída';
       titleGroup.append(doneBadge);
     }
@@ -8627,12 +10153,25 @@ function renderEvolutionTimeline() {
     }
     if (kpiRow.children.length || kpiRow.innerHTML) card.append(kpiRow);
 
+    if (it.type === 'mes' && it.summary) {
+      const sBox = document.createElement('div');
+      sBox.className = 'rounded-xl border border-emerald-500/20 bg-emerald-50/30 p-3 text-xs dark:border-emerald-500/20 dark:bg-emerald-950/15';
+      const sLbl = document.createElement('p');
+      sLbl.className = 'text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400';
+      sLbl.textContent = '🧭 Síntese Geral do Mês';
+      const sTxt = document.createElement('p');
+      sTxt.className = 'mt-1 whitespace-pre-wrap leading-relaxed text-zinc-800 dark:text-zinc-200';
+      sTxt.textContent = it.summary;
+      sBox.append(sLbl, sTxt);
+      card.append(sBox);
+    }
+
     const bodyGrid = document.createElement('div');
     bodyGrid.className = 'grid gap-3 sm:grid-cols-2 pt-1';
 
     const wCol = document.createElement('div');
-    wCol.className = 'rounded-xl border border-emerald-500/20 bg-emerald-50/30 p-3 dark:border-emerald-500/20 dark:bg-emerald-950/15';
-    wCol.innerHTML = '<p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> O que eu evoluí</p>';
+    wCol.className = 'rounded-xl border border-ok-600/20 bg-ok-50/30 p-3 dark:border-ok-500/20 dark:bg-ok-950/15';
+    wCol.innerHTML = '<p class="text-[11px] font-bold uppercase tracking-wider text-ok-700 dark:text-ok-400 flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-ok-500"></span> O que eu evoluí</p>';
     if (it.wins) {
       const p = document.createElement('p');
       p.className = 'mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800 dark:text-zinc-200';
@@ -8660,7 +10199,7 @@ function renderEvolutionTimeline() {
     if (it.better) {
       const bRow = document.createElement('div');
       bRow.className = 'rounded-lg border border-zinc-200/60 bg-zinc-50/70 p-2.5 text-xs dark:border-zinc-800 dark:bg-zinc-800/30';
-      bRow.innerHTML = '<p class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">📈 Onde melhorei vs anterior</p>';
+      bRow.innerHTML = '<p class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">⚖️ Onde evoluí vs regredi</p>';
       const p = document.createElement('p');
       p.className = 'mt-1 whitespace-pre-wrap leading-relaxed text-zinc-700 dark:text-zinc-300';
       p.textContent = it.better;
@@ -8683,10 +10222,12 @@ function renderEvolutionTimeline() {
       card.append(impRow);
     }
 
-    if (it.review) {
+    if (it.review || it.nextFocus) {
       const fRow = document.createElement('p');
       fRow.className = 'text-xs text-zinc-500 pt-1 border-t border-zinc-100 dark:border-zinc-800';
-      fRow.innerHTML = `<span class="font-semibold text-zinc-700 dark:text-zinc-300">Foco planejado:</span> ${escapeHtml(it.review)}`;
+      const fLabel = it.type === 'mes' ? 'Grande foco do próximo mês:' : 'Foco planejado:';
+      const fText = it.type === 'mes' ? it.nextFocus : it.review;
+      fRow.innerHTML = `<span class="font-semibold text-zinc-700 dark:text-zinc-300">${fLabel}</span> ${escapeHtml(fText)}`;
       card.append(fRow);
     }
 
@@ -9026,52 +10567,91 @@ function renderEvolutionCharts() {
     });
   }
 
-  // 5. Diagnóstico de Evolução / Antiestagnação Dinâmico
+  // 5. Diagnóstico de Evolução / Regressão Dinâmico (conforme a métrica ativa no gráfico)
   if (insightEl) {
-    const validHabits = items.map((x) => x.habitPct).filter((x) => x != null);
-    if (validHabits.length >= 2) {
-      const mid = Math.floor(validHabits.length / 2);
-      const firstHalf = validHabits.slice(0, mid);
-      const secondHalf = validHabits.slice(mid);
-      const avg1 = Math.round(firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length);
-      const avg2 = Math.round(secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length);
-      const diff = avg2 - avg1;
+    const pickSeries = () => {
+      if (evoChartMetric === 'study') {
+        const vals = items.map((x) => x.studyHours).filter((v) => v != null && v > 0);
+        return {
+          name: 'Horas de estudo',
+          vals,
+          fmt: (v) => `${v.toFixed(1)}h`,
+          fmtDiff: (d) => `${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(1)}h`,
+          threshold: 0.5,
+        };
+      }
+      if (evoChartMetric === 'sleep') {
+        const vals = items.map((x) => x.sleepHours).filter((v) => v != null);
+        return {
+          name: 'Sono médio',
+          vals,
+          fmt: (v) => fmtSleep(v),
+          fmtDiff: (d) => `${d > 0 ? '+' : '−'}${fmtMin(Math.round(Math.abs(d) * 60))}`,
+          threshold: 0.25,
+        };
+      }
+      const vals = items.map((x) => x.habitPct).filter((v) => v != null);
+      return {
+        name: 'Adesão a hábitos',
+        vals,
+        fmt: (v) => `${Math.round(v)}%`,
+        fmtDiff: (d) => `${d > 0 ? '+' : ''}${Math.round(d)} pts`,
+        threshold: 2,
+      };
+    };
 
-      if (diff > 2) {
+    const sInfo = pickSeries();
+    if (sInfo.vals.length >= 2) {
+      const mid = Math.floor(sInfo.vals.length / 2);
+      const firstHalf = sInfo.vals.slice(0, mid);
+      const secondHalf = sInfo.vals.slice(mid);
+      const avg1 = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+      const avg2 = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+      const diff = avg2 - avg1;
+      const prevVal = sInfo.vals[sInfo.vals.length - 2];
+      const lastVal = sInfo.vals[sInfo.vals.length - 1];
+      const stepDiff = lastVal - prevVal;
+      const stepText = `Último vs anterior: <strong>${sInfo.fmt(prevVal)} → ${sInfo.fmt(lastVal)}</strong> (${sInfo.fmtDiff(stepDiff)}).`;
+
+      if (diff > sInfo.threshold) {
+        insightEl.className = 'rounded-xl border border-ok-600/25 bg-ok-50/40 p-3.5 text-xs leading-relaxed text-zinc-700 dark:border-ok-500/25 dark:bg-ok-950/20 dark:text-zinc-300';
         insightEl.innerHTML = `
-          <p class="font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-            <span class="text-base">📈</span> Evolução Comprovada: Subida de +${diff} pontos percentuais!
+          <p class="font-semibold text-ok-700 dark:text-ok-400 flex items-center gap-1.5">
+            <span>▲</span> ${sInfo.name}: Evolução Comprovada (${sInfo.fmtDiff(diff)} na tendência)
           </p>
-          <p class="mt-1 text-zinc-700 dark:text-zinc-300">
-            Seus dados comprovam que sua consistência recente (<strong>${avg2}%</strong> de adesão) superou o início do período analisado (<strong>${avg1}%</strong>). Você <strong>não está estagnado</strong>: sua rotina está gerando tração real e hábitos mais sólidos. Continue aplicando o plano de ação acima!
+          <p class="mt-1">
+            A segunda metade do período (<strong>${sInfo.fmt(avg2)}</strong>) superou a primeira metade (<strong>${sInfo.fmt(avg1)}</strong>). ${stepText}
           </p>
         `;
-      } else if (diff >= -2) {
+      } else if (diff >= -sInfo.threshold) {
+        insightEl.className = 'rounded-xl border border-indigo-500/20 bg-indigo-50/35 p-3.5 text-xs leading-relaxed text-zinc-700 dark:border-indigo-500/20 dark:bg-indigo-950/20 dark:text-zinc-300';
         insightEl.innerHTML = `
           <p class="font-semibold text-indigo-800 dark:text-indigo-300 flex items-center gap-1.5">
-            <span class="text-base">🛡️</span> Consistência Sólida: Ritmo estável em ${avg2}% de execução.
+            <span>●</span> ${sInfo.name}: Ritmo Estável (${sInfo.fmt(avg1)} → ${sInfo.fmt(avg2)})
           </p>
-          <p class="mt-1 text-zinc-700 dark:text-zinc-300">
-            A impressão de estagnação muitas vezes surge quando a rotina se torna natural, mas <strong>sustentar a consistência ao longo do tempo é a maior vitória</strong>. Sua taxa manteve-se firme (${avg1}% → ${avg2}%). Para atingir o próximo patamar, foque em 1 meta chave no plano de ação acima.
+          <p class="mt-1">
+            Consistência sustentada ao longo da janela analisada. ${stepText}
           </p>
         `;
       } else {
+        insightEl.className = 'rounded-xl border border-rose-500/25 bg-rose-50/40 p-3.5 text-xs leading-relaxed text-zinc-700 dark:border-rose-500/25 dark:bg-rose-950/20 dark:text-zinc-300';
         insightEl.innerHTML = `
-          <p class="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-            <span class="text-base">⚠️</span> Ponto de Atenção Identificado: Oscilação de ${avg1}% para ${avg2}%.
+          <p class="font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+            <span>▼</span> ${sInfo.name}: Regressão Identificada (${sInfo.fmtDiff(diff)})
           </p>
-          <p class="mt-1 text-zinc-700 dark:text-zinc-300">
-            Houve uma leve queda na regularidade nos períodos recentes. Isso não anula seu progresso anterior nem significa estagnação permanente: é apenas um sinal para calibrar a rotina. Use as anotações do card acima ("O que eu pequei") para simplificar as metas e recuperar a tração.
+          <p class="mt-1">
+            A média caiu de <strong>${sInfo.fmt(avg1)}</strong> para <strong>${sInfo.fmt(avg2)}</strong>. ${stepText} Use a seção “O que eu pequei” e o plano de ação acima para reverter a queda.
           </p>
         `;
       }
     } else {
+      insightEl.className = 'rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5 text-xs leading-relaxed text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/30 dark:text-zinc-300';
       insightEl.innerHTML = `
         <p class="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
           <span>📊</span> Gráficos de Evolução Ativados
         </p>
         <p class="mt-1 text-zinc-600 dark:text-zinc-400">
-          Conforme você registrar seus hábitos diários e reflexões periódicas, os gráficos traçarão sua linha de tendência e diagnósticos comparativos automáticos para comprovar sua evolução no tempo.
+          Conforme você registrar mais períodos em ${sInfo.name.toLowerCase()}, os gráficos calcularão automaticamente se houve evolução ou regressão.
         </p>
       `;
     }
@@ -10754,10 +12334,10 @@ if (!REDUCED_MOTION && 'IntersectionObserver' in window) {
         cardObserver.unobserve(entry.target);
       }
     });
-  }, { rootMargin: '0px 0px -24px 0px', threshold: 0.04 });
+  }, { rootMargin: '100px 0px 100px 0px', threshold: 0 });
   $$('.card').forEach((card) => {
     const r = card.getBoundingClientRect();
-    if (r.top > window.innerHeight * 0.92) {
+    if (r.top > window.innerHeight * 0.92 && r.height > 0 && r.height < window.innerHeight * 0.9) {
       card.classList.add('reveal-ready');
       cardObserver.observe(card);
     }
